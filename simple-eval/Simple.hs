@@ -8,63 +8,53 @@ import Control.Monad.Trans
 import Control.Monad.IO.Class
 import Data.Monoid
 
-import Data.Text.Lazy (pack)
+import Data.Text.Lazy (pack, Text(..))
+import Text.Blaze.Html5 ((!), Html)
+import Text.Blaze.Html5.Attributes
+import qualified Text.Blaze.Html5 as H
+import qualified Text.Blaze.Html5.Attributes as HA
+import Text.Blaze.Html.Renderer.Text
 
 import qualified Diagrams.Prelude as D
 import Diagrams.Backend.SVG
 
 import Mueval.Interpreter
-import Mueval.Parallel
+import Mueval.Parallel hiding (watchDog)
 import qualified Mueval.ArgsParse as MArgs
 import Mueval.Context
 import qualified Language.Haskell.Interpreter as I
 import Control.Concurrent.MVar (putMVar, MVar)
-import Control.Concurrent (forkIO, myThreadId, ThreadId)
+import Control.Concurrent (forkIO, myThreadId, ThreadId, killThread, threadDelay, throwTo)
 
--- import Interp
+import Display (DisplayResult(..), DR(..))
+import Interp
 
-diagramModules :: [String]
-diagramModules = [ "Diagrams.Prelude"
-                 , "Diagrams.Core" ]
+type InterpResult = Either I.InterpreterError DisplayResult
 
-options :: MArgs.Options
-options = MArgs.Options { MArgs.expression = ""
-                        , MArgs.modules =
-                          Just $ defaultModules ++ diagramModules
-                        , MArgs.timeLimit = 1
-                        , MArgs.user = ""
-                        , MArgs.loadFile = ""
-                        , MArgs.printType = False
-                        , MArgs.extensions = False
-                        , MArgs.namedExtensions = []
-                        , MArgs.noImports = False
-                        , MArgs.rLimits = False
-                        , MArgs.packageTrust = False
-                        , MArgs.trustedPackages = defaultPackages
-                        , MArgs.help = False }
+formWithCode :: Text -> Html
+formWithCode code = do
+  H.form ! action "/diagrams" ! method "POST" $ do
+    H.p "Input your code:"
+    H.br
+    H.textarea ! rows "20" ! cols "80" ! name "code" $ H.toHtml code
+    H.br
+    H.input ! type_ "Submit" ! value "Eval"
 
-
-type InterpResult = Either I.InterpreterError (String,String,String)
 
 runInterp :: MArgs.Options -> MVar InterpResult -> IO ThreadId
 runInterp opts mvar = do
   mainId <- myThreadId
-  watchDog (MArgs.timeLimit opts) mainId
   forkIO $ do
-    r <- liftIO (I.runInterpreter (interpreter opts))
+    r <- liftIO (I.runInterpreter (setInterp opts))
     putMVar mvar r
   
 serve :: ScottyM ()
 serve = do
   middleware logStdoutDev
 
-  get "/" $ do
-    html $ mconcat [ "<form method=POST action=\"diagrams\">"
-                   , "Input your code: <br />"
-                   , "<textarea name=\"code\"></textarea>"
-                   , "<br />"
-                   , "<input type=submit value=\"Eval\">"
-                   , "</form>"]
+  get "/" $ html . renderHtml . H.docTypeHtml $ do
+    H.head $ H.title "Evaluate"
+    H.body $ formWithCode ""
   
   post "/diagrams" $ do
     code <- param "code"
@@ -72,8 +62,14 @@ serve = do
     r <- liftIO $ block runInterp opts
     case r of
       Left err -> text $ pack (show err)
-      Right (e,et,val) -> text $ pack val
-
+      Right (DisplayResult drs) -> html . renderHtml . H.docTypeHtml $ do
+        H.head $ H.title "Evaluate"
+        H.body $ do
+          formWithCode (pack code)
+          H.br
+          H.div ! style "background-color:grey; padding:12px;" $ do
+            mconcat $ map (H.preEscapedToHtml . result) drs
+      
   
 staticServe :: ScottyM ()
 staticServe = do
