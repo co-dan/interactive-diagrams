@@ -1,0 +1,161 @@
+/* original stylesheet from www.mathb.in */
+
+body {
+    background: #ffffff;
+    margin-left: 1%;
+    margin-right: 1%;
+    /* margin: 0; */
+    /* padding: 0; */
+    /* font-family: helvetica, arial, "trebuchet ms", sans-serif; */
+    font-size: 16px;
+    line-height: 24px;
+    color: #333333;
+}
+
+pre, code {
+    color: #000066;
+    font-size: 15px;
+    line-height: 20px;
+}
+
+img {
+    border: 0;
+}
+
+.noscript {
+    text-align: center;
+    border: 3px double red;
+    color: red;
+    margin-bottom: 1em;
+    font-size: 24px;
+}
+
+
+a:link {color: #0000e0; text-decoration: none}
+a:visited {color: #0000e0; text-decoration: none}
+a:hover {color: #0000ff; text-decoration: underline}
+a:active {color: #0000ff; text-decoration: none}
+
+#main {
+    margin: 2em 2%;
+    overflow: hidden;
+    min-width: 600px;
+}
+
+.input {
+    width: 40%;
+    min-width: 250px;
+    float: left;
+
+    display: inline;       /* fix for doubling margin in IE */
+    word-wrap: break-word; /* long text breaking sidebar float in IE */
+    overflow: hidden; /* long non-text content breaking IE sidebar float */
+}
+
+.output {
+    width: 57%;
+    min-width: 250px;
+    float: right;
+
+    display: inline;       /* fix for doubling margin in IE */
+    word-wrap: break-word; /* long text breaking sidebar float in IE */
+    overflow: hidden;      /* long non-text content breaking IE sidebar float */
+}
+
+/* Preview content style */
+#preview {
+    min-height: 450px;
+    margin: 1em 1em 2em 1em;
+}
+
+#form {
+    background: #f0f0f0;
+    border: 1px solid #bbbbbb;
+    padding: 10px;
+}
+
+#sheet {
+    border: 1px solid gray;
+    overflow: auto;
+    position: relative;
+}
+
+.input form label {
+    display: block;
+    margin-top: 1em;
+}
+
+.input form label:first-child {
+    margin-top: 0;
+}
+
+.input form input, .input form textarea {
+    width: 96%;
+}
+
+.input form textarea {
+    height: 275px;
+}
+
+.input form input#submit {
+    width: 220px;
+    margin-left: auto;
+    margin-right: auto;
+    display: block;
+    margin-top: 1em;
+}
+
+form .errors {
+    margin-top: 1em;
+    border: 1px double red;
+    width: 95%;
+    color: red;
+}
+
+form .errors ul {
+    margin-top: 5px;
+    margin-bottom: 5px;
+}
+
+.output #permaurl {
+    margin-top: 1em;
+    text-align: center;
+}
+
+.output #permaurl label {
+}
+
+.output #permaurl input {
+    width: 150px;
+}
+
+label {
+    font-weight: 600;
+}
+
+textarea, input {
+    padding: 5px;
+}
+
+#preview h1:first-child, #preview h2:first-child,
+#preview h3:first-child, #preview h4:first-child,
+#preview h5:first-child, #preview h6:first-child,
+#preview p:first-child {
+    margin-top: 0;
+}
+
+#preview h1, #preview h2,
+#preview h3, #preview h4,
+#preview h5, #preview h6 {
+    margin-top: 1.5em;
+}
+
+#preview .title {
+    text-align: center;
+}
+
+#preview .name {
+    margin-top: 1em;
+    text-align: center;
+    font-weight: 400;
+}
