@@ -31,14 +31,26 @@ import Interp
 
 type InterpResult = Either I.InterpreterError DisplayResult
 
+mainPage :: String -> Html -> Html
+mainPage title content = H.docTypeHtml $ do
+  H.head $ do
+    H.title $ "Evaluate -> " <> (H.toHtml title)
+    H.link ! rel "stylesheet" ! type_ "text/css" ! href "/style.css"
+  H.body $ do
+    H.h1 (H.toHtml title)
+    H.div ! HA.id "main" $ content
+    
+
 formWithCode :: Text -> Html
 formWithCode code = do
-  H.form ! action "/diagrams" ! method "POST" $ do
-    H.p "Input your code:"
-    H.br
-    H.textarea ! rows "20" ! cols "80" ! name "code" $ H.toHtml code
-    H.br
-    H.input ! type_ "Submit" ! value "Eval"
+  H.div ! class_ "input" $
+    H.div ! HA.id "form" $
+      H.form ! action "/diagrams" ! method "POST" $ do
+        H.p "Input your code:"
+        H.br
+        H.textarea ! rows "20" ! cols "80" ! name "code" $ H.toHtml code
+        H.br
+        H.input ! type_ "Submit" ! value "Eval"
 
 
 runInterp :: MArgs.Options -> MVar InterpResult -> IO ThreadId
@@ -52,9 +64,7 @@ serve :: ScottyM ()
 serve = do
   middleware logStdoutDev
 
-  get "/" $ html . renderHtml . H.docTypeHtml $ do
-    H.head $ H.title "Evaluate"
-    H.body $ formWithCode ""
+  get "/" $ html . renderHtml $ mainPage "main" (formWithCode "")
   
   post "/diagrams" $ do
     code <- param "code"
@@ -62,13 +72,12 @@ serve = do
     r <- liftIO $ block runInterp opts
     case r of
       Left err -> text $ pack (show err)
-      Right (DisplayResult drs) -> html . renderHtml . H.docTypeHtml $ do
-        H.head $ H.title "Evaluate"
-        H.body $ do
+      Right (DisplayResult drs) -> html . renderHtml $ 
+        mainPage "result" $ do
           formWithCode (pack code)
-          H.br
-          H.div ! style "background-color:grey; padding:12px;" $ do
-            mconcat $ map (H.preEscapedToHtml . result) drs
+          H.div ! class_ "output" $
+            H.div ! HA.id "sheet" $ do
+              mconcat $ map (H.preEscapedToHtml . result) drs
       
   
 staticServe :: ScottyM ()
