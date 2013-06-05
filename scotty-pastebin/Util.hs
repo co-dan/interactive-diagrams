@@ -17,3 +17,8 @@ runWithSql = runResourceT
 getDR :: DisplayResult -> [DR]
 getDR (DisplayResult drs) = drs
        
+intToKey :: Int -> Key a
+intToKey = Key . PersistInt64 . fromIntegral
+
+keyToInt :: Key a -> Int
+keyToInt (Key (PersistInt64 i)) = fromIntegral (toInteger i)
