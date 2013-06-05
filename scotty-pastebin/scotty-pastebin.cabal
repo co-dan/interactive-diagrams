@@ -32,4 +32,5 @@ executable scotty-pastebin
                        wai-middleware-static,
                        display,
                        monad-logger >=0.2,
-                       resourcet
+                       resourcet,
+                       errors, either ==3.4

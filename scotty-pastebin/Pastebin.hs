@@ -14,6 +14,9 @@ import Control.Monad.Trans.Resource
 import Data.Monoid
 import Data.Foldable (foldMap)
 
+import Control.Monad.Trans.Maybe
+import Control.Error.Util
+
 import Text.Read (readMaybe)
 import Data.Text.Lazy (pack, Text(..))
 import Text.Blaze.Html5 ((!), Html)
@@ -75,24 +78,19 @@ renderPaste (p@Paste{..}) = html . renderHtml . mainPage "Paste" $ do
     H.div ! HA.id "sheet" $ do
       foldMap (H.preEscapedToHtml . Display.result) (getDR pasteResult)
 
--- | TODO: Handle various `raises' using 'Control.Error' from 'errors'
-getPaste :: ScottyM ()
-getPaste = do
-  S.get "/get/:id" $ do
-    pid <- readMaybe <$> param "id"
-    case pid of
-      Nothing -> raise "Error: invalid id"
-      Just pid -> do
-        res <- liftIO $ runWithSql $ P.get (Key . PersistInt64 $ pid)
-        case res of
-          Nothing -> raise "Paste not found"
-          Just p -> renderPaste p
 
+
+-- | TODO: Handle various `raises' using 'Control.Error' from 'errors'
+getPaste :: MaybeT ActionM Paste
+getPaste = do 
+  pid <- hoistMaybe . readMaybe =<< lift (param "id")
+  paste <- liftIO $ runWithSql $ P.get (Key . PersistInt64 $ pid)
+  hoistMaybe paste
 
 main :: IO ()
 main = do
   runWithSql (runMigration migrateAll)
   scotty 3000 $ do
     middleware logStdoutDev
-    getPaste
+    S.get "/get/:id" $ maybeT (raise "Invalid id") renderPaste getPaste
 
