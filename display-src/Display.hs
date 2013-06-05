@@ -27,14 +27,15 @@ import qualified Text.Blaze.Html5              as B
 import           Prelude hiding (span)
 import           Text.Blaze.Svg.Renderer.Utf8
 
-data ClientType = Html | Svg | Text deriving (Eq, Show, Enum)
+data ClientType = Html | Svg | Text deriving (Eq, Show, Enum, Read)
 
-newtype DisplayResult = DisplayResult [DR] deriving (Eq, Monoid, Typeable)
+newtype DisplayResult = DisplayResult [DR]
+                      deriving (Eq, Monoid, Typeable, Show, Read)
 
 data DR = DR {
       clientType :: ClientType, -- "SVG" "IMG" etc, changes how the browser-side javascript handles this result.
       result :: TL.Text            -- actual result data
-      } deriving (Eq, Show, Typeable)
+      } deriving (Eq, Show, Typeable, Read)
 
 text :: TL.Text -> DisplayResult
 text x = DisplayResult [ DR Text x ]
