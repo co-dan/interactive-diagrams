@@ -6,11 +6,7 @@ import Web.Scotty as S
 import Network.Wai.Middleware.RequestLogger
 import Network.Wai.Middleware.Static
 
-import Control.Applicative
 import Control.Monad.Trans
-import Control.Monad.IO.Class
-import Control.Monad.Logger
-import Control.Monad.Trans.Resource
 import Data.Monoid
 import Data.Foldable (foldMap)
 
@@ -18,7 +14,7 @@ import Control.Monad.Trans.Maybe
 import Control.Error.Util
 
 import Text.Read (readMaybe)
-import Data.Text.Lazy (pack, Text(..))
+import Data.Text.Lazy (pack, Text)
 import Text.Blaze.Html5 ((!), Html)
 import Text.Blaze.Html5.Attributes
 import qualified Text.Blaze.Html5 as H
@@ -31,6 +27,7 @@ import Database.Persist.Sqlite as P
 
 import Display hiding (text,html)
 import DisplayPersist
+import Util (runWithSql, getDR)
 
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistUpperCase|
 Paste
@@ -38,6 +35,8 @@ Paste
     result DisplayResult
     deriving Show
 |]
+
+-- | Rendering and views
 
 mainPage :: String -> Html -> Html
 mainPage title content = H.docTypeHtml $ do
@@ -60,27 +59,16 @@ formWithCode code = do
         H.br
         H.input ! type_ "Submit" ! value "Eval"
 
--- | TODO: Move to Util
-        
-runWithSql :: SqlPersistT (LoggingT (ResourceT IO)) a -> IO a
-runWithSql = runResourceT
-           . runStdoutLoggingT
-           . withSqliteConn "./pastes.db"
-           . runSqlConn
-
-getDR :: DisplayResult -> [DR]
-getDR (DisplayResult drs) = drs
 
 renderPaste :: Paste -> ActionM ()
-renderPaste (p@Paste{..}) = html . renderHtml . mainPage "Paste" $ do
+renderPaste Paste{..} = html . renderHtml . mainPage "Paste" $ do
   formWithCode (pack pasteContent)
   H.div ! class_ "output" $
     H.div ! HA.id "sheet" $ do
       foldMap (H.preEscapedToHtml . Display.result) (getDR pasteResult)
 
+-- | Database access and logic
 
-
--- | TODO: Handle various `raises' using 'Control.Error' from 'errors'
 getPaste :: MaybeT ActionM Paste
 getPaste = do 
   pid <- hoistMaybe . readMaybe =<< lift (param "id")
@@ -92,5 +80,6 @@ main = do
   runWithSql (runMigration migrateAll)
   scotty 3000 $ do
     middleware logStdoutDev
+    middleware $ staticPolicy (addBase "../common/static")
     S.get "/get/:id" $ maybeT (raise "Invalid id") renderPaste getPaste
 
