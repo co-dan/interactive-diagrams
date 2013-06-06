@@ -7,7 +7,7 @@ import Network.Wai.Middleware.RequestLogger
 import Network.Wai.Middleware.Static
 import Network.HTTP.Types
 
-import Control.Monad (forM_)
+import Control.Monad (forM_, guard)
 import Control.Monad.Trans
 import Data.Monoid
 import Data.Foldable (foldMap)
@@ -54,7 +54,7 @@ formWithCode :: Text -> Html
 formWithCode code = do
   H.div ! class_ "input" $
     H.div ! HA.id "form" $
-      H.form ! action "/diagrams" ! method "POST" $ do
+      H.form ! action "/new" ! method "POST" $ do
         H.p "Input your code:"
         H.br
         H.textarea ! rows "20" ! cols "80" ! name "code" $ H.toHtml code
@@ -81,14 +81,26 @@ getPaste = do
 listPastes :: ActionM ()
 listPastes = do
   pastes <- liftIO $ runWithSql $ 
-    selectList [] [LimitTo 20]
+    selectList [] [LimitTo 20, Desc PasteId]
   html . renderHtml . mainPage "Paste" $ do
     formWithCode ""
     H.hr
     forM_ pastes $ \(Entity k' Paste{..}) -> do
       let k = keyToInt k'
-      H.a ! href (H.toValue ("/get/" ++ (show k))) $ H.toHtml (show k)
+      H.a ! href (H.toValue ("/get/" ++ (show k))) $
+        H.toHtml $ "Paste id " ++ (show k)
       H.br
+
+newPaste :: MaybeT ActionM Int
+newPaste = do
+  code <- lift (param "code")
+  guard $ not . null $ code
+  pid <- liftIO $ runWithSql $ insert $
+         Paste code (DisplayResult [DR Text (pack code)])
+  return (keyToInt pid)
+
+redirPaste :: Int -> ActionM ()
+redirPaste i = redirect $ pack ("/get/" ++ show i)
 
 page404 :: ActionM ()
 page404 = do
@@ -103,3 +115,4 @@ main = do
     middleware $ staticPolicy (addBase "../common/static")
     S.get "/get/:id" $ maybeT page404 renderPaste getPaste
     S.get "/" listPastes
+    S.post "/new" $ maybeT (raise "Paste error") redirPaste newPaste
