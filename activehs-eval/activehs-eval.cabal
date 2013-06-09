@@ -17,6 +17,6 @@ cabal-version:       >=1.8
 executable activehs-eval
   main-is:             Main.hs
   -- other-modules:       
-  build-depends:       base ==4.6.*, text ==0.11.*, mtl ==2.1.*, transformers ==0.3.*,
+  build-depends:       base >=4.6, text ==0.11.*, mtl ==2.1.*, transformers ==0.3.*,
                        display, hint, scotty, blaze-html, wai-extra, wai-middleware-static, unix
   hs-source-dirs:      src

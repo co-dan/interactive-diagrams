@@ -17,6 +17,6 @@ cabal-version:       >=1.8
 executable simple-eval
   main-is:             CommandLine.hs
   -- other-modules:       
-  build-depends:       base ==4.6.*, text ==0.11.*, unix ==2.6.*, mtl ==2.1.*,
+  build-depends:       base >=4.6, text ==0.11.*, unix ==2.6.*, mtl ==2.1.*,
                        display, hint, mueval, scotty, blaze-html, wai-extra, wai-middleware-static, unix
   hs-source-dirs:      src
