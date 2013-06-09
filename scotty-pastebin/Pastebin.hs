@@ -73,7 +73,8 @@ renderPaste Paste{..} = html . renderHtml . mainPage "Paste" $ do
 
 getPaste :: MaybeT ActionM Paste
 getPaste = do 
-  pid <- hoistMaybe . readMaybe =<< lift (param "id")
+  -- pid <- hoistMaybe . readMaybe =<< lift (param "id")
+  pid <- lift $ param "id"
   paste <- liftIO $ runWithSql $ P.get (intToKey pid)
   hoistMaybe paste
 
