@@ -31,6 +31,13 @@ executable scotty-pastebin
                        wai-extra,
                        wai-middleware-static,
                        display,
+                       diagrams,
                        monad-logger >=0.2,
                        resourcet,
-                       errors, either ==3.4
+                       errors, either ==3.4,
+                       unix,
+                       filepath,
+                       hashable,
+                       time,
+                       ghc-paths,
+                       ghc >= 7.6

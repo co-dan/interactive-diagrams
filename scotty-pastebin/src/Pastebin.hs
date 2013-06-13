@@ -14,9 +14,12 @@ import Data.Foldable (foldMap)
 
 import Control.Monad.Trans.Maybe
 import Control.Error.Util
+import System.FilePath.Posix
 
 import Text.Read (readMaybe)
 import Data.Text.Lazy (pack, Text)
+import qualified Data.Text.Lazy as T
+import qualified Data.Text.Lazy.IO as T
 import Text.Blaze.Html5 ((!), Html)
 import Text.Blaze.Html5.Attributes
 import qualified Text.Blaze.Html5 as H
@@ -29,11 +32,14 @@ import Database.Persist.Sqlite as P
 
 import Display hiding (text,html)
 import DisplayPersist
-import Util (runWithSql, getDR, intToKey, keyToInt)
-
+import Util (runWithSql, getDR, intToKey,
+             keyToInt, hash, getPastesDir)
+import Eval
+import SignalHandlers
+  
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistUpperCase|
 Paste
-    content String
+    content Text
     result DisplayResult
     deriving Show
 |]
@@ -64,7 +70,7 @@ formWithCode code = do
 
 renderPaste :: Paste -> ActionM ()
 renderPaste Paste{..} = html . renderHtml . mainPage "Paste" $ do
-  formWithCode (pack pasteContent)
+  formWithCode pasteContent
   H.div ! class_ "output" $
     H.div ! HA.id "sheet" $ do
       foldMap (H.preEscapedToHtml . Display.result) (getDR pasteResult)
@@ -95,11 +101,22 @@ listPastes = do
 newPaste :: MaybeT ActionM Int
 newPaste = do
   code <- lift (param "code")
-  guard $ not . null $ code
-  pid <- liftIO $ runWithSql $ insert $
-         Paste code (DisplayResult [DR Text (pack code)])
+  guard $ not . T.null $ code
+  pid <- liftIO (compilePaste code)
   return (keyToInt pid)
 
+compilePaste :: Text -> IO (Key Paste)
+compilePaste code = do
+  fname <- hash code
+  let fpath = getPastesDir </> show fname ++ ".hs"
+  T.writeFile fpath code
+  res <- run (compileFile fpath)
+  restoreHandlers
+  -- print res
+  -- return (intToKey 1)
+  runWithSql $ insert $
+    Paste code (display res)
+  
 redirPaste :: Int -> ActionM ()
 redirPaste i = redirect $ pack ("/get/" ++ show i)
 
