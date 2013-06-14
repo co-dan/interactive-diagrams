@@ -31,7 +31,7 @@ executable scotty-pastebin
                        wai-extra,
                        wai-middleware-static,
                        display,
-                       diagrams,
+--                       diagrams,
                        monad-logger >=0.2,
                        resourcet,
                        errors, either ==3.4,
