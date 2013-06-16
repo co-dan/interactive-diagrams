@@ -16,12 +16,12 @@ import Control.Monad.Trans.Maybe
 import Control.Error.Util
 import System.FilePath.Posix
 
-import Text.Read (readMaybe)
 import Data.Text.Lazy (pack, Text)
 import qualified Data.Text.Lazy as T
 import qualified Data.Text.Lazy.IO as T
 import Text.Blaze.Html5 ((!), Html)
-import Text.Blaze.Html5.Attributes
+import Text.Blaze.Html5.Attributes (type_, class_, href, rel, action, method,
+                                    name, value, cols, rows)
 import qualified Text.Blaze.Html5 as H
 import qualified Text.Blaze.Html5.Attributes as HA
 import Text.Blaze.Html.Renderer.Text
@@ -35,7 +35,6 @@ import DisplayPersist
 import Util (runWithSql, getDR, intToKey,
              keyToInt, hash, getPastesDir)
 import Eval
-import SignalHandlers
   
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistUpperCase|
 Paste
@@ -102,20 +101,22 @@ newPaste :: MaybeT ActionM Int
 newPaste = do
   code <- lift (param "code")
   guard $ not . T.null $ code
-  pid <- liftIO (compilePaste code)
+  pid <- lift (compilePaste code)
   return (keyToInt pid)
 
-compilePaste :: Text -> IO (Key Paste)
+compilePaste :: Text -> ActionM (Key Paste)
 compilePaste code = do
-  fname <- hash code
+  fname <- liftIO $ hash code
   let fpath = getPastesDir </> show fname ++ ".hs"
-  T.writeFile fpath code
-  res <- run (compileFile fpath)
-  restoreHandlers
+  liftIO $ T.writeFile fpath code
+  res <- liftIO $ run (compileFile fpath)
+  case res of
+    Left err -> raise (pack err)
+    Right r -> liftIO . runWithSql $ insert $
+               Paste code (display r)
+
   -- print res
   -- return (intToKey 1)
-  runWithSql $ insert $
-    Paste code (display res)
   
 redirPaste :: Int -> ActionM ()
 redirPaste i = redirect $ pack ("/get/" ++ show i)
