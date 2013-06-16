@@ -17,26 +17,26 @@ import Data.IORef
 
 import Display
 import SignalHandlers
+import EvalError
 
 import Control.Monad
 
-data LoadingException = LoadingException
-                      deriving (Typeable)
-instance Show LoadingException where
-  show LoadingException = "Cannot load the targets"
-instance Exception LoadingException
-
 -- LogAction == DynFlags -> Severity -> SrcSpan -> PprStyle -> MsgDoc -> IO ()
-logHandler :: IORef [String] -> LogAction
+logHandler :: IORef [EvalError] -> LogAction
 logHandler ref dflags severity srcSpan style msg =
-  case severity of
-    SevError ->   modifyIORef' ref (++ [printDoc])
-    SevFatal ->   modifyIORef' ref (++ [printDoc])
-    _ -> return ()
-  where cntx = initSDocContext dflags style
-        locMsg = mkLocMessage severity srcSpan msg
-        printDoc = show (runSDoc locMsg cntx)
-         
+  case srcSpan of
+    RealSrcSpan sp -> modifyIORef' ref (++ [err sp])
+    UnhelpfulSpan _ -> return ()
+  -- case severity of
+  --   SevError ->   modifyIORef' ref (++ [printDoc])
+  --   SevFatal ->   modifyIORef' ref (++ [printDoc])
+  --   _ -> return ()
+  where err sp = EvalError severity msg' sp
+        cntx = initSDocContext dflags style
+        msg' = show (runSDoc msg cntx)
+        -- locMsg = mkLocMessage severity srcSpan msg
+        -- printDoc = show (runSDoc locMsg cntx)
+
 handleException :: (ExceptionMonad m, MonadIO m)
                    => m a -> m (Either String a)
 handleException m =
@@ -50,8 +50,7 @@ run :: Ghc DisplayResult -> IO (Either String DisplayResult)
 run m = do
   ref <- newIORef []
   r <- handleException $ run' (initGhc ref >> m)
-  logMsg <- unlines <$> readIORef ref
-  -- liftIO $ putStrLn log
+  logMsg <- unlines . map show <$> readIORef ref
   case r of
     Left s -> return $ Left $ s ++ "\n" ++ logMsg
     _ -> return r
@@ -59,7 +58,7 @@ run m = do
 run' :: Display a => Ghc a -> IO a
 run' m = runGhc (Just libdir) m
 
-initGhc :: IORef [String] -> Ghc ()
+initGhc :: IORef [EvalError] -> Ghc ()
 initGhc ref = do
   dfs <- getSessionDynFlags
   setSessionDynFlags $ dfs { hscTarget = HscInterpreted
@@ -88,3 +87,6 @@ output a = do
   let style = defaultUserStyle
       cntx = initSDocContext dfs style
   liftIO $ print $ runSDoc (ppr a) cntx
+
+
+test2 = run (compileFile "./test/file1.hs")

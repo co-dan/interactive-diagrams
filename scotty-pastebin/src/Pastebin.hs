@@ -7,10 +7,12 @@ import Network.Wai.Middleware.RequestLogger
 import Network.Wai.Middleware.Static
 import Network.HTTP.Types
 
-import Control.Monad (forM_, guard)
+import Control.Monad 
 import Control.Monad.Trans
+import Control.Monad.Trans.Either
 import Data.Monoid
 import Data.Foldable (foldMap)
+import Data.EitherR
 
 import Control.Monad.Trans.Maybe
 import Control.Error.Util
@@ -97,26 +99,32 @@ listPastes = do
         H.toHtml $ "Paste id " ++ (show k)
       H.br
 
-newPaste :: MaybeT ActionM Int
+errPage :: Text -> Text -> ActionM ()
+errPage code msg = do
+  html . renderHtml . mainPage "Error" $ do
+    formWithCode code
+    H.hr
+    H.toHtml msg
+  
+newPaste :: EitherT (Text,Text) ActionM Int
 newPaste = do
   code <- lift (param "code")
-  guard $ not . T.null $ code
-  pid <- lift (compilePaste code)
+  when (T.null code) $ throwT (code,"Empty input")
+  pid <- compilePaste code
+         `catchT` \e -> throwT (code, e)
   return (keyToInt pid)
 
-compilePaste :: Text -> ActionM (Key Paste)
+compilePaste :: Text -> EitherT Text ActionM (Key Paste)
 compilePaste code = do
   fname <- liftIO $ hash code
   let fpath = getPastesDir </> show fname ++ ".hs"
   liftIO $ T.writeFile fpath code
   res <- liftIO $ run (compileFile fpath)
   case res of
-    Left err -> raise (pack err)
+    Left err -> throwT (pack err)
     Right r -> liftIO . runWithSql $ insert $
                Paste code (display r)
 
-  -- print res
-  -- return (intToKey 1)
   
 redirPaste :: Int -> ActionM ()
 redirPaste i = redirect $ pack ("/get/" ++ show i)
@@ -134,4 +142,4 @@ main = do
     middleware $ staticPolicy (addBase "../common/static")
     S.get "/get/:id" $ maybeT page404 renderPaste getPaste
     S.get "/" listPastes
-    S.post "/new" $ maybeT (raise "Paste error") redirPaste newPaste
+    S.post "/new" $ eitherT (uncurry errPage) redirPaste newPaste
