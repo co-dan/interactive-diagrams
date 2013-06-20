@@ -1,6 +1,5 @@
 {-# LANGUAGE ScopedTypeVariables, RankNTypes, DeriveDataTypeable #-}
---module Eval where
-module Main where
+module Eval where
 
 import GHC
 import GHC.Paths
@@ -17,7 +16,9 @@ import Data.Dynamic
 import Data.IORef
 import System.Posix.Process
 import System.Posix.Signals
+import System.Posix.Types (ProcessID)
 import Control.Concurrent
+import Control.Concurrent.Async (race)
 
 import Display
 import SignalHandlers
@@ -92,24 +93,40 @@ output a = do
       cntx = initSDocContext dfs style
   liftIO $ print $ runSDoc (ppr a) cntx
 
-loadFile :: FilePath -> IO (Either String String)
+
+runToFile :: FilePath -> Ghc ()
+runToFile f = do
+  dr <- compileFile f
+  liftIO $ writeFile (f ++ ".res") (show dr)
+  return ()
+  
+processTimeout :: ProcessID -> IO ()
+processTimeout pid = do
+  threadDelay (3 * 1000000)
+  putStrLn "Timed out, killing process"
+  signalProcess killProcess pid
+  throw TooLong
+
+loadFile :: FilePath -> IO (Either String DisplayResult)
 loadFile f = run $ do
   sess <- getSession
   pid <- liftIO . forkProcess . run' $ do
     setSession sess
-    dr <- compileFile f
-    liftIO $ writeFile (f ++ ".res") (show dr)
-    return ()
-  liftIO $ do
-    threadDelay (2 * 1000000)
-    tc <- getProcessStatus False False pid
-    print tc
-    case tc of
-      Just _ -> do
-        r <- readFile (f ++ ".res")
-        return r
-      Nothing -> do
-        signalProcess killProcess pid
-        throw TooLong
+    runToFile f
+  r <- liftIO $ do
+    race (processTimeout pid) $ do
+      tc <- getProcessStatus True False pid
+      -- print tc
+      case tc of
+        Just _ -> do
+          r <- read <$> readFile (f ++ ".res")
+          return r
+        Nothing -> do
+          signalProcess killProcess pid
+          throw TooLong
+  case r of
+    Left () -> throw TooLong -- it actually cannot be the case
+    -- since if the processTimeout "wins" the race, the exception will
+    -- be thrown
+    Right x -> return x
 
-main = print =<< loadFile "./test/file1.hs"

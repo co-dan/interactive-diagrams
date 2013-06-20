@@ -119,7 +119,7 @@ compilePaste code = do
   fname <- liftIO $ hash code
   let fpath = getPastesDir </> show fname ++ ".hs"
   liftIO $ T.writeFile fpath code
-  res <- liftIO $ run (compileFile fpath)
+  res <- liftIO $ loadFile fpath
   case res of
     Left err -> throwT (pack err)
     Right r -> liftIO . runWithSql $ insert $
