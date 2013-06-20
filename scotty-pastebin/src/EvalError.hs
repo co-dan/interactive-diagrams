@@ -1,7 +1,8 @@
 {-# LANGUAGE DeriveDataTypeable, RecordWildCards #-}
 module EvalError (
   Severity(..), SrcSpan(..),
-  EvalError(..), LoadingException(..)
+  EvalError(..),
+  LoadingException(..), TooLong(..)
   ) where
 
 import GHC
@@ -15,6 +16,11 @@ instance Show LoadingException where
   show LoadingException = "Cannot load the targets"
 instance Exception LoadingException
 
+data TooLong = TooLong
+             deriving (Typeable)
+instance Show TooLong where
+  show TooLong = "The process has hit the time limit"
+instance Exception TooLong  
 
 data EvalError = EvalError
                  { severity :: Severity

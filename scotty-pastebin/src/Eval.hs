@@ -1,5 +1,6 @@
 {-# LANGUAGE ScopedTypeVariables, RankNTypes, DeriveDataTypeable #-}
-module Eval where
+--module Eval where
+module Main where
 
 import GHC
 import GHC.Paths
@@ -14,6 +15,9 @@ import Unsafe.Coerce
 import System.IO.Unsafe
 import Data.Dynamic
 import Data.IORef
+import System.Posix.Process
+import System.Posix.Signals
+import Control.Concurrent
 
 import Display
 import SignalHandlers
@@ -46,7 +50,7 @@ handleException m =
   m >>= return . Right
   
   
-run :: Ghc DisplayResult -> IO (Either String DisplayResult)
+run :: Ghc a -> IO (Either String a)
 run m = do
   ref <- newIORef []
   r <- handleException $ run' (initGhc ref >> m)
@@ -55,7 +59,7 @@ run m = do
     Left s -> return $ Left $ s ++ "\n" ++ logMsg
     _ -> return r
 
-run' :: Display a => Ghc a -> IO a
+run' :: Ghc a -> IO a
 run' m = runGhc (Just libdir) m
 
 initGhc :: IORef [EvalError] -> Ghc ()
@@ -71,13 +75,13 @@ compileFile file = do
   setTargets =<< sequence [ guessTarget file Nothing
                           , guessTarget "Helper.hs" Nothing]
   graph <- depanal [] False
-  output graph
+  -- output graph
   loaded <- load LoadAllTargets
   when (failed loaded) $ throw LoadingException
   setContext (map (IIModule . moduleName . ms_mod) graph)
   let expr = "return . display =<< main"
   ty <- exprType expr -- throws exception if doesn't typecheck
-  output ty
+  -- output ty
   res <- unsafePerformIO . unsafeCoerce <$> compileExpr expr
   return res
 
@@ -88,5 +92,24 @@ output a = do
       cntx = initSDocContext dfs style
   liftIO $ print $ runSDoc (ppr a) cntx
 
+loadFile :: FilePath -> IO (Either String String)
+loadFile f = run $ do
+  sess <- getSession
+  pid <- liftIO . forkProcess . run' $ do
+    setSession sess
+    dr <- compileFile f
+    liftIO $ writeFile (f ++ ".res") (show dr)
+    return ()
+  liftIO $ do
+    threadDelay (2 * 1000000)
+    tc <- getProcessStatus False False pid
+    print tc
+    case tc of
+      Just _ -> do
+        r <- readFile (f ++ ".res")
+        return r
+      Nothing -> do
+        signalProcess killProcess pid
+        throw TooLong
 
-test2 = run (compileFile "./test/file1.hs")
+main = print =<< loadFile "./test/file1.hs"
