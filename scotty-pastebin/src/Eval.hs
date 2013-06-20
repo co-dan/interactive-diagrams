@@ -1,6 +1,17 @@
 {-# LANGUAGE ScopedTypeVariables, RankNTypes, DeriveDataTypeable #-}
 module Eval where
 
+import Control.Monad (when)
+import Unsafe.Coerce (unsafeCoerce)
+import System.IO.Unsafe (unsafePerformIO)
+import Data.IORef (IORef, newIORef, modifyIORef', readIORef)
+
+import System.Posix.Process (forkProcess, getProcessStatus)
+import System.Posix.Signals (signalProcess, killProcess)
+import System.Posix.Types (ProcessID)
+import Control.Concurrent (threadDelay)
+import Control.Concurrent.Async (race)
+
 import GHC
 import GHC.Paths
 import DynFlags
@@ -8,24 +19,14 @@ import MonadUtils
 import Outputable
 import Exception
 import Panic
-import ErrUtils
 
-import Unsafe.Coerce
-import System.IO.Unsafe
-import Data.Dynamic
-import Data.IORef
-import System.Posix.Process
-import System.Posix.Signals
-import System.Posix.Types (ProcessID)
-import Control.Concurrent
-import Control.Concurrent.Async (race)
 
 import Display
 import SignalHandlers
 import EvalError
 
-import Control.Monad
 
+-- | A log handler for GHC API. Saves the errors and warnings in an @IORef@
 -- LogAction == DynFlags -> Severity -> SrcSpan -> PprStyle -> MsgDoc -> IO ()
 logHandler :: IORef [EvalError] -> LogAction
 logHandler ref dflags severity srcSpan style msg =
@@ -42,6 +43,9 @@ logHandler ref dflags severity srcSpan style msg =
         -- locMsg = mkLocMessage severity srcSpan msg
         -- printDoc = show (runSDoc locMsg cntx)
 
+
+-- | Exception handler for GHC API. Catches all exceptions
+-- and restores handlers.        
 handleException :: (ExceptionMonad m, MonadIO m)
                    => m a -> m (Either String a)
 handleException m =
@@ -51,6 +55,7 @@ handleException m =
   m >>= return . Right
   
   
+-- | Runs a Ghc monad and returns either a result, or an error message
 run :: Ghc a -> IO (Either String a)
 run m = do
   ref <- newIORef []
@@ -60,17 +65,23 @@ run m = do
     Left s -> return $ Left $ s ++ "\n" ++ logMsg
     _ -> return r
 
+
 run' :: Ghc a -> IO a
 run' m = runGhc (Just libdir) m
 
+
+-- | Inits the GHC API, sets the mode and the log handler         
 initGhc :: IORef [EvalError] -> Ghc ()
 initGhc ref = do
   dfs <- getSessionDynFlags
   setSessionDynFlags $ dfs { hscTarget = HscInterpreted
                            , ghcLink = LinkInMemory
-                           , log_action = logHandler ref}
+                           , log_action = logHandler ref }
   return ()
-
+  
+  
+-- | Compiles the 'main' action in the source code file
+-- to a @DisplayResult@
 compileFile :: FilePath -> Ghc DisplayResult
 compileFile file = do
   setTargets =<< sequence [ guessTarget file Nothing
@@ -86,6 +97,7 @@ compileFile file = do
   res <- unsafePerformIO . unsafeCoerce <$> compileExpr expr
   return res
 
+-- | Outputs any value that can be pretty-printed using the default style
 output :: Outputable a => a -> Ghc ()
 output a = do
   dfs <- getSessionDynFlags
@@ -94,19 +106,27 @@ output a = do
   liftIO $ print $ runSDoc (ppr a) cntx
 
 
+-- | Compiles a source code file using @compileFile@ and writes
+-- the result to a file
 runToFile :: FilePath -> Ghc ()
 runToFile f = do
   dr <- compileFile f
   liftIO $ writeFile (f ++ ".res") (show dr)
   return ()
   
-processTimeout :: ProcessID -> IO ()
+
+-- | Waits for a certain period of time (3 seconds)
+-- and then kills the process
+processTimeout :: ProcessID -- ^ ID of a process to be killed
+                  -> IO ()
 processTimeout pid = do
   threadDelay (3 * 1000000)
-  putStrLn "Timed out, killing process"
+  -- putStrLn "Timed out, killing process"
   signalProcess killProcess pid
   throw TooLong
 
+  
+-- | Loads the file and compiles it using time restrictions
 loadFile :: FilePath -> IO (Either String DisplayResult)
 loadFile f = run $ do
   sess <- getSession
