@@ -135,7 +135,7 @@ output a = do
 -- the result to a file
 runToFile :: FilePath -> Ghc ()
 runToFile f = do
-  dr <- compileFile f
+  dr <- handleException $ compileFile f
   liftIO $ writeFile (f ++ ".res") (show dr)
   return ()
   
@@ -156,7 +156,8 @@ handleQueue :: EvalQueue -> HscEnv -> Ghc ()
 handleQueue (EvalQueue chan) sess = do
   (fpath, resultMVar) <- liftIO $ readChan chan
   liftIO $ putStrLn $ "Got input: " ++ show fpath
-  r <- handleException $ loadFile fpath sess
+  r <- loadFile fpath sess
+       `gcatch` \(e :: TooLong) -> return (Left (show TooLong))
   -- r <- handleException $ compileFile fpath
   liftIO $ putStrLn $ "Got result: " ++ show r
   liftIO $ putMVar resultMVar r
@@ -164,7 +165,7 @@ handleQueue (EvalQueue chan) sess = do
 
   
 -- | Loads the file and compiles it using time restrictions
-loadFile :: FilePath -> HscEnv -> Ghc (DisplayResult)
+loadFile :: FilePath -> HscEnv -> Ghc (EvalResult)
 loadFile f sess = do
   pid <- liftIO . forkProcess . run' $ do
     setSession sess
@@ -175,7 +176,7 @@ loadFile f sess = do
       -- print tc
       case tc of
         Just _ -> do
-          r :: DisplayResult <- read <$> readFile (f ++ ".res")
+          r :: EvalResult <- read <$> readFile (f ++ ".res")
           return r
         Nothing -> do
           signalProcess killProcess pid
