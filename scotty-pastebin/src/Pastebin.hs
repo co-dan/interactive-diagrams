@@ -1,26 +1,30 @@
 {-# LANGUAGE OverloadedStrings, TemplateHaskell, QuasiQuotes #-}
 {-# LANGUAGE TypeFamilies, GeneralizedNewtypeDeriving, GADTs #-}
 {-# LANGUAGE EmptyDataDecls, FlexibleContexts, RecordWildCards #-}
-import Web.Scotty as S
+module Main where
 
+import Control.Monad (forM_, when)
+import Control.Monad.Trans (lift, liftIO)
+import Control.Monad.IO.Class (MonadIO(..))
+import Control.Monad.Trans.Either (EitherT(..), eitherT)
+import Data.Monoid ((<>))
+import Data.Foldable (foldMap)
+import Control.Monad.Trans.Maybe (MaybeT(..))
+
+import Data.EitherR (throwT, catchT)
+import Control.Error.Util (hoistMaybe, maybeT)
+import System.FilePath.Posix ((</>))
+import Data.Time.Clock (getCurrentTime, diffUTCTime)
+import Data.Text.Lazy (pack, Text)
+import qualified Data.Text.Lazy as T
+import qualified Data.Text.Lazy.IO as T
+
+  
+import Web.Scotty as S
 import Network.Wai.Middleware.RequestLogger
 import Network.Wai.Middleware.Static
 import Network.HTTP.Types
 
-import Control.Monad 
-import Control.Monad.Trans
-import Control.Monad.Trans.Either
-import Data.Monoid
-import Data.Foldable (foldMap)
-import Data.EitherR
-
-import Control.Monad.Trans.Maybe
-import Control.Error.Util
-import System.FilePath.Posix
-
-import Data.Text.Lazy (pack, Text)
-import qualified Data.Text.Lazy as T
-import qualified Data.Text.Lazy.IO as T
 import Text.Blaze.Html5 ((!), Html)
 import Text.Blaze.Html5.Attributes (type_, class_, href, rel, action, method,
                                     name, value, cols, rows)
@@ -32,6 +36,7 @@ import Database.Persist as P
 import Database.Persist.TH as P
 import Database.Persist.Sqlite as P
 
+  
 import Display hiding (text,html)
 import DisplayPersist
 import Util (runWithSql, getDR, intToKey,
@@ -134,6 +139,15 @@ page404 = do
   status status404
   text "Not found"
   
+measureTime :: MonadIO m => m a -> m a
+measureTime act = do
+  t0 <- liftIO getCurrentTime
+  res <- act
+  t1 <- liftIO getCurrentTime
+  liftIO $ putStrLn $ "Time elapsed: " ++ show (diffUTCTime t1 t0)
+  return res
+  
+
 main :: IO ()
 main = do
   runWithSql (runMigration migrateAll)
@@ -142,4 +156,4 @@ main = do
     middleware $ staticPolicy (addBase "../common/static")
     S.get "/get/:id" $ maybeT page404 renderPaste getPaste
     S.get "/" listPastes
-    S.post "/new" $ eitherT (uncurry errPage) redirPaste newPaste
+    S.post "/new" $ eitherT (uncurry errPage) redirPaste (measureTime newPaste)
