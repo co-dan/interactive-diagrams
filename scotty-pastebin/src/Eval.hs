@@ -1,7 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables, RankNTypes, DeriveDataTypeable #-}
 module Eval where
 
-import Control.Monad (when)
+import Control.Monad (when, forever)
 import Unsafe.Coerce (unsafeCoerce)
 import System.IO.Unsafe (unsafePerformIO)
 import Data.IORef (IORef, newIORef, modifyIORef', readIORef)
@@ -9,9 +9,11 @@ import Data.IORef (IORef, newIORef, modifyIORef', readIORef)
 import System.Posix.Process (forkProcess, getProcessStatus)
 import System.Posix.Signals (signalProcess, killProcess)
 import System.Posix.Types (ProcessID)
-import Control.Concurrent (threadDelay)
+import Control.Concurrent (threadDelay, ThreadId, forkIO)
 import Control.Concurrent.Async (race)
-
+import Control.Concurrent.MVar (MVar, newEmptyMVar, putMVar, takeMVar)
+import Control.Concurrent.Chan (Chan, newChan, readChan, writeChan)
+  
 import GHC
 import GHC.Paths
 import DynFlags
@@ -25,7 +27,30 @@ import Display
 import SignalHandlers
 import EvalError
 
+type EvalResult = Either String DisplayResult
+newtype EvalQueue = EvalQueue (Chan (FilePath, MVar EvalResult))
 
+
+-- | Spawn a new evaluator
+prepareEvalQueue :: IO (EvalQueue, ThreadId)
+prepareEvalQueue = do
+  chan <- EvalQueue <$> newChan
+  tid <- forkIO $ do
+    run $ do
+      compileFile "Preload.hs"
+      -- TODO: preloading
+      sess <- getSession
+      forever $ handleQueue chan sess
+    return ()
+  return (chan, tid)
+  
+
+sendEvaluator :: EvalQueue -> FilePath -> IO EvalResult
+sendEvaluator (EvalQueue chan) fpath = do
+  mv <- newEmptyMVar
+  writeChan chan (fpath, mv)
+  takeMVar mv
+  
 -- | A log handler for GHC API. Saves the errors and warnings in an @IORef@
 -- LogAction == DynFlags -> Severity -> SrcSpan -> PprStyle -> MsgDoc -> IO ()
 logHandler :: IORef [EvalError] -> LogAction
@@ -126,10 +151,21 @@ processTimeout pid = do
   throw TooLong
 
   
+-- | Function that handles requests from the @EvalQueue@
+handleQueue :: EvalQueue -> HscEnv -> Ghc ()  
+handleQueue (EvalQueue chan) sess = do
+  (fpath, resultMVar) <- liftIO $ readChan chan
+  liftIO $ putStrLn $ "Got input: " ++ show fpath
+  r <- handleException $ loadFile fpath sess
+  -- r <- handleException $ compileFile fpath
+  liftIO $ putStrLn $ "Got result: " ++ show r
+  liftIO $ putMVar resultMVar r
+  return ()
+
+  
 -- | Loads the file and compiles it using time restrictions
-loadFile :: FilePath -> IO (Either String DisplayResult)
-loadFile f = run $ do
-  sess <- getSession
+loadFile :: FilePath -> HscEnv -> Ghc (DisplayResult)
+loadFile f sess = do
   pid <- liftIO . forkProcess . run' $ do
     setSession sess
     runToFile f
@@ -139,7 +175,7 @@ loadFile f = run $ do
       -- print tc
       case tc of
         Just _ -> do
-          r <- read <$> readFile (f ++ ".res")
+          r :: DisplayResult <- read <$> readFile (f ++ ".res")
           return r
         Nothing -> do
           signalProcess killProcess pid

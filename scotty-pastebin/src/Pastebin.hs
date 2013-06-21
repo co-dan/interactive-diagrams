@@ -111,20 +111,20 @@ errPage code msg = do
     H.hr
     H.toHtml msg
   
-newPaste :: EitherT (Text,Text) ActionM Int
-newPaste = do
+newPaste :: EvalQueue -> EitherT (Text,Text) ActionM Int
+newPaste queue = do
   code <- lift (param "code")
   when (T.null code) $ throwT (code,"Empty input")
-  pid <- compilePaste code
+  pid <- compilePaste queue code
          `catchT` \e -> throwT (code, e)
   return (keyToInt pid)
 
-compilePaste :: Text -> EitherT Text ActionM (Key Paste)
-compilePaste code = do
+compilePaste :: EvalQueue -> Text -> EitherT Text ActionM (Key Paste)
+compilePaste queue code = do
   fname <- liftIO $ hash code
   let fpath = getPastesDir </> show fname ++ ".hs"
   liftIO $ T.writeFile fpath code
-  res <- liftIO $ loadFile fpath
+  res <- liftIO $ sendEvaluator queue fpath
   case res of
     Left err -> throwT (pack err)
     Right r -> liftIO . runWithSql $ insert $
@@ -151,9 +151,10 @@ measureTime act = do
 main :: IO ()
 main = do
   runWithSql (runMigration migrateAll)
+  (queue, _) <- prepareEvalQueue
   scotty 3000 $ do
     middleware logStdoutDev
     middleware $ staticPolicy (addBase "../common/static")
     S.get "/get/:id" $ maybeT page404 renderPaste getPaste
     S.get "/" listPastes
-    S.post "/new" $ eitherT (uncurry errPage) redirPaste (measureTime newPaste)
+    S.post "/new" $ eitherT (uncurry errPage) redirPaste (measureTime (newPaste queue))
