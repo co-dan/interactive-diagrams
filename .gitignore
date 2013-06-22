@@ -2,3 +2,5 @@
 *.hi
 cabal-dev/
 dist/
+test/
+pastes.db
