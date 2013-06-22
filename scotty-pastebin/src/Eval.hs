@@ -135,7 +135,7 @@ compileFile file = do
   let expr = "return . display =<< main"
   ty <- exprType expr -- throws exception if doesn't typecheck
   -- output ty
-  res <- unsafePerformIO . unsafeCoerce <$> compileExpr expr  
+  res <- unsafePerformIO . unsafeCoerce <$> compileExpr expr
   return res
 
 -- | Outputs any value that can be pretty-printed using the default style
