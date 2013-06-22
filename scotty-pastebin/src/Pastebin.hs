@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings, TemplateHaskell, QuasiQuotes #-}
 {-# LANGUAGE TypeFamilies, GeneralizedNewtypeDeriving, GADTs #-}
 {-# LANGUAGE EmptyDataDecls, FlexibleContexts, RecordWildCards #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Main where
 
 import Control.Monad (forM_, when)
@@ -42,7 +43,8 @@ import DisplayPersist
 import Util (runWithSql, getDR, intToKey,
              keyToInt, hash, getPastesDir)
 import Eval
-  
+import EvalError  
+
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistUpperCase|
 Paste
     content Text
@@ -104,29 +106,37 @@ listPastes = do
         H.toHtml $ "Paste id " ++ (show k)
       H.br
 
-errPage :: Text -> Text -> ActionM ()
-errPage code msg = do
+errPage :: Text -> (Text, [EvalError]) -> ActionM ()
+errPage code (msg, errors) = do
   html . renderHtml . mainPage "Error" $ do
     formWithCode code
-    H.hr
-    H.toHtml msg
+    H.div ! class_ "output" $ do
+      H.div ! HA.id "sheet" $ do
+        H.toHtml msg
+      forM_ errors $ \(er :: EvalError) -> do
+        H.div ! HA.id "error" $ do
+          H.toHtml $ T.pack $ show er
+        
   
-newPaste :: EvalQueue -> EitherT (Text,Text) ActionM Int
+newPaste :: EvalQueue
+            -> EitherT (Text, (Text, [EvalError])) ActionM Int
 newPaste queue = do
   code <- lift (param "code")
-  when (T.null code) $ throwT (code,"Empty input")
+  when (T.null code) $ throwT (code, ("Empty input", []))
   pid <- compilePaste queue code
          `catchT` \e -> throwT (code, e)
   return (keyToInt pid)
 
-compilePaste :: EvalQueue -> Text -> EitherT Text ActionM (Key Paste)
+compilePaste :: EvalQueue
+                -> Text
+                -> EitherT (Text, [EvalError]) ActionM (Key Paste)
 compilePaste queue code = do
   fname <- liftIO $ hash code
   let fpath = getPastesDir </> show fname ++ ".hs"
   liftIO $ T.writeFile fpath code
-  res <- liftIO $ sendEvaluator queue fpath
+  (res, errors) <- liftIO $ sendEvaluator queue fpath
   case res of
-    Left err -> throwT (pack err)
+    Left err -> throwT (pack err, errors)
     Right r -> liftIO . runWithSql $ insert $
                Paste code (display r)
 

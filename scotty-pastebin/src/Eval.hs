@@ -1,19 +1,24 @@
 {-# LANGUAGE ScopedTypeVariables, RankNTypes, DeriveDataTypeable #-}
 module Eval where
 
+import Prelude hiding (writeFile, readFile)
+
 import Control.Monad (when, forever)
 import Unsafe.Coerce (unsafeCoerce)
 import System.IO.Unsafe (unsafePerformIO)
-import Data.IORef (IORef, newIORef, modifyIORef', readIORef)
+import Data.IORef (IORef, newIORef, modifyIORef',
+                   readIORef, writeIORef)
+import Control.Concurrent (threadDelay, ThreadId, forkIO)
+import Control.Concurrent.MVar (MVar, newEmptyMVar, putMVar, takeMVar)
+import Control.Concurrent.Chan (Chan, newChan, readChan, writeChan)
+import Data.ByteString (writeFile, readFile)
 
 import System.Posix.Process (forkProcess, getProcessStatus)
 import System.Posix.Signals (signalProcess, killProcess)
 import System.Posix.Types (ProcessID)
-import Control.Concurrent (threadDelay, ThreadId, forkIO)
 import Control.Concurrent.Async (race)
-import Control.Concurrent.MVar (MVar, newEmptyMVar, putMVar, takeMVar)
-import Control.Concurrent.Chan (Chan, newChan, readChan, writeChan)
-  
+import Data.Serialize (encode, decode)  
+
 import GHC
 import GHC.Paths
 import DynFlags
@@ -27,8 +32,15 @@ import Display
 import SignalHandlers
 import EvalError
 
+
+import Debug.Trace
+traceM :: Monad m => String -> m ()
+traceM s = trace s $ return ()
+  
+
 type EvalResult = Either String DisplayResult
-newtype EvalQueue = EvalQueue (Chan (FilePath, MVar EvalResult))
+newtype EvalQueue =
+  EvalQueue (Chan (FilePath, MVar (EvalResult, [EvalError])))
 
 
 -- | Spawn a new evaluator
@@ -38,14 +50,14 @@ prepareEvalQueue = do
   tid <- forkIO $ do
     run $ do
       compileFile "Preload.hs"
-      -- TODO: preloading
+      -- TODO: preloading diagrams
       sess <- getSession
       forever $ handleQueue chan sess
     return ()
   return (chan, tid)
   
 
-sendEvaluator :: EvalQueue -> FilePath -> IO EvalResult
+sendEvaluator :: EvalQueue -> FilePath -> IO (EvalResult, [EvalError])
 sendEvaluator (EvalQueue chan) fpath = do
   mv <- newEmptyMVar
   writeChan chan (fpath, mv)
@@ -56,13 +68,16 @@ sendEvaluator (EvalQueue chan) fpath = do
 logHandler :: IORef [EvalError] -> LogAction
 logHandler ref dflags severity srcSpan style msg =
   case srcSpan of
-    RealSrcSpan sp -> modifyIORef' ref (++ [err sp])
+    RealSrcSpan sp -> do
+      modifyIORef' ref (++ [err sp])
+      errors <- readIORef ref
+      print errors
     UnhelpfulSpan _ -> return ()
   -- case severity of
   --   SevError ->   modifyIORef' ref (++ [printDoc])
   --   SevFatal ->   modifyIORef' ref (++ [printDoc])
   --   _ -> return ()
-  where err sp = EvalError severity msg' sp
+  where err sp = EvalError severity msg' (srcPos sp)
         cntx = initSDocContext dflags style
         msg' = show (runSDoc msg cntx)
         -- locMsg = mkLocMessage severity srcSpan msg
@@ -101,7 +116,8 @@ initGhc ref = do
   dfs <- getSessionDynFlags
   setSessionDynFlags $ dfs { hscTarget = HscInterpreted
                            , ghcLink = LinkInMemory
-                           , log_action = logHandler ref }
+                           -- , log_action = logHandler ref }
+                           }
   return ()
   
   
@@ -119,7 +135,7 @@ compileFile file = do
   let expr = "return . display =<< main"
   ty <- exprType expr -- throws exception if doesn't typecheck
   -- output ty
-  res <- unsafePerformIO . unsafeCoerce <$> compileExpr expr
+  res <- unsafePerformIO . unsafeCoerce <$> compileExpr expr  
   return res
 
 -- | Outputs any value that can be pretty-printed using the default style
@@ -135,37 +151,40 @@ output a = do
 -- the result to a file
 runToFile :: FilePath -> Ghc ()
 runToFile f = do
+  ref <- liftIO $ newIORef []
+  dfs <- getSessionDynFlags
+  setSessionDynFlags $ dfs { log_action = logHandler ref }
   dr <- handleException $ compileFile f
-  liftIO $ writeFile (f ++ ".res") (show dr)
+  errors <- liftIO $ readIORef ref
+  liftIO $ writeFile (f ++ ".res") (encode (dr,errors))
   return ()
   
 
 -- | Waits for a certain period of time (3 seconds)
 -- and then kills the process
 processTimeout :: ProcessID -- ^ ID of a process to be killed
-                  -> IO ()
+                  -> IO (EvalResult, [EvalError])
 processTimeout pid = do
   threadDelay (3 * 1000000)
   -- putStrLn "Timed out, killing process"
   signalProcess killProcess pid
-  throw TooLong
+  return (Left (show TooLong), [])
 
   
 -- | Function that handles requests from the @EvalQueue@
 handleQueue :: EvalQueue -> HscEnv -> Ghc ()  
 handleQueue (EvalQueue chan) sess = do
   (fpath, resultMVar) <- liftIO $ readChan chan
-  liftIO $ putStrLn $ "Got input: " ++ show fpath
-  r <- loadFile fpath sess
-       `gcatch` \(e :: TooLong) -> return (Left (show TooLong))
+  traceM $ "Got input: " ++ show fpath
+  r <- loadFile fpath sess 
   -- r <- handleException $ compileFile fpath
-  liftIO $ putStrLn $ "Got result: " ++ show r
+  traceM $ "Got result: " ++ show r
   liftIO $ putMVar resultMVar r
   return ()
 
   
 -- | Loads the file and compiles it using time restrictions
-loadFile :: FilePath -> HscEnv -> Ghc (EvalResult)
+loadFile :: FilePath -> HscEnv -> Ghc (EvalResult, [EvalError])
 loadFile f sess = do
   pid <- liftIO . forkProcess . run' $ do
     setSession sess
@@ -176,14 +195,11 @@ loadFile f sess = do
       -- print tc
       case tc of
         Just _ -> do
-          r :: EvalResult <- read <$> readFile (f ++ ".res")
+          Right (r :: (EvalResult, [EvalError])) <- 
+            decode <$> readFile (f ++ ".res")
           return r
         Nothing -> do
           signalProcess killProcess pid
-          throw TooLong
-  case r of
-    Left () -> throw TooLong -- it actually cannot be the case
-    -- since if the processTimeout "wins" the race, the exception will
-    -- be thrown
-    Right x -> return x
+          return (Left (show TooLong), [])
+  either return return r
 
