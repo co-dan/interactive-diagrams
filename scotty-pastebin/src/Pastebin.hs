@@ -58,30 +58,34 @@ mainPage :: String -> Html -> Html
 mainPage title content = H.docTypeHtml $ do
   H.head $ do
     H.title $ "Evaluate -> " <> (H.toHtml title)
-    H.link ! rel "stylesheet" ! type_ "text/css" ! href "/style.css"
+    H.link ! rel "stylesheet" ! type_ "text/css" ! href "/css/bootstrap.min.css"
   H.body $ do
-    H.h1 (H.toHtml title)
-    H.div ! HA.id "main" $ content
+    H.div ! class_ "container-fluid" $ do
+      H.div ! class_ "row-fluid" $
+        H.div ! class_ "span12" $
+          H.h1 (H.toHtml title)
+      H.div ! class_ "row-fluid" 
+        $ content
     
 
 formWithCode :: Text -> Html
 formWithCode code = do
-  H.div ! class_ "input" $
+  H.div ! class_ "span6" 
+        ! HA.style "padding-right:20px; border-right: 1px solid #ccc;" $
     H.div ! HA.id "form" $
       H.form ! action "/new" ! method "POST" $ do
         H.p "Input your code:"
-        H.br
-        H.textarea ! rows "20" ! cols "80" ! name "code" $ H.toHtml code
-        H.br
-        H.input ! type_ "Submit" ! value "Eval"
+        H.textarea ! rows "20" ! name "code" ! class_ "row-fluid" $ H.toHtml code
+        H.input ! type_ "Submit" ! class_ "btn" ! value "Eval"
 
 
 renderPaste :: Paste -> ActionM ()
 renderPaste Paste{..} = html . renderHtml . mainPage "Paste" $ do
   formWithCode pasteContent
-  H.div ! class_ "output" $
-    H.div ! HA.id "sheet" $ do
-      foldMap (H.preEscapedToHtml . Display.result) (getDR pasteResult)
+  H.div ! class_ "span5" $
+    H.div ! HA.id "sheet" $ 
+      H.pre $
+        foldMap (H.preEscapedToHtml . Display.result) (getDR pasteResult)
 
 -- | * Database access and logic
 
@@ -99,12 +103,12 @@ listPastes = do
     selectList [] [LimitTo 20, Desc PasteId]
   html . renderHtml . mainPage "Paste" $ do
     formWithCode ""
-    H.hr
-    forM_ pastes $ \(Entity k' Paste{..}) -> do
-      let k = keyToInt k'
-      H.a ! href (H.toValue ("/get/" ++ (show k))) $
-        H.toHtml $ "Paste id " ++ (show k)
-      H.br
+    H.div ! class_ "span5" $ do
+      forM_ pastes $ \(Entity k' Paste{..}) -> do
+        let k = keyToInt k'
+        H.a ! href (H.toValue ("/get/" ++ (show k))) $
+          H.toHtml $ "Paste id " ++ (show k)
+        H.br
 
 errPage :: Text -> (Text, [EvalError]) -> ActionM ()
 errPage code (msg, errors) = do
