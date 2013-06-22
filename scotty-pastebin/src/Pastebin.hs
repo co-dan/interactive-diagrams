@@ -8,7 +8,7 @@ import Control.Monad (forM_, when)
 import Control.Monad.Trans (lift, liftIO)
 import Control.Monad.IO.Class (MonadIO(..))
 import Control.Monad.Trans.Either (EitherT(..), eitherT)
-import Data.Monoid ((<>))
+import Data.Monoid ((<>), mempty)
 import Data.Foldable (foldMap)
 import Control.Monad.Trans.Maybe (MaybeT(..))
 
@@ -59,6 +59,8 @@ mainPage title content = H.docTypeHtml $ do
   H.head $ do
     H.title $ "Evaluate -> " <> (H.toHtml title)
     H.link ! rel "stylesheet" ! type_ "text/css" ! href "/css/bootstrap.min.css"
+    H.script ! HA.src "/js/bootstrap.min.js" $ mempty
+    H.script ! HA.src "http://code.jquery.com/jquery-2.0.2.min.js" $ mempty
   H.body $ do
     H.div ! class_ "container-fluid" $ do
       H.div ! class_ "row-fluid" $
@@ -89,12 +91,14 @@ renderPaste Paste{..} = html . renderHtml . mainPage "Paste" $ do
 
 -- | * Database access and logic
 
+
 getPaste :: MaybeT ActionM Paste
 getPaste = do 
   -- pid <- hoistMaybe . readMaybe =<< lift (param "id")
   pid <- lift $ param "id"
   paste <- liftIO $ runWithSql $ P.get (intToKey pid)
   hoistMaybe paste
+
 
 -- | ** Selects 20 recent pastes
 listPastes :: ActionM ()
@@ -110,16 +114,28 @@ listPastes = do
           H.toHtml $ "Paste id " ++ (show k)
         H.br
 
+
 errPage :: Text -> (Text, [EvalError]) -> ActionM ()
 errPage code (msg, errors) = do
   html . renderHtml . mainPage "Error" $ do
     formWithCode code
-    H.div ! class_ "output" $ do
+    H.div ! class_ "span5" $ do
       H.div ! HA.id "sheet" $ do
-        H.toHtml msg
-      forM_ errors $ \(er :: EvalError) -> do
+        H.p $ H.toHtml msg
+      forM_ errors $ \EvalError{..} -> do
         H.div ! HA.id "error" $ do
-          H.toHtml $ T.pack $ show er
+          let (style, caption) = case severity of
+                SevError -> ("alert-error", "Error")
+                SevWarning -> ("alert-block", "Warning")
+                SevFatal -> ("alert-error", "Error")
+                _ -> ("alert-info", "Info")
+          H.div ! class_ ("alert " <> style) $ do
+            H.button ! type_ "button" ! class_ "close"
+                     ! H.dataAttribute "dissmis" "alert" $
+                         H.preEscapedToHtml ("&times;" :: String)
+            H.strong $ caption
+            H.br
+            foldMap ((<> H.br) . H.toHtml . T.pack) (lines errMsg)
         
   
 newPaste :: EvalQueue
