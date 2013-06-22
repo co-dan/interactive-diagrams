@@ -1,5 +1,6 @@
 {- Original file from GHCLive project,
-copyright (c) 2012, Shae Erisson & contributors -}
+copyright (c) 2012, Shae Erisson & contributors 
+          (c) 2013, Dan Frumin, Luite Stegeman -}
 {-# LANGUAGE DeriveDataTypeable   #-}
 {-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE FlexibleContexts     #-}
@@ -9,6 +10,8 @@ copyright (c) 2012, Shae Erisson & contributors -}
 {-# LANGUAGE TypeOperators        #-}
 {-# LANGUAGE DefaultSignatures    #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE DeriveGeneric        #-}
+{-# LANGUAGE StandaloneDeriving   #-}
 
 module Display where
 
@@ -19,6 +22,7 @@ import           Data.Monoid
 import qualified Data.Text                     as T
 import qualified Data.Text.Lazy                as TL
 import           Data.Typeable
+import           Data.Serialize  
 import qualified Diagrams.Backend.SVG          as D
 import qualified Diagrams.Prelude              as D
 import           GHC.Generics
@@ -27,15 +31,28 @@ import qualified Text.Blaze.Html5              as B
 import           Prelude hiding (span)
 import           Text.Blaze.Svg.Renderer.Utf8
 
-data ClientType = Html | Svg | Text deriving (Eq, Show, Enum, Read)
+data ClientType = Html | Svg | Text
+                deriving (Eq, Show, Enum, Read, Generic)
+
+instance Serialize ClientType                         
 
 newtype DisplayResult = DisplayResult [DR]
-                      deriving (Eq, Monoid, Typeable, Show, Read)
+                      deriving (Eq, Monoid, Typeable,
+                                Show, Read, Generic)
+                               
+instance Serialize DisplayResult
 
 data DR = DR {
       clientType :: ClientType, -- "SVG" "IMG" etc, changes how the browser-side javascript handles this result.
       result :: TL.Text            -- actual result data
-      } deriving (Eq, Show, Typeable, Read)
+      } deriving (Eq, Show, Typeable, Read, Generic)
+
+
+instance Serialize TL.Text where
+  put = put . show
+  get = return . TL.pack =<< get
+
+instance Serialize DR
 
 text :: TL.Text -> DisplayResult
 text x = DisplayResult [ DR Text x ]
