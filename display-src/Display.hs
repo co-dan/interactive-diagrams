@@ -49,7 +49,7 @@ data DR = DR {
 
 
 instance Serialize TL.Text where
-  put = put . show
+  put = put . TL.unpack
   get = return . TL.pack =<< get
 
 instance Serialize DR
