@@ -3,4 +3,5 @@
 cabal-dev/
 dist/
 test/
-pastes.db
+scotty-pastebin/pastes.db
+scotty-pastebin/bla.hs
