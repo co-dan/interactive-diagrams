@@ -43,7 +43,10 @@ import DisplayPersist
 import Util (runWithSql, getDR, intToKey,
              keyToInt, hash, getPastesDir)
 import Eval
-import EvalError  
+import Eval.EvalError  
+import Eval.EvalSettings
+import Eval.EvalM
+import Eval.Helpers
 
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistUpperCase|
 Paste
@@ -154,12 +157,11 @@ compilePaste queue code = do
   fname <- liftIO $ hash code
   let fpath = getPastesDir </> show fname ++ ".hs"
   liftIO $ T.writeFile fpath code
-  (res, errors) <- liftIO $ sendEvaluator queue fpath
+  (res, errors) <- liftIO $ sendEvaluator queue (compileFile fpath)
   case res of
     Left err -> throwT (pack err, errors)
     Right r -> liftIO . runWithSql $ insert $
                Paste code (display r)
-
   
 redirPaste :: Int -> ActionM ()
 redirPaste i = redirect $ pack ("/get/" ++ show i)

@@ -1,28 +1,33 @@
 {-# LANGUAGE ScopedTypeVariables, RankNTypes, DeriveDataTypeable #-}
+{-# LANGUAGE RecordWildCards #-}
 module Eval where
 
 import Prelude hiding (writeFile, readFile)
 
 import Control.Monad (when, forever)
+import Control.Monad.Trans (lift)
+import Control.Monad.IO.Class (MonadIO, liftIO)
+import Control.Monad.State (MonadState(..))
 import Unsafe.Coerce (unsafeCoerce)
 import System.IO.Unsafe (unsafePerformIO)
 import Data.IORef (IORef, newIORef, modifyIORef',
-                   readIORef, writeIORef)
+                   readIORef)
 import Control.Concurrent (threadDelay, ThreadId, forkIO)
 import Control.Concurrent.MVar (MVar, newEmptyMVar, putMVar, takeMVar)
 import Control.Concurrent.Chan (Chan, newChan, readChan, writeChan)
 import Data.ByteString (writeFile, readFile)
-
+import System.FilePath.Posix ((</>))
 import System.Posix.Process (forkProcess, getProcessStatus)
 import System.Posix.Signals (signalProcess, killProcess)
 import System.Posix.Types (ProcessID)
 import Control.Concurrent.Async (race)
-import Data.Serialize (encode, decode)  
-
+import Data.Serialize (encode, decode, Serialize)  
+import Data.Default
+  
 import GHC
 import GHC.Paths
 import DynFlags
-import MonadUtils
+import MonadUtils hiding (MonadIO, liftIO)
 import Outputable
 import Exception
 import Panic
@@ -30,8 +35,10 @@ import Panic
 
 import Display
 import SignalHandlers
-import EvalError
-
+import Eval.EvalError
+import Eval.EvalSettings
+import Eval.EvalM
+import Eval.Helpers
 
 import Debug.Trace
 traceM :: Monad m => String -> m ()
@@ -39,30 +46,36 @@ traceM s = trace s $ return ()
   
 
 type EvalResult = Either String DisplayResult
+type EvalResultWithErrors = (EvalResult, [EvalError])
 newtype EvalQueue =
-  EvalQueue (Chan (FilePath, MVar (EvalResult, [EvalError])))
+  EvalQueue (Chan (EvalM DisplayResult, MVar EvalResultWithErrors))
+
+-- | Runs a Ghc monad and returns either a result, or an error message
+run :: Ghc a -> IO (Either String a)
+run m = do
+  ref <- newIORef []
+  r <- handleException $ run' (initGhc ref >> m)
+  logMsg <- unlines . map show <$> readIORef ref
+  case r of
+    Left s -> return $ Left $ s ++ "\n" ++ logMsg
+    _ -> return r
 
 
--- | Spawn a new evaluator
-prepareEvalQueue :: IO (EvalQueue, ThreadId)
-prepareEvalQueue = do
-  chan <- EvalQueue <$> newChan
-  tid <- forkIO $ do
-    run $ do
-      compileFile "Preload.hs"
-      -- TODO: preloading diagrams
-      sess <- getSession
-      forever $ handleQueue chan sess
-    return ()
-  return (chan, tid)
-  
+run' :: Ghc a -> IO a
+run' m = runGhc (Just libdir) m
 
-sendEvaluator :: EvalQueue -> FilePath -> IO (EvalResult, [EvalError])
-sendEvaluator (EvalQueue chan) fpath = do
-  mv <- newEmptyMVar
-  writeChan chan (fpath, mv)
-  takeMVar mv
-  
+
+-- | Inits the GHC API, sets the mode and the log handler         
+initGhc :: IORef [EvalError] -> Ghc ()
+initGhc ref = do
+  dfs <- getSessionDynFlags
+  setSessionDynFlags $ dfs { hscTarget = HscInterpreted
+                           , ghcLink = LinkInMemory
+                           -- , log_action = logHandler ref }
+                           }
+  return ()
+
+
 -- | A log handler for GHC API. Saves the errors and warnings in an @IORef@
 -- LogAction == DynFlags -> Severity -> SrcSpan -> PprStyle -> MsgDoc -> IO ()
 logHandler :: IORef [EvalError] -> LogAction
@@ -94,67 +107,52 @@ handleException m =
   flip gfinally (liftIO restoreHandlers) $
   m >>= return . Right
   
+
+
+-- | Spawn a new evaluator
+prepareEvalQueue :: IO (EvalQueue, ThreadId)
+prepareEvalQueue = do
+  chan <- EvalQueue <$> newChan
+  tid <- forkIO $ do
+    run $ do
+      evalEvalM $ compileFile "Preload.hs"
+      sess <- getSession
+      forever $ handleQueue chan sess
+    return ()
+  return (chan, tid)
   
--- | Runs a Ghc monad and returns either a result, or an error message
-run :: Ghc a -> IO (Either String a)
-run m = do
-  ref <- newIORef []
-  r <- handleException $ run' (initGhc ref >> m)
-  logMsg <- unlines . map show <$> readIORef ref
-  case r of
-    Left s -> return $ Left $ s ++ "\n" ++ logMsg
-    _ -> return r
 
-
-run' :: Ghc a -> IO a
-run' m = runGhc (Just libdir) m
-
-
--- | Inits the GHC API, sets the mode and the log handler         
-initGhc :: IORef [EvalError] -> Ghc ()
-initGhc ref = do
-  dfs <- getSessionDynFlags
-  setSessionDynFlags $ dfs { hscTarget = HscInterpreted
-                           , ghcLink = LinkInMemory
-                           -- , log_action = logHandler ref }
-                           }
+sendEvaluator :: EvalQueue -> EvalM DisplayResult -> IO (EvalResult, [EvalError])
+sendEvaluator (EvalQueue chan) act = do
+  mv <- newEmptyMVar
+  writeChan chan (act, mv)
+  takeMVar mv
+  
+  
+-- | Function that handles requests from the @EvalQueue@
+handleQueue :: EvalQueue -> HscEnv -> Ghc ()  
+handleQueue (EvalQueue chan) sess = do
+  (act', resultMVar) <- liftIO $ readChan chan
+  -- r <- loadFile fpath sess
+  r <- runWithLimits act' sess
+  liftIO $ putMVar resultMVar r
   return ()
-  
-  
--- | Compiles the 'main' action in the source code file
--- to a @DisplayResult@
-compileFile :: FilePath -> Ghc DisplayResult
-compileFile file = do
-  setTargets =<< sequence [ guessTarget file Nothing
-                          , guessTarget "Helper.hs" Nothing]
-  graph <- depanal [] False
-  -- output graph
-  loaded <- load LoadAllTargets
-  when (failed loaded) $ throw LoadingException
-  setContext (map (IIModule . moduleName . ms_mod) graph)
-  let expr = "return . display =<< main"
-  ty <- exprType expr -- throws exception if doesn't typecheck
-  -- output ty
-  res <- unsafePerformIO . unsafeCoerce <$> compileExpr expr
-  return res
 
--- | Outputs any value that can be pretty-printed using the default style
-output :: Outputable a => a -> Ghc ()
-output a = do
-  dfs <- getSessionDynFlags
-  let style = defaultUserStyle
-      cntx = initSDocContext dfs style
-  liftIO $ print $ runSDoc (ppr a) cntx
 
+runWithLimits :: EvalM DisplayResult -> HscEnv -> Ghc EvalResultWithErrors
+runWithLimits act' sess = evalEvalM $ do
+  let act = evalEvalM act'
+  EvalSettings{..} <- get
+  liftEvalM $ execTimeLimit act timeout (tmpDirPath </> fileName) sess    
 
 -- | Compiles a source code file using @compileFile@ and writes
 -- the result to a file
-runToFile :: FilePath -> Ghc ()
-runToFile f = do
+runToFile :: Serialize a => Ghc a -> FilePath -> Ghc ()
+runToFile act f = do
   ref <- liftIO $ newIORef []
   dfs <- getSessionDynFlags
   setSessionDynFlags $ dfs { log_action = logHandler ref }
-  dr <- handleException $ compileFile f
+  dr <- handleException $ act
   errors <- liftIO $ readIORef ref
   liftIO $ writeFile (f ++ ".res") (encode (dr,errors))
   return ()
@@ -163,34 +161,26 @@ runToFile f = do
 -- | Waits for a certain period of time (3 seconds)
 -- and then kills the process
 processTimeout :: ProcessID -- ^ ID of a process to be killed
-                  -> IO (EvalResult, [EvalError])
-processTimeout pid = do
-  threadDelay (3 * 1000000)
+               -> Int -- ^ Time limit (in seconds)
+               -> IO (EvalResult, [EvalError])
+processTimeout pid lim = do
+  threadDelay (lim * 1000000)
   -- putStrLn "Timed out, killing process"
   signalProcess killProcess pid
   return (Left (show TooLong), [])
 
-  
--- | Function that handles requests from the @EvalQueue@
-handleQueue :: EvalQueue -> HscEnv -> Ghc ()  
-handleQueue (EvalQueue chan) sess = do
-  (fpath, resultMVar) <- liftIO $ readChan chan
-  traceM $ "Got input: " ++ show fpath
-  r <- loadFile fpath sess 
-  -- r <- handleException $ compileFile fpath
-  traceM $ "Got result: " ++ show r
-  liftIO $ putMVar resultMVar r
-  return ()
-
-  
--- | Loads the file and compiles it using time restrictions
-loadFile :: FilePath -> HscEnv -> Ghc (EvalResult, [EvalError])
-loadFile f sess = do
+-- | Executes an action using time restrictions
+execTimeLimit :: Ghc DisplayResult -- ^ Action to be executed
+              -> Int -- ^ Time limit
+              -> FilePath -- ^ A path to a temporary file
+              -> HscEnv -- ^ Session in which the action will be executed
+              -> Ghc (EvalResult, [EvalError])
+execTimeLimit act lim f sess = do
   pid <- liftIO . forkProcess . run' $ do
     setSession sess
-    runToFile f
+    runToFile act f
   r <- liftIO $ do
-    race (processTimeout pid) $ do
+    race (processTimeout pid lim) $ do
       tc <- getProcessStatus True False pid
       -- print tc
       case tc of

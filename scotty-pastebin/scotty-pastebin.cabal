@@ -32,6 +32,7 @@ executable scotty-pastebin
                        blaze-html,
                        wai-extra,
                        wai-middleware-static,
+                       data-default ==0.5.*,
                        display,
 --                       diagrams,
                        monad-logger >=0.2,
