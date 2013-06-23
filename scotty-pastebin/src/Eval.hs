@@ -2,13 +2,14 @@
 {-# LANGUAGE RecordWildCards #-}
 module Eval where
 
-import Prelude hiding (writeFile, readFile)
+import Prelude hiding (writeFile, readFile, mapM_)
 
 import Control.Monad (forever)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.Reader (MonadReader(..))
 import Data.IORef (IORef, newIORef, modifyIORef',
                    readIORef)
+import Data.Foldable (mapM_)
 import Control.Concurrent ( ThreadId, forkIO)
 import Control.Concurrent.MVar (MVar, newEmptyMVar, putMVar, takeMVar)
 import Control.Concurrent.Chan (Chan, newChan, readChan, writeChan)
@@ -160,7 +161,7 @@ execTimeLimit :: Ghc DisplayResult -- ^ Action to be executed
               -> Ghc (EvalResult, [EvalError])
 execTimeLimit act set f sess = do
   pid <- liftIO . forkProcess . flip run' set $ do
-    liftIO $ setRLimits (rlimits set)
+    liftIO $ mapM_ setRLimits (rlimits set)
     setSession sess
     liftEvalM $ runToFile act f
   r <- liftIO $ do

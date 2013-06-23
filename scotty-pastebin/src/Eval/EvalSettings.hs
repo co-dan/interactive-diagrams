@@ -39,7 +39,7 @@ data EvalSettings = EvalSettings
       -- -20 is the highest, 20 is the lowest
     , niceness    :: Int
       -- | Resource limits for the 'setrlimit' syscall
-    , rlimits     :: RLimits
+    , rlimits     :: Maybe RLimits
     }
 
     
@@ -49,7 +49,7 @@ defaultSettings = EvalSettings
     , fileName   = "test.hs"
     , timeout    = 3
     , niceness   = 10
-    , rlimits    = def
+    , rlimits    = Nothing
     }
 
 instance Default EvalSettings where
