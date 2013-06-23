@@ -7,7 +7,7 @@ import Prelude hiding (writeFile, readFile)
 import Control.Monad (when, forever)
 import Control.Monad.Trans (lift)
 import Control.Monad.IO.Class (MonadIO, liftIO)
-import Control.Monad.State (MonadState(..))
+import Control.Monad.Reader (MonadReader(..))
 import Unsafe.Coerce (unsafeCoerce)
 import System.IO.Unsafe (unsafePerformIO)
 import Data.IORef (IORef, newIORef, modifyIORef',
@@ -140,7 +140,7 @@ handleQueue (EvalQueue chan) sess = do
 runWithLimits :: EvalM DisplayResult -> HscEnv -> Ghc EvalResultWithErrors
 runWithLimits act' sess = evalEvalM $ do
   let act = evalEvalM act'
-  EvalSettings{..} <- get
+  EvalSettings{..} <- ask
   liftEvalM $ execTimeLimit act timeout (tmpDirPath </> fileName) sess    
 
 -- | Compiles a source code file using @compileFile@ and writes
@@ -180,10 +180,3 @@ execTimeLimit act lim f sess = do
   either return return r
 
 
--- | Outputs any value that can be pretty-printed using the default style
-output :: Outputable a => a -> Ghc ()
-output a = do
-  dfs <- getSessionDynFlags
-  let style = defaultUserStyle
-      cntx = initSDocContext dfs style
-  liftIO $ print $ runSDoc (ppr a) cntx

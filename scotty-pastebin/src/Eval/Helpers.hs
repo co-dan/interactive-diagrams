@@ -34,3 +34,11 @@ compileExpr expr = liftEvalM $ do
   -- output ty
   res <- unsafePerformIO . unsafeCoerce <$> GHC.compileExpr expr
   return res
+
+-- | Outputs any value that can be pretty-printed using the default style
+output :: Outputable a => a -> Ghc ()
+output a = do
+  dfs <- getSessionDynFlags
+  let style = defaultUserStyle
+      cntx = initSDocContext dfs style
+  liftIO $ print $ runSDoc (ppr a) cntx
