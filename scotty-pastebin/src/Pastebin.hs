@@ -157,7 +157,9 @@ compilePaste queue code = do
   fname <- liftIO $ hash code
   let fpath = getPastesDir </> show fname ++ ".hs"
   liftIO $ T.writeFile fpath code
-  (res, errors) <- liftIO $ sendEvaluator queue (compileFile fpath)
+  (res, errors) <- liftIO $ sendEvaluator queue $ do
+    loadFile fpath
+    compileExpr "return . display =<< main"
   case res of
     Left err -> throwT (pack err, errors)
     Right r -> liftIO . runWithSql $ insert $

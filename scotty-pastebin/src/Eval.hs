@@ -39,13 +39,13 @@ import Eval.EvalError
 import Eval.EvalSettings
 import Eval.EvalM
 import Eval.Helpers
+import Eval.Limits
 
 import Debug.Trace
 traceM :: Monad m => String -> m ()
 traceM s = trace s $ return ()
   
 
-type EvalResult = Either String DisplayResult
 type EvalResultWithErrors = (EvalResult, [EvalError])
 newtype EvalQueue =
   EvalQueue (Chan (EvalM DisplayResult, MVar EvalResultWithErrors))
@@ -60,10 +60,8 @@ run m = do
     Left s -> return $ Left $ s ++ "\n" ++ logMsg
     _ -> return r
 
-
 run' :: Ghc a -> IO a
 run' m = runGhc (Just libdir) m
-
 
 -- | Inits the GHC API, sets the mode and the log handler         
 initGhc :: IORef [EvalError] -> Ghc ()
@@ -115,7 +113,7 @@ prepareEvalQueue = do
   chan <- EvalQueue <$> newChan
   tid <- forkIO $ do
     run $ do
-      evalEvalM $ compileFile "Preload.hs"
+      evalEvalM $ loadFile "Preload.hs"
       sess <- getSession
       forever $ handleQueue chan sess
     return ()
@@ -156,18 +154,6 @@ runToFile act f = do
   errors <- liftIO $ readIORef ref
   liftIO $ writeFile (f ++ ".res") (encode (dr,errors))
   return ()
-  
-
--- | Waits for a certain period of time (3 seconds)
--- and then kills the process
-processTimeout :: ProcessID -- ^ ID of a process to be killed
-               -> Int -- ^ Time limit (in seconds)
-               -> IO (EvalResult, [EvalError])
-processTimeout pid lim = do
-  threadDelay (lim * 1000000)
-  -- putStrLn "Timed out, killing process"
-  signalProcess killProcess pid
-  return (Left (show TooLong), [])
 
 -- | Executes an action using time restrictions
 execTimeLimit :: Ghc DisplayResult -- ^ Action to be executed
@@ -193,3 +179,11 @@ execTimeLimit act lim f sess = do
           return (Left (show TooLong), [])
   either return return r
 
+
+-- | Outputs any value that can be pretty-printed using the default style
+output :: Outputable a => a -> Ghc ()
+output a = do
+  dfs <- getSessionDynFlags
+  let style = defaultUserStyle
+      cntx = initSDocContext dfs style
+  liftIO $ print $ runSDoc (ppr a) cntx
