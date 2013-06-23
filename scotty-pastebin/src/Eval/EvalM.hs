@@ -24,9 +24,6 @@ newtype EvalM a = EvalM { unEvalM :: ReaderT EvalSettings Ghc a }
 liftEvalM :: Ghc a -> EvalM a
 liftEvalM = EvalM . lift
 
-evalEvalM :: EvalM a -> Ghc a
-evalEvalM (EvalM act') = runReaderT act' def
-
 runEvalM :: EvalM a -> EvalSettings -> Ghc a
 runEvalM (EvalM act') set = runReaderT act' set
 

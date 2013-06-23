@@ -50,18 +50,18 @@ type EvalResultWithErrors = (EvalResult, [EvalError])
 newtype EvalQueue =
   EvalQueue (Chan (EvalM DisplayResult, MVar EvalResultWithErrors))
 
--- | Runs a Ghc monad and returns either a result, or an error message
-run :: Ghc a -> IO (Either String a)
-run m = do
+-- | Runs an EvalM monad and returns either a result, or an error message
+run :: EvalM a -> EvalSettings -> IO (Either String a)
+run m set = do
   ref <- newIORef []
-  r <- handleException $ run' (initGhc ref >> m)
+  r <- handleException $ run' (liftEvalM (initGhc ref) >> m) set
   logMsg <- unlines . map show <$> readIORef ref
   case r of
     Left s -> return $ Left $ s ++ "\n" ++ logMsg
     _ -> return r
 
-run' :: Ghc a -> IO a
-run' m = runGhc (Just libdir) m
+run' :: EvalM a -> EvalSettings -> IO a
+run' m set = runGhc (Just libdir) (runEvalM m set)
 
 -- | Inits the GHC API, sets the mode and the log handler         
 initGhc :: IORef [EvalError] -> Ghc ()
@@ -108,14 +108,14 @@ handleException m =
 
 
 -- | Spawn a new evaluator
-prepareEvalQueue :: IO (EvalQueue, ThreadId)
-prepareEvalQueue = do
+prepareEvalQueue :: EvalSettings -> IO (EvalQueue, ThreadId)
+prepareEvalQueue set = do
   chan <- EvalQueue <$> newChan
   tid <- forkIO $ do
-    run $ do
-      evalEvalM $ loadFile "Preload.hs"
+    run (do
+      loadFile "Preload.hs"
       sess <- getSession
-      forever $ handleQueue chan sess
+      forever $ handleQueue chan sess) set
     return ()
   return (chan, tid)
   
@@ -128,7 +128,7 @@ sendEvaluator (EvalQueue chan) act = do
   
   
 -- | Function that handles requests from the @EvalQueue@
-handleQueue :: EvalQueue -> HscEnv -> Ghc ()  
+handleQueue :: EvalQueue -> HscEnv -> EvalM ()  
 handleQueue (EvalQueue chan) sess = do
   (act', resultMVar) <- liftIO $ readChan chan
   -- r <- loadFile fpath sess
@@ -137,11 +137,11 @@ handleQueue (EvalQueue chan) sess = do
   return ()
 
 
-runWithLimits :: EvalM DisplayResult -> HscEnv -> Ghc EvalResultWithErrors
-runWithLimits act' sess = evalEvalM $ do
-  let act = evalEvalM act'
-  EvalSettings{..} <- ask
-  liftEvalM $ execTimeLimit act timeout (tmpDirPath </> fileName) sess    
+runWithLimits :: EvalM DisplayResult -> HscEnv -> EvalM EvalResultWithErrors
+runWithLimits act' sess = do
+  (set@EvalSettings{..}) <- ask
+  let act = runEvalM act' set
+  liftEvalM $ execTimeLimit act set (tmpDirPath </> fileName) sess    
 
 -- | Compiles a source code file using @compileFile@ and writes
 -- the result to a file
@@ -157,16 +157,16 @@ runToFile act f = do
 
 -- | Executes an action using time restrictions
 execTimeLimit :: Ghc DisplayResult -- ^ Action to be executed
-              -> Int -- ^ Time limit
+              -> EvalSettings -- ^ Settings with time limit
               -> FilePath -- ^ A path to a temporary file
               -> HscEnv -- ^ Session in which the action will be executed
               -> Ghc (EvalResult, [EvalError])
-execTimeLimit act lim f sess = do
-  pid <- liftIO . forkProcess . run' $ do
+execTimeLimit act set f sess = do
+  pid <- liftIO . forkProcess . flip run' set $ do
     setSession sess
-    runToFile act f
+    liftEvalM $ runToFile act f
   r <- liftIO $ do
-    race (processTimeout pid lim) $ do
+    race (processTimeout pid (timeout set)) $ do
       tc <- getProcessStatus True False pid
       -- print tc
       case tc of

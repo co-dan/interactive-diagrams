@@ -12,6 +12,7 @@ import Data.Monoid ((<>), mempty)
 import Data.Foldable (foldMap)
 import Control.Monad.Trans.Maybe (MaybeT(..))
 
+import Data.Default
 import Data.EitherR (throwT, catchT)
 import Control.Error.Util (hoistMaybe, maybeT)
 import System.FilePath.Posix ((</>))
@@ -185,7 +186,7 @@ measureTime act = do
 main :: IO ()
 main = do
   runWithSql (runMigration migrateAll)
-  (queue, _) <- prepareEvalQueue
+  (queue, _) <- prepareEvalQueue (def { tmpDirPath = getPastesDir })
   scotty 3000 $ do
     middleware logStdoutDev
     middleware $ staticPolicy (addBase "../common/static")
