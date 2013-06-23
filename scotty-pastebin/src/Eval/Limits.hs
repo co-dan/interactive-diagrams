@@ -1,12 +1,14 @@
+{-# LANGUAGE RecordWildCards #-}
 module Eval.Limits where
 
 import Control.Concurrent (threadDelay)
 import System.Posix.Signals (signalProcess, killProcess)
 import System.Posix.Types (ProcessID)
+import System.Posix.Resource (setResourceLimit)
 
 import Eval.EvalM
 import Eval.EvalError
-
+import Eval.EvalSettings
 
 -- | Waits for a certain period of time (3 seconds)
 -- and then kills the process
@@ -19,3 +21,14 @@ processTimeout pid lim = do
   signalProcess killProcess pid
   return (Left (show TooLong), [])
 
+
+-- | Set rlimits using setrlimit syscall
+setRLimits :: RLimits -> IO ()
+setRLimits RLimits{..} = mapM_ (uncurry setResourceLimit) lims
+  where lims = [ (ResourceCoreFileSize, coreFileSizeLimit)
+               , (ResourceCPUTime, cpuTimeLimit)
+               , (ResourceDataSize, dataSizeLimit)
+               -- , (ResourceFileSize, fileSizeLimit)
+               -- , (ResourceOpenFiles, openFilesLimit)
+               -- , (ResourceStackSize, stackSizeLimit)
+               , (ResourceTotalMemory, totalMemoryLimit) ]

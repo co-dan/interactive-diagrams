@@ -5,7 +5,6 @@ import Control.Monad (liftM)
 import Control.Monad.Trans
 import Control.Monad.Reader (ReaderT(..), MonadReader(..),
                              runReaderT)
-import Data.Default
 import GHC
 import DynFlags
 import Exception
