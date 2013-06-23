@@ -15,12 +15,16 @@ copyright (c) 2012, Shae Erisson & contributors
 
 module Display where
 
+import           Prelude hiding (span)
+
+import           Control.Monad (liftM)
 import           Data.Char
 import           Data.Word
 import           Data.Int
 import           Data.Monoid
 import qualified Data.Text                     as T
 import qualified Data.Text.Lazy                as TL
+import qualified Data.Text.Lazy.Encoding       as TL
 import           Data.Typeable
 import           Data.Serialize  
 import qualified Diagrams.Backend.SVG          as D
@@ -28,8 +32,10 @@ import qualified Diagrams.Prelude              as D
 import           GHC.Generics
 import           Text.Blaze.Html.Renderer.Text
 import qualified Text.Blaze.Html5              as B
-import           Prelude hiding (span)
 import           Text.Blaze.Svg.Renderer.Utf8
+
+
+
 
 data ClientType = Html | Svg | Text
                 deriving (Eq, Show, Enum, Read, Generic)
@@ -49,8 +55,8 @@ data DR = DR {
 
 
 instance Serialize TL.Text where
-  put = put . TL.unpack
-  get = return . TL.pack =<< get
+  put = put . TL.encodeUtf8
+  get = liftM TL.decodeUtf8 get
 
 instance Serialize DR
 
