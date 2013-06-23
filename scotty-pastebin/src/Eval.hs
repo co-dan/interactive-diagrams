@@ -4,25 +4,20 @@ module Eval where
 
 import Prelude hiding (writeFile, readFile)
 
-import Control.Monad (when, forever)
-import Control.Monad.Trans (lift)
+import Control.Monad (forever)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.Reader (MonadReader(..))
-import Unsafe.Coerce (unsafeCoerce)
-import System.IO.Unsafe (unsafePerformIO)
 import Data.IORef (IORef, newIORef, modifyIORef',
                    readIORef)
-import Control.Concurrent (threadDelay, ThreadId, forkIO)
+import Control.Concurrent ( ThreadId, forkIO)
 import Control.Concurrent.MVar (MVar, newEmptyMVar, putMVar, takeMVar)
 import Control.Concurrent.Chan (Chan, newChan, readChan, writeChan)
 import Data.ByteString (writeFile, readFile)
 import System.FilePath.Posix ((</>))
-import System.Posix.Process (forkProcess, getProcessStatus)
+import System.Posix.Process (nice, forkProcess, getProcessStatus)
 import System.Posix.Signals (signalProcess, killProcess)
-import System.Posix.Types (ProcessID)
 import Control.Concurrent.Async (race)
 import Data.Serialize (encode, decode, Serialize)  
-import Data.Default
   
 import GHC
 import GHC.Paths
@@ -140,7 +135,9 @@ handleQueue (EvalQueue chan) sess = do
 runWithLimits :: EvalM DisplayResult -> HscEnv -> EvalM EvalResultWithErrors
 runWithLimits act' sess = do
   (set@EvalSettings{..}) <- ask
-  let act = runEvalM act' set
+  let act = do
+        liftIO $ nice niceness
+        runEvalM act' set
   liftEvalM $ execTimeLimit act set (tmpDirPath </> fileName) sess    
 
 -- | Compiles a source code file using @compileFile@ and writes
@@ -163,6 +160,7 @@ execTimeLimit :: Ghc DisplayResult -- ^ Action to be executed
               -> Ghc (EvalResult, [EvalError])
 execTimeLimit act set f sess = do
   pid <- liftIO . forkProcess . flip run' set $ do
+    liftIO $ setRLimits (rlimits set)
     setSession sess
     liftEvalM $ runToFile act f
   r <- liftIO $ do
