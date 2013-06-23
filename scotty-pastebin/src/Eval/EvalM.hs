@@ -1,11 +1,13 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving, FlexibleInstances #-}
 module Eval.EvalM where
 
+import Control.Monad (liftM)
 import Control.Monad.Trans
 import Control.Monad.Reader (ReaderT(..), MonadReader(..),
                              runReaderT)
 import Data.Default
 import GHC
+import DynFlags
 import Exception
 import qualified MonadUtils
 
@@ -43,3 +45,16 @@ instance ExceptionMonad EvalM where
         let eval_restore act = 
               liftEvalM $ ghc_restore (runEvalM act r)
         runEvalM (callb eval_restore) r
+
+instance MonadUtils.MonadIO EvalM where
+  liftIO = liftIO
+
+instance HasDynFlags EvalM where
+  getDynFlags = liftEvalM getDynFlags
+
+instance Functor EvalM where
+  fmap = liftM
+  
+instance GhcMonad EvalM where
+  getSession = liftEvalM getSession
+  setSession = liftEvalM . setSession
