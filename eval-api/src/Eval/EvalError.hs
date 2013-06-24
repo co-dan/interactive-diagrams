@@ -1,6 +1,6 @@
 {-# LANGUAGE DeriveDataTypeable, RecordWildCards, DeriveGeneric #-}
 {-# LANGUAGE StandaloneDeriving #-}
-module EvalError (
+module Eval.EvalError (
   Severity(..), SrcPos(..), srcPos,
   EvalError(..),
   LoadingException(..), TooLong(..)

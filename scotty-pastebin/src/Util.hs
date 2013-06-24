@@ -43,3 +43,4 @@ currentTime = getCurrentTime >>= return . floor . toRational . utctDayTime
 
 getPastesDir :: FilePath
 getPastesDir = "/tmp"
+
