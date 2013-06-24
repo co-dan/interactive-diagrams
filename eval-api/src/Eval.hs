@@ -21,7 +21,6 @@ import Control.Concurrent.Async (race)
 import Data.Serialize (encode, decode, Serialize)  
   
 import GHC
-import GHC.Paths
 import DynFlags
 import MonadUtils hiding (MonadIO, liftIO)
 import Outputable
@@ -57,7 +56,7 @@ run m set = do
     _ -> return r
 
 run' :: EvalM a -> EvalSettings -> IO a
-run' m set = runGhc (Just libdir) (runEvalM m set)
+run' m set = runGhc (libDirPath set) (runEvalM m set)
 
 -- | Inits the GHC API, sets the mode and the log handler         
 initGhc :: IORef [EvalError] -> Ghc ()

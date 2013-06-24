@@ -10,6 +10,7 @@ import Data.Default
 import System.Posix.Resource (ResourceLimit(..),
                               ResourceLimits(..),
                               Resource(..))
+import GHC.Paths
 
 data RLimits = RLimits
     { coreFileSizeLimit :: ResourceLimits
@@ -27,8 +28,10 @@ deriving instance Show Resource
 
 -- | Datastructure holding the settings for the interpreter  
 data EvalSettings = EvalSettings
-    { -- | Path to the directory where temporary files are held
-      tmpDirPath  :: FilePath
+    { -- | Path to the directory with Haskell libraries
+      libDirPath  :: Maybe FilePath
+      -- | Path to the directory where temporary files are held
+    , tmpDirPath  :: FilePath
       -- | File name that will be used for source code.
       -- The result will be written to '<filename>.res'
     , fileName    :: FilePath
@@ -46,6 +49,7 @@ data EvalSettings = EvalSettings
 defaultSettings :: EvalSettings
 defaultSettings = EvalSettings
     { tmpDirPath = "/tmp"
+    , libDirPath = Just libdir
     , fileName   = "test.hs"
     , timeout    = 3
     , niceness   = 10
