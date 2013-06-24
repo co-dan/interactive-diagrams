@@ -4,7 +4,7 @@ module Eval where
 
 import Prelude hiding (writeFile, readFile, mapM_)
 
-import Control.Monad (forever)
+import Control.Monad (forever, liftM)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.Reader (MonadReader(..))
 import Data.IORef (IORef, newIORef, modifyIORef',
@@ -99,7 +99,7 @@ handleException m =
   ghandle (\(ex :: SomeException) -> return (Left (showException ex))) $
   handleGhcException (\ge -> return (Left (showGhcException ge ""))) $
   flip gfinally (liftIO restoreHandlers) $
-  m >>= return . Right
+  liftM Right m
   
 
 
@@ -148,7 +148,7 @@ runToFile act f = do
   ref <- liftIO $ newIORef []
   dfs <- getSessionDynFlags
   setSessionDynFlags $ dfs { log_action = logHandler ref }
-  dr <- handleException $ act
+  dr <- handleException act
   errors <- liftIO $ readIORef ref
   liftIO $ writeFile (f ++ ".res") (encode (dr,errors))
   return ()
@@ -164,8 +164,7 @@ execTimeLimit act set f sess = do
     liftIO $ mapM_ setRLimits (rlimits set)
     setSession sess
     liftEvalM $ runToFile act f
-  r <- liftIO $ do
-    race (processTimeout pid (timeout set)) $ do
+  r <- liftIO $ race (processTimeout pid (timeout set)) $ do
       tc <- getProcessStatus True False pid
       -- print tc
       case tc of

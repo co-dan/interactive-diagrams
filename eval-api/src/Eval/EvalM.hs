@@ -24,7 +24,7 @@ liftEvalM :: Ghc a -> EvalM a
 liftEvalM = EvalM . lift
 
 runEvalM :: EvalM a -> EvalSettings -> Ghc a
-runEvalM (EvalM act') set = runReaderT act' set
+runEvalM (EvalM act') = runReaderT act'
 
 instance MonadIO Ghc where
   liftIO = MonadUtils.liftIO
@@ -32,11 +32,11 @@ instance MonadIO Ghc where
 instance ExceptionMonad EvalM where
   gcatch (EvalM act) ctch =
     EvalM $ ReaderT $ \r ->
-    (runReaderT act r)
+    runReaderT act r
     `gcatch` (\e -> runReaderT (unEvalM (ctch e)) r)
 
   gmask callb =
-    EvalM $ ReaderT $ \r -> do
+    EvalM $ ReaderT $ \r -> 
       gmask $ \ghc_restore -> do
         let eval_restore act = 
               liftEvalM $ ghc_restore (runEvalM act r)

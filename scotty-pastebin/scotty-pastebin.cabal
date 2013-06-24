@@ -45,4 +45,5 @@ executable scotty-pastebin
                        hashable,
                        time,
                        ghc-paths,
-                       ghc >= 7.6
+                       ghc >= 7.6,
+                       eval-api

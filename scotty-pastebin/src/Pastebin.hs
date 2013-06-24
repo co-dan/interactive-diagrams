@@ -61,11 +61,11 @@ Paste
 mainPage :: String -> Html -> Html
 mainPage title content = H.docTypeHtml $ do
   H.head $ do
-    H.title $ "Evaluate -> " <> (H.toHtml title)
+    H.title $ "Evaluate -> " <> H.toHtml title
     H.link ! rel "stylesheet" ! type_ "text/css" ! href "/css/bootstrap.min.css"
     H.script ! HA.src "/js/bootstrap.min.js" $ mempty
     H.script ! HA.src "http://code.jquery.com/jquery-2.0.2.min.js" $ mempty
-  H.body $ do
+  H.body $ 
     H.div ! class_ "container-fluid" $ do
       H.div ! class_ "row-fluid" $
         H.div ! class_ "span12" $
@@ -75,7 +75,7 @@ mainPage title content = H.docTypeHtml $ do
     
 
 formWithCode :: Text -> Html
-formWithCode code = do
+formWithCode code = 
   H.div ! class_ "span6" 
         ! HA.style "padding-right:20px; border-right: 1px solid #ccc;" $
     H.div ! HA.id "form" $
@@ -111,22 +111,22 @@ listPastes = do
     selectList [] [LimitTo 20, Desc PasteId]
   html . renderHtml . mainPage "Paste" $ do
     formWithCode ""
-    H.div ! class_ "span5" $ do
+    H.div ! class_ "span5" $ 
       forM_ pastes $ \(Entity k' Paste{..}) -> do
         let k = keyToInt k'
-        H.a ! href (H.toValue ("/get/" ++ (show k))) $
-          H.toHtml $ "Paste id " ++ (show k)
+        H.a ! href (H.toValue ("/get/" ++ show k)) $
+          H.toHtml $ "Paste id " ++ show k
         H.br
 
 
 errPage :: Text -> (Text, [EvalError]) -> ActionM ()
-errPage code (msg, errors) = do
+errPage code (msg, errors) = 
   html . renderHtml . mainPage "Error" $ do
     formWithCode code
     H.div ! class_ "span5" $ do
-      H.div ! HA.id "sheet" $ do
+      H.div ! HA.id "sheet" $ 
         H.p $ H.toHtml msg
-      forM_ errors $ \EvalError{..} -> do
+      forM_ errors $ \EvalError{..} -> 
         H.div ! HA.id "error" $ do
           let (style, caption) = case severity of
                 SevError -> ("alert-error", "Error")
@@ -137,7 +137,7 @@ errPage code (msg, errors) = do
             H.button ! type_ "button" ! class_ "close"
                      ! H.dataAttribute "dissmis" "alert" $
                          H.preEscapedToHtml ("&times;" :: String)
-            H.strong $ caption
+            H.strong caption
             H.br
             foldMap ((<> H.br) . H.toHtml . T.pack) (lines errMsg)
         

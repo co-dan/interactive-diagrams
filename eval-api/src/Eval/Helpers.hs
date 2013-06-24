@@ -1,7 +1,7 @@
 module Eval.Helpers where
 
 import Control.Monad (when)
-import Control.Monad.IO.Class (liftIO)
+import Control.Monad.IO.Class (liftIO, MonadIO)
 import Unsafe.Coerce (unsafeCoerce)
 import System.IO.Unsafe (unsafePerformIO)
 
@@ -17,7 +17,7 @@ import Display
 
 -- | Loads the file into the evaluator
 loadFile :: FilePath -> EvalM ()
-loadFile file = liftEvalM $ do
+loadFile file = do
   setTargets =<< sequence [ guessTarget file Nothing
                           , guessTarget "Helper.hs" Nothing]
   graph <- depanal [] False
@@ -28,14 +28,14 @@ loadFile file = liftEvalM $ do
 
 -- | Compiles an expression to a @DisplayResult@
 compileExpr :: String -> EvalM DisplayResult
-compileExpr expr = liftEvalM $ do
+compileExpr expr = do
   ty <- exprType expr -- throws exception if doesn't typecheck
   -- output ty
-  res <- unsafePerformIO . unsafeCoerce <$> GHC.compileExpr expr
-  return res
+  unsafePerformIO . unsafeCoerce <$> GHC.compileExpr expr
+  
 
 -- | Outputs any value that can be pretty-printed using the default style
-output :: Outputable a => a -> Ghc ()
+output :: (GhcMonad m, MonadIO m) => Outputable a => a -> m ()
 output a = do
   dfs <- getSessionDynFlags
   let style = defaultUserStyle
