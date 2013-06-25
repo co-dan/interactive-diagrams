@@ -1,3 +1,1 @@
-module Helper (module Display) where
-
-import Display
+../common/Helper.hs
