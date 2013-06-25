@@ -51,5 +51,6 @@ executable evali
                        readline,
                        data-default,
                        time,
+                       text,
                        eval-api,
                        display

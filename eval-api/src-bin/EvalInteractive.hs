@@ -4,6 +4,7 @@ module Main where
 import Control.Monad
 import Control.Monad.IO.Class
 import Data.List
+import qualified Data.Text.Lazy as TL
 import Data.Default
 import System.Console.Readline
 import Data.Time.Clock (getCurrentTime, diffUTCTime)
@@ -28,8 +29,15 @@ loop c q = do
     Just ":quit" -> return ()
     Just ln -> do
       addHistory ln
-      measureTime $ 
-        print =<< sendEvaluator q (evalLn ln)
+      measureTime $ do
+        (r, errors) <- sendEvaluator q (evalLn ln)
+        case r of
+          Right (DisplayResult res) ->
+            mapM_ (putStr . TL.unpack . result) res
+            >> putStrLn ""
+          Left err -> putStrLn err
+        putStrLn "Errors:"
+        mapM_ print errors   
       loop c q
 
 evalLn :: String -> EvalM DisplayResult
