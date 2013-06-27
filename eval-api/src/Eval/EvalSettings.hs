@@ -100,7 +100,7 @@ openFilesLimitHard = ResourceLimit 7
 fileSizeLimitSoft = fileSizeLimitHard
 fileSizeLimitHard = ResourceLimit 10800
 dataSizeLimitSoft = dataSizeLimitHard
-dataSizeLimitHard = ResourceLimit $ 1000 * 10^(6::Int)
+dataSizeLimitHard = ResourceLimit $ 104857600 * 5 -- 100 * 5 mb
 -- These should not be identical, to give the XCPU handler time to trigger
 cpuTimeLimitSoft = ResourceLimit 4
 cpuTimeLimitHard = ResourceLimit 5

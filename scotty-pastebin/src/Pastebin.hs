@@ -186,10 +186,11 @@ measureTime act = do
 main :: IO ()
 main = do
   runWithSql (runMigration migrateAll)
-  (queue, _) <- prepareEvalQueue (def { tmpDirPath = getPastesDir })
+  (queue, _) <- prepareEvalQueue (def {tmpDirPath = getPastesDir, rlimits = Just def})
   scotty 3000 $ do
     middleware logStdoutDev
     middleware $ staticPolicy (addBase "../common/static")
     S.get "/get/:id" $ maybeT page404 renderPaste getPaste
     S.get "/" listPastes
     S.post "/new" $ eitherT (uncurry errPage) redirPaste (measureTime (newPaste queue))
+

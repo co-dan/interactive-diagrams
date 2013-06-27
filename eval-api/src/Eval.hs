@@ -152,6 +152,9 @@ runToFile act f = do
   liftIO $ writeFile (f ++ ".res") (encode (dr,errors))
   return ()
 
+-- | Result of the deserialization
+type DecodeResult = Either String (EvalResult, [EvalError])
+
 -- | Executes an action using time restrictions
 execTimeLimit :: Ghc DisplayResult -- ^ Action to be executed
               -> EvalSettings -- ^ Settings with time limit
@@ -165,12 +168,13 @@ execTimeLimit act set f sess = do
     liftEvalM $ runToFile act f
   r <- liftIO $ race (processTimeout pid (timeout set)) $ do
       tc <- getProcessStatus True False pid
-      -- print tc
       case tc of
-        Just _ -> do
-          Right (r :: (EvalResult, [EvalError])) <- 
-            decode <$> readFile (f ++ ".res")
-          return r
+        Just exitSt -> do
+          r :: DecodeResult <- decode <$> readFile (f ++ ".res")
+          case r of
+            Right eres -> return eres
+            Left str -> return (Left $ "Deserialization error:\n" ++
+                                str ++ "\nExit status was: " ++ show exitSt, [])
         Nothing -> do
           signalProcess killProcess pid
           return (Left (show TooLong), [])
