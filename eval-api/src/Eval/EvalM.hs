@@ -1,4 +1,4 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving, FlexibleInstances #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving, FlexibleInstances, CPP #-}
 module Eval.EvalM where
 
 import Control.Monad (liftM)
@@ -26,8 +26,10 @@ liftEvalM = EvalM . lift
 runEvalM :: EvalM a -> EvalSettings -> Ghc a
 runEvalM (EvalM act') = runReaderT act'
 
+#if __GLASGOW_HASKELL__ < 707 
 instance MonadIO Ghc where
   liftIO = MonadUtils.liftIO
+#endif
 
 instance ExceptionMonad EvalM where
   gcatch (EvalM act) ctch =
@@ -42,8 +44,10 @@ instance ExceptionMonad EvalM where
               liftEvalM $ ghc_restore (runEvalM act r)
         runEvalM (callb eval_restore) r
 
+#if __GLASGOW_HASKELL__ < 707 
 instance MonadUtils.MonadIO EvalM where
   liftIO = liftIO
+#endif
 
 instance HasDynFlags EvalM where
   getDynFlags = liftEvalM getDynFlags
