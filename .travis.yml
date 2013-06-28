@@ -1,3 +1,6 @@
 language: haskell
+install:
+  - cd eval-api
+  - cabal install 
 script: 
   - cabal install eval-api/
