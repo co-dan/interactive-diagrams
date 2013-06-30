@@ -51,10 +51,14 @@ allow idia_web_t etc_t:file { read open getattr };
 
 # Forking new processes & transitioning
 allow idia_web_t self:capability { setuid setgid kill };
-allow idia_web_t self:process    { fork setpgid setrlimit dyntransition }; 
+allow idia_web_t self:process    { fork setpgid setrlimit dyntransition getpgid }; 
 domain_dyntrans_type(idia_web_t)
 dyntrans_pattern(idia_web_t, idia_restricted_t)
 dyntrans_pattern(idia_web_t, idia_web_t)
+typebounds idia_web_t idia_restricted_t;
+# When setcon(3) is used to set a different context on a new thread without an
+# associated typebounds policy statement, then the call will return 'Operation not
+# permitted' 
 allow idia_web_t self:process setsched;
 
 # I/O
