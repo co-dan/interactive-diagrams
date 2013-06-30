@@ -3,13 +3,15 @@ module Eval.EvalSettings
     (
      EvalSettings(..), defaultSettings,
      RLimits(..),
-     ResourceLimits(..), ResourceLimit(..), Resource(..)
+     ResourceLimits(..), ResourceLimit(..), Resource(..),
+     SecurityContext
     ) where
 
 import Data.Default
 import System.Posix.Resource (ResourceLimit(..),
                               ResourceLimits(..),
                               Resource(..))
+import System.Linux.SELinux (SecurityContext)  
 import GHC.Paths
 
 data RLimits = RLimits
@@ -43,6 +45,9 @@ data EvalSettings = EvalSettings
     , niceness    :: Int
       -- | Resource limits for the 'setrlimit' syscall
     , rlimits     :: Maybe RLimits
+      -- | SELinux security context under which the worker 
+      -- process will be running.
+    , secontext   :: SecurityContext
     }
 
     
@@ -54,6 +59,7 @@ defaultSettings = EvalSettings
     , timeout    = 3
     , niceness   = 10
     , rlimits    = Nothing
+    , secontext  = "system_u:system_r:idia_restricted_t:SystemLow-SystemHigh"
     }
 
 instance Default EvalSettings where

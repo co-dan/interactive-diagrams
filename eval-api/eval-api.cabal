@@ -36,7 +36,8 @@ library
                        ghc-paths ==0.1.*,
                        data-default ==0.5.*,
                        ghc >= 7.6,
-                       display ==0.1.*
+                       display ==0.1.*,
+                       selinux
                        
   
   hs-source-dirs:      src

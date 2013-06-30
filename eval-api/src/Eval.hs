@@ -10,7 +10,7 @@ import Control.Monad.Reader (MonadReader(..))
 import Data.IORef (IORef, newIORef, modifyIORef',
                    readIORef)
 import Data.Foldable (mapM_)
-import Control.Concurrent ( ThreadId, forkIO)
+import Control.Concurrent (ThreadId, forkIO)
 import Control.Concurrent.MVar (MVar, newEmptyMVar, putMVar, takeMVar)
 import Control.Concurrent.Chan (Chan, newChan, readChan, writeChan)
 import Data.ByteString (writeFile, readFile)
@@ -19,7 +19,8 @@ import System.Posix.Process (nice, forkProcess, getProcessStatus)
 import System.Posix.Signals (signalProcess, killProcess)
 import Control.Concurrent.Async (race)
 import Data.Serialize (encode, decode, Serialize)  
-  
+import System.Linux.SELinux (getCon)
+
 import GHC
 import DynFlags
 import MonadUtils hiding (MonadIO, liftIO)
@@ -163,7 +164,16 @@ execTimeLimit :: Ghc DisplayResult -- ^ Action to be executed
               -> Ghc (EvalResult, [EvalError])
 execTimeLimit act set f sess = do
   pid <- liftIO . forkProcess . flip run' set $ do
-    liftIO $ mapM_ setRLimits (rlimits set)
+    liftIO $ do
+      mapM_ setRLimits (rlimits set)
+      putStrLn $ "Calling setCon " ++ show (secontext set)
+
+      getCon >>= \c -> putStrLn $ "Current context: " ++ show c
+      
+      setupSELinuxCntx (secontext set)
+
+      getCon >>= \c -> putStrLn $ "Current context: " ++ show c
+      
     setSession sess
     liftEvalM $ runToFile act f
   r <- liftIO $ race (processTimeout pid (timeout set)) $ do

@@ -5,6 +5,7 @@ import Control.Concurrent (threadDelay)
 import System.Posix.Signals (signalProcess, killProcess)
 import System.Posix.Types (ProcessID)
 import System.Posix.Resource (setResourceLimit)
+import System.Linux.SELinux (setCon, SecurityContext)
 
 import Eval.EvalM
 import Eval.EvalError
@@ -32,3 +33,7 @@ setRLimits RLimits{..} = mapM_ (uncurry setResourceLimit) lims
                -- , (ResourceOpenFiles, openFilesLimit)
                -- , (ResourceStackSize, stackSizeLimit)
                , (ResourceTotalMemory, totalMemoryLimit) ]
+
+
+setupSELinuxCntx :: SecurityContext -> IO ()
+setupSELinuxCntx = setCon
