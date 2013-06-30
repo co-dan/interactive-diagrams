@@ -1,0 +1,127 @@
+policy_module(interactive-diagrams, 1.0.0)
+
+require {
+  type user_home_t;
+  type user_home_dir_t;
+  type tmp_t;
+  type locale_t;
+  type node_t;
+  type bin_t;
+  type etc_t;
+}       
+
+# domain types
+type idia_restricted_t; # child process, should be very restricted
+type idia_web_t; # scotty-pastebin security context
+type idia_web_exec_t; # scotty-pastebin executable file context
+
+
+type idia_db_t; # SQLite database
+type idia_pkg_t; # directory with GHC packages
+type idia_web_common_t; # html templates, css and other static content
+
+# role system_r types idia_t;
+# TODO: why do we need system_r?
+role system_r types idia_web_t;
+
+init_daemon_domain(idia_web_t, idia_web_exec_t)
+
+domain_type(idia_restricted_t)
+role system_r types idia_restricted_t;
+
+# domain_type(idia_compile_t)
+# role system_r types idia_compile_t;
+
+# domain_type(idia_worker_notify_t)
+# role system_r types idia_worker_notify_t;
+
+files_type(idia_pkg_t)
+files_type(idia_web_common_t)
+
+##############################
+# idia web service
+
+# Locale
+allow idia_web_t locale_t:dir search;
+allow idia_web_t locale_t:file { read getattr open };
+allow idia_web_t locale_t:lnk_file read;
+# need this for /etc/locale.alias access 
+# TODO
+allow idia_web_t etc_t:file { read open getattr };
+
+# Forking new processes & transitioning
+allow idia_web_t self:capability { setuid setgid kill };
+allow idia_web_t self:process    { fork setpgid setrlimit dyntransition }; 
+domain_dyntrans_type(idia_web_t)
+dyntrans_pattern(idia_web_t, idia_restricted_t)
+dyntrans_pattern(idia_web_t, idia_web_t)
+allow idia_web_t self:process setsched;
+
+# I/O
+allow idia_web_t self:fd use;
+allow idia_web_t self:fifo_file { read write ioctl getattr };
+
+
+# no idea why do we need this
+# TODO
+allow idia_web_t self:process { execmem };
+
+# it needs to access /home/vagrant and /home/vagrant/ghc for some reason
+# TODO
+# search should be alright tho
+allow idia_web_t user_home_t:dir search;
+allow idia_web_t user_home_dir_t:dir search;
+
+# networking, because the block below doesn't work :-(
+# some of this can be removed with proper setup
+allow idia_web_t self:capability { net_bind_service };
+allow idia_web_t node_t:tcp_socket node_bind;
+allow idia_web_t self:netlink_route_socket { write getattr read bind create nlmsg_read };
+allow idia_web_t self:tcp_socket { read write bind create setopt accept listen };
+allow idia_web_t self:udp_socket { create connect getattr };
+
+
+# Temp file
+allow idia_web_t tmp_t:dir { write add_name create open };
+# the directory with temp files should be labeled with tmp_t
+allow idia_web_t tmp_t:file { write getattr read create open ioctl };
+
+# Common files (css, js, html)
+read_files_pattern(idia_web_t, idia_web_common_t, idia_web_common_t)
+
+# # Seems like we also need this
+# # probably for loading Display.hi and Preload.hi
+# getattr_dirs_pattern(idia_web_t, idia_web_exec_t, idia_web_exec_t)
+# Need this for: preloading sqlite
+manage_dirs_pattern(idia_web_t, idia_web_exec_t, idia_web_exec_t)
+write_files_pattern(idia_web_t, idia_web_exec_t, idia_web_exec_t)
+allow idia_web_t idia_web_exec_t:file { create unlink };
+# allow idia_web_t idia_web_exec_t:dir { write read add_name remove_name };
+# allow idia_web_t idia_web_exec_t:file { write create unlink };
+
+# Access to DB
+rw_files_pattern(idia_web_t, idia_db_t, idia_db_t)
+
+# Allow web worker to access GHC & idia packages
+getattr_dirs_pattern(idia_web_t, idia_pkg_t, idia_pkg_t)
+exec_files_pattern(idia_web_t, idia_pkg_t, idia_pkg_t)
+read_files_pattern(idia_web_t, idia_pkg_t, idia_pkg_t)
+read_files_pattern(idia_web_t, idia_pkg_t, idia_pkg_t)
+
+# for running gcc
+allow idia_web_t bin_t:dir { search getattr };
+allow idia_web_t bin_t:file { execute read open execute_no_trans getattr };
+allow idia_web_t bin_t:lnk_file { read getattr };
+
+
+########################################
+# worker process
+allow idia_restricted_t self:process { getpgid };
+
+
+# hmm this doesn't seem to work
+type idia_web_port_t;
+corenet_port(idia_web_t)
+
+allow idia_web_t idia_web_port_t:tcp_socket name_bind;
+

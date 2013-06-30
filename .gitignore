@@ -5,3 +5,5 @@ dist/
 test/
 scotty-pastebin/pastes.db
 scotty-pastebin/bla.hs
+*.if
+*.pp

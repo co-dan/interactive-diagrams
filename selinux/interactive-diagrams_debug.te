@@ -1,0 +1,194 @@
+policy_module(interactive-diagrams_debug, 1.0.0)
+
+#######################################################################
+# debug stuff, to allow running interactive-diagrams from 
+# an unconfined user
+#
+# development:
+# - install programs to the correct locations, make sure that they have
+#     the correct file labels (ls -lZ)
+# - run programs in permissive mode with runcon
+#     (check contexts with ps -Z)
+# - use audit2allow -dl to find the necessary rules
+# - for rules that are required for production:
+#     clean up (using the templates) and add to interactive-diagrams.sh
+######################################################################
+gen_require(`
+        type unconfined_t;
+        type proc_t;
+        type shell_exec_t;
+        type getty_t;
+        type sshd_t;
+
+        type idia_t;
+        type idia_web_t;
+        type idia_restricted_t;
+        type idia_var_log_t;
+
+        type bin_t;
+        type home_root_t;
+        type locale_t;
+        type user_home_dir_t;
+        type user_home_t;
+        type tmp_t;
+        type var_log_t;
+        type var_run_t;
+        type var_lib_t;
+        type var_t;
+        type etc_t;
+        type sysfs_t;
+        type tmpfs_t;
+        type cgroup_t;
+        type idia_conf_t;
+        type idia_var_run_t;
+        type idia_var_run_worker_t;
+        type idia_var_lib_t;
+        type idia_var_lib_worker_t;
+        type idia_env_t;
+        type idia_worker_notify_t;
+        type user_tmp_t;
+        type default_t;
+        type idia_compile_t;
+        type idia_var_lib_compile_t;
+')
+
+role system_r types unconfined_t;
+allow unconfined_t idia_t:process transition;
+allow unconfined_t idia_restricted_t:process transition;
+allow unconfined_t idia_t:process dyntransition;
+allow unconfined_t idia_restricted_t:process dyntransition;
+userdom_use_user_terminals(idia_t)
+allow idia_t self:capability { sys_tty_config };
+allow idia_t self:fifo_file { read write getattr ioctl };
+allow idia_t getty_t:fd use;
+allow idia_t proc_t:file { read getattr open };
+allow idia_t sshd_t:fd use;
+allow idia_web_t self:capability { sys_tty_config };
+allow idia_web_t getty_t:fd use;
+allow idia_web_t proc_t:file { read getattr open };
+allow idia_web_t sshd_t:fd use;
+
+userdom_use_user_terminals(idia_restricted_t)
+allow idia_restricted_t self:capability { sys_tty_config };
+allow idia_restricted_t getty_t:fd use;
+allow idia_restricted_t proc_t:file { read getattr open };
+allow idia_restricted_t sshd_t:fd use;
+
+allow idia_restricted_t unconfined_t:process sigchld;
+allow idia_restricted_t user_devpts_t:chr_file { write getattr };
+allow idia_restricted_t idia_var_lib_worker_t:dir read;
+##############################################################
+
+# maybe allow below permanently
+
+# for running gcc
+allow idia_t bin_t:dir { search getattr };
+allow idia_t bin_t:file { execute read open execute_no_trans getattr };
+allow idia_t bin_t:lnk_file { read getattr };
+
+
+allow idia_t etc_t:file { read open getattr };
+allow idia_t home_root_t:dir search;
+allow idia_t locale_t:dir search;
+allow idia_t locale_t:file { read getattr open };
+allow idia_t locale_t:lnk_file read;
+allow idia_t self:process { execmem signal sigkill setsched setsockcreate };
+allow idia_t self:unix_stream_socket { bind create setopt connect listen accept read write ioctl connectto };
+allow idia_t tmp_t:dir { write search add_name remove_name create getattr };
+allow idia_t tmp_t:file { write getattr read create open ioctl };
+allow idia_t user_home_dir_t:dir search;
+allow idia_t user_home_t:dir { search getattr };
+allow idia_t user_home_t:file { execute entrypoint getattr read open ioctl };
+allow idia_t user_home_t:lnk_file read;
+allow idia_t var_log_t:dir search;
+allow idia_t var_log_t:file append;
+allow idia_t var_run_t:dir search;
+allow idia_t var_t:dir search;
+allow idia_t idia_conf_t:dir search;
+allow idia_t idia_conf_t:file { read getattr open ioctl };
+allow idia_t idia_var_log_t:dir { search write add_name };
+allow idia_t idia_var_log_t:file { getattr open ioctl append create };
+
+allow idia_t idia_worker_notify_t:unix_stream_socket { create setopt bind listen accept read ioctl };
+
+
+allow idia_t idia_restricted_t:process sigkill;
+allow idia_t idia_restricted_t:unix_stream_socket { create setopt bind listen connect write ioctl };
+
+allow idia_t var_t:lnk_file read;
+allow idia_t default_t:dir search;
+allow idia_t idia_var_run_t:dir { search write add_name remove_name };
+allow idia_t idia_var_run_t:sock_file { create unlink write setattr };
+allow idia_t idia_var_run_worker_t:dir { write add_name remove_name };
+allow idia_t idia_var_run_worker_t:sock_file { create write unlink setattr };
+allow idia_t var_lib_t:dir search;
+allow idia_t idia_var_run_worker_t:dir search;
+allow idia_t self:capability { dac_read_search dac_override chown sys_chroot fowner fsetid };
+allow idia_t idia_var_lib_t:dir create;
+allow idia_t idia_var_lib_worker_t:dir { open search read write getattr setattr remove_name rmdir add_name create };
+allow idia_t idia_var_lib_worker_t:file { getattr unlink };
+allow idia_t sysfs_t:dir { search getattr };
+allow idia_t tmpfs_t:dir search;
+allow idia_t cgroup_t:dir { getattr search write add_name create };
+allow idia_t cgroup_t:file { open write getattr ioctl };
+
+# for notifying that child has started
+allow idia_restricted_t idia_worker_notify_t:unix_stream_socket {write ioctl connectto };
+
+# socket for communication with clients (created/opened by idia_t before setcon)
+allow idia_restricted_t self:unix_stream_socket { accept read ioctl write };
+allow idia_restricted_t self:process { execmem };
+
+# this doesn't look ok, only allow add_name in temp?
+allow idia_restricted_t idia_var_lib_worker_t:dir { open search getattr write add_name remove_name create };
+allow idia_restricted_t idia_var_lib_worker_t:file { execute create write open getattr read ioctl unlink append };
+allow idia_restricted_t idia_env_t:dir { search getattr };
+allow idia_restricted_t idia_env_t:file { open read getattr ioctl execute };
+allow idia_restricted_t idia_env_t:lnk_file read;
+
+#### for allowing child processes
+allow idia_restricted_t self:fifo_file { read write ioctl getattr };
+allow idia_restricted_t self:process getsched;
+allow idia_restricted_t idia_env_t:dir { read open };
+allow idia_restricted_t idia_env_t:file execute_no_trans;
+allow idia_restricted_t idia_var_lib_worker_t:dir getattr;
+
+allow idia_t tmp_t:file execute;
+####
+
+######################
+# for reading enforcing flag
+selinux_get_enforce_mode(idia_t)
+selinux_get_fs_mount(idia_t)
+
+allow idia_t security_t:dir list_dir_perms;
+allow idia_t security_t:file read_file_perms;
+allow idia_t security_t:filesystem getattr;
+read_files_pattern(idia_t, proc_t, proc_t)
+read_lnk_files_pattern(idia_t, proc_t, proc_t)
+list_dirs_pattern(idia_t, proc_t, proc_t)
+
+
+# debug, remove these!!!
+
+allow idia_restricted_t security_t:dir list_dir_perms;
+allow idia_restricted_t security_t:file read_file_perms;
+allow idia_restricted_t security_t:filesystem getattr;
+read_files_pattern(idia_restricted_t, proc_t, proc_t)
+read_lnk_files_pattern(idia_restricted_t, proc_t, proc_t)
+list_dirs_pattern(idia_restricted_t, proc_t, proc_t)
+
+allow idia_restricted_t etc_t:file read;
+allow idia_restricted_t locale_t:dir search;
+allow idia_restricted_t locale_t:file { read getattr open };
+allow idia_restricted_t self:unix_stream_socket { create connect };
+allow idia_restricted_t var_run_t:dir search;
+allow idia_restricted_t var_t:dir search;
+
+allow idia_t tmp_t:file unlink;
+allow idia_t user_tmp_t:dir search;
+allow idia_t user_tmp_t:file getattr;
+allow idia_t user_tmp_t:dir { write search add_name remove_name };
+allow idia_t user_tmp_t:file { write getattr read create open ioctl };
+
+
