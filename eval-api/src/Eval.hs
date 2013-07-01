@@ -4,7 +4,7 @@ module Eval where
 
 import Prelude hiding (writeFile, readFile, mapM_)
 
-import Control.Monad (forever, liftM)
+import Control.Monad (forever, liftM, when)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.Reader (MonadReader(..))
 import Data.IORef (IORef, newIORef, modifyIORef',
@@ -13,12 +13,17 @@ import Data.Foldable (mapM_)
 import Control.Concurrent (ThreadId, forkIO)
 import Control.Concurrent.MVar (MVar, newEmptyMVar, putMVar, takeMVar)
 import Control.Concurrent.Chan (Chan, newChan, readChan, writeChan)
-import Data.ByteString (writeFile, readFile)
+import Data.ByteString (writeFile, readFile, hGetContents, hPutStr)
 import System.FilePath.Posix ((</>))
 import System.Posix.Process (nice, forkProcess, getProcessStatus)
 import System.Posix.Signals (signalProcess, killProcess)
 import Control.Concurrent.Async (race)
-import Data.Serialize (encode, decode, Serialize)  
+import Data.Serialize (encode, decode, Serialize)
+import Network (listenOn, connectTo, accept,
+                socketPort, PortID(..), Socket(..))
+import System.IO (Handle, hClose)
+import System.Posix.Files (removeLink)
+import System.Directory (doesFileExist)
 
 import GHC
 import DynFlags
@@ -36,7 +41,7 @@ import Eval.EvalM
 import Eval.Helpers
 import Eval.Limits
 
-import Debug.Trace
+import Debug.Trace hiding (traceM)
 traceM :: Monad m => String -> m ()
 traceM s = trace s $ return ()
   
@@ -110,7 +115,7 @@ prepareEvalQueue set = do
     run (do
       loadFile "Preload.hs"
       sess <- getSession
-      forever $ handleQueue chan sess) set
+      forever $ liftIO $ forkIO $ run' (handleQueue chan sess) set) set
     return ()
   return (chan, tid)
   
@@ -126,20 +131,26 @@ sendEvaluator (EvalQueue chan) act = do
 handleQueue :: EvalQueue -> HscEnv -> EvalM ()  
 handleQueue (EvalQueue chan) sess = do
   (act', resultMVar) <- liftIO $ readChan chan
-  -- r <- loadFile fpath sess
   r <- runWithLimits act' sess
   liftIO $ putMVar resultMVar r
   return ()
 
-
+-- | Sets up initial limits, prepares the socket and the monadic action
+-- and runs it in a restricted environment
 runWithLimits :: EvalM DisplayResult -> HscEnv -> EvalM EvalResultWithErrors
 runWithLimits act' sess = do
   (set@EvalSettings{..}) <- ask
   let act = do
         liftIO $ nice niceness
         runEvalM act' set
-  liftEvalM $ execTimeLimit act set (tmpDirPath </> fileName) sess    
 
+  liftIO $ do
+    exists <- doesFileExist (tmpDirPath </> fileName)
+    when exists $ removeLink (tmpDirPath </> fileName)
+  soc <- liftIO $ listenOn (UnixSocket (tmpDirPath </> fileName))
+  liftEvalM $ execTimeLimit act set soc sess
+    
+  
 -- | Compiles a source code file using @compileFile@ and writes
 -- the result to a file
 runToFile :: Serialize a => Ghc a -> FilePath -> Ghc ()
@@ -152,27 +163,42 @@ runToFile act f = do
   liftIO $ writeFile (f ++ ".res") (encode (dr,errors))
   return ()
 
+-- | Runs a Ghc monad code and outputs the result to a handle  
+runToHandle :: (Serialize a) => Ghc a -> Handle -> Ghc ()
+runToHandle act hndl = do
+  ref <- liftIO $ newIORef []
+  dfs <- getSessionDynFlags
+  setSessionDynFlags $ dfs { log_action = logHandler ref }
+  dr <- handleException act
+  errors <- liftIO $ readIORef ref
+  liftIO $ hPutStr hndl (encode (dr,errors))
+  liftIO $ hClose hndl
+  return ()
+  
+  
 -- | Result of the deserialization
 type DecodeResult = Either String (EvalResult, [EvalError])
 
 -- | Executes an action using time restrictions
 execTimeLimit :: Ghc DisplayResult -- ^ Action to be executed
               -> EvalSettings -- ^ Settings with time limit
-              -> FilePath -- ^ A path to a temporary file
+              -> Socket -- ^ A socket that should be used for communication
               -> HscEnv -- ^ Session in which the action will be executed
               -> Ghc (EvalResult, [EvalError])
-execTimeLimit act set f sess = do
+execTimeLimit act set soc sess = do
   pid <- liftIO . forkProcess . flip run' set $ do
     liftIO $ do
       mapM_ setRLimits (rlimits set)
       setupSELinuxCntx (secontext set)      
     setSession sess
-    liftEvalM $ runToFile act f
+    hndl <- liftIO $ connectTo "localhost" =<< socketPort soc
+    liftEvalM $ runToHandle act hndl
+  (hndl, _, _) <- liftIO $ accept soc
   r <- liftIO $ race (processTimeout pid (timeout set)) $ do
       tc <- getProcessStatus True False pid
       case tc of
         Just exitSt -> do
-          r :: DecodeResult <- decode <$> readFile (f ++ ".res")
+          r :: DecodeResult <- decode <$> hGetContents hndl
           case r of
             Right eres -> return eres
             Left str -> return (Left $ "Deserialization error:\n" ++
