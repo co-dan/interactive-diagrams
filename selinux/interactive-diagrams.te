@@ -8,6 +8,12 @@ require {
   type node_t;
   type bin_t;
   type etc_t;
+  type default_t;
+  type fs_t;
+  type proc_t;
+  type home_root_t;
+  type sshd_t;
+  type security_t;
 }       
 
 # domain types
@@ -21,7 +27,6 @@ type idia_pkg_t; # directory with GHC packages
 type idia_web_common_t; # html templates, css and other static content
 
 # role system_r types idia_t;
-# TODO: why do we need system_r?
 role system_r types idia_web_t;
 
 init_daemon_domain(idia_web_t, idia_web_exec_t)
@@ -52,6 +57,15 @@ allow idia_web_t etc_t:file { read open getattr };
 # Forking new processes & transitioning
 allow idia_web_t self:capability { setuid setgid kill };
 allow idia_web_t self:process    { fork setpgid setrlimit dyntransition getpgid }; 
+# type=AVC msg=audit(1372668674.152:1177): avc:  denied  { dyntransition } for  pid=22437 comm="scotty-pastebin" scontext=unconfined_u:system_r:idia_web_t:s0-s0:c0.c1023 tcontext=system_u:system_r:idia_restricted_t:s0-s0:c0.c1023 tclass=process
+#        Was caused by:
+#                Policy constraint violation.
+
+#                May require adding a type attribute to the domain or type to satisfy the constraint.
+
+#                Constraints are defined in the policy sources in policy/constraints (general), policy/mcs (MCS), and policy/mls (MLS).
+# The problem is that dyntransition requires that the user and the role of the subject and the target are the same
+
 domain_dyntrans_type(idia_web_t)
 dyntrans_pattern(idia_web_t, idia_restricted_t)
 dyntrans_pattern(idia_web_t, idia_web_t)
@@ -64,7 +78,7 @@ allow idia_web_t self:process setsched;
 # I/O
 allow idia_web_t self:fd use;
 allow idia_web_t self:fifo_file { read write ioctl getattr };
-
+allow idia_web_t sshd_t:fd use; # sshd_t?
 
 # no idea why do we need this
 # TODO
@@ -75,6 +89,16 @@ allow idia_web_t self:process { execmem };
 # search should be alright tho
 allow idia_web_t user_home_t:dir search;
 allow idia_web_t user_home_dir_t:dir search;
+#============= idia_web_t ==============
+allow idia_web_t default_t:dir search;
+allow idia_web_t fs_t:filesystem getattr;
+allow idia_web_t security_t:filesystem getattr; # why??
+allow idia_web_t proc_t:file { read getattr };
+# won't print to stdin without this ^
+allow idia_web_t home_root_t:dir search;
+allow idia_web_t proc_t:file open;
+allow idia_web_t security_t:dir getattr; # sys/fs/selinux
+
 
 # networking, because the block below doesn't work :-(
 # some of this can be removed with proper setup
@@ -122,7 +146,13 @@ allow idia_web_t bin_t:lnk_file { read getattr };
 # worker process
 allow idia_restricted_t self:process { getpgid };
 
+# Communication is done via tmp files
+# allow idia_restricted_t tmp_t:dir { write add_name create open };
+# the directory with temp files should be labeled with tmp_t
+allow idia_restricted_t tmp_t:file { write create open ioctl };
 
+
+########################################
 # hmm this doesn't seem to work
 type idia_web_port_t;
 corenet_port(idia_web_t)

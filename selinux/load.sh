@@ -1,3 +1,3 @@
 #!/bin/bash
-sudo semodule -i interactive-diagrams.pp
+sudo semodule -Di interactive-diagrams.pp
 

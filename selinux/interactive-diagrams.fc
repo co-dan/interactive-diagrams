@@ -3,6 +3,7 @@
 /home/vagrant/.cabal(.*)         gen_context(unconfined_u:object_r:idia_pkg_t, s0)
 
 /idia/run(/.*)?        gen_context(system_u:object_r:idia_web_exec_t,s0)
+# /idia/run/bin/scotty-pastebin gen_context(system_u:system_r:idia_web_exec_t,s0)
 /idia/run/bin/pastes.db gen_context(system_u:object_r:idia_db_t,s0)
 /idia/run/common(/.*?)  gen_context(system_u:object_r:idia_web_common_t,s0)
 /idia/run/common        gen_context(system_u:object_r:idia_web_common_t,s0)
