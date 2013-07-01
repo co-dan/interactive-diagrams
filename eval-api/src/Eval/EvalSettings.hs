@@ -59,7 +59,7 @@ defaultSettings = EvalSettings
     , timeout    = 3
     , niceness   = 10
     , rlimits    = Nothing
-    , secontext  = "system_u:system_r:idia_restricted_t:SystemLow-SystemHigh"
+    , secontext  = "idia_restricted_t"
     }
 
 instance Default EvalSettings where

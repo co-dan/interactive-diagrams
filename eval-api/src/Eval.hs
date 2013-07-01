@@ -19,7 +19,6 @@ import System.Posix.Process (nice, forkProcess, getProcessStatus)
 import System.Posix.Signals (signalProcess, killProcess)
 import Control.Concurrent.Async (race)
 import Data.Serialize (encode, decode, Serialize)  
-import System.Linux.SELinux (getCon)
 
 import GHC
 import DynFlags
@@ -166,14 +165,7 @@ execTimeLimit act set f sess = do
   pid <- liftIO . forkProcess . flip run' set $ do
     liftIO $ do
       mapM_ setRLimits (rlimits set)
-      putStrLn $ "Calling setCon " ++ show (secontext set)
-
-      getCon >>= \c -> putStrLn $ "Current context: " ++ show c
-      
-      setupSELinuxCntx (secontext set)
-
-      getCon >>= \c -> putStrLn $ "Current context: " ++ show c
-      
+      setupSELinuxCntx (secontext set)      
     setSession sess
     liftEvalM $ runToFile act f
   r <- liftIO $ race (processTimeout pid (timeout set)) $ do

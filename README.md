@@ -5,10 +5,11 @@ interactive-diagrams and a paste site with the ability for dynamic rendering of 
 
 ## Links
 
-[Blog](http://parenz.wordpress.com)
-[Wiki](https://github.com/co-dan/interactive-diagrams/wiki)
+- [Blog](http://parenz.wordpress.com)
 
-## Current status:
+- [Wiki](https://github.com/co-dan/interactive-diagrams/wiki)
+
+## Current status
 
 Not ready for public
 
