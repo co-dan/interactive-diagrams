@@ -1,6 +1,9 @@
 #!/bin/sh
 cd ../eval-api/ &&
-cabal build && cabal install &&
+cabal build && 
+cabal install &&
+cp dist/build/evali/evali /idia/run/bin/evali &&
+sudo restorecon /idia/run/bin/evali &&
 cd ../scotty-pastebin &&
 cabal configure &&
 cabal build &&

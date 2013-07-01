@@ -115,7 +115,9 @@ prepareEvalQueue set = do
     run (do
       loadFile "Preload.hs"
       sess <- getSession
-      forever $ liftIO $ forkIO $ run' (handleQueue chan sess) set) set
+      -- this is causing problems (memory leaks?):
+      -- forever $ liftIO $ forkIO $ run' (handleQueue chan sess) set) set
+      forever $ handleQueue chan sess) set
     return ()
   return (chan, tid)
   
