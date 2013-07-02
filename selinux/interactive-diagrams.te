@@ -15,6 +15,11 @@ require {
   type sshd_t;
   type security_t;
   type user_tmp_t;
+
+  type semanage_t;
+  type unconfined_t;
+  type setfiles_t;
+  type user_devpts_t;
 }       
 
 # domain types
@@ -51,13 +56,12 @@ files_type(idia_web_common_t)
 allow idia_web_t locale_t:dir search;
 allow idia_web_t locale_t:file { read getattr open };
 allow idia_web_t locale_t:lnk_file read;
-# need this for /etc/locale.alias access 
-# TODO
+# TODO: need this for /etc/locale.alias access 
 allow idia_web_t etc_t:file { read open getattr };
 
 # Forking new processes & transitioning
 allow idia_web_t self:capability { setuid setgid kill };
-allow idia_web_t self:process    { fork setpgid setrlimit dyntransition getpgid }; 
+allow idia_web_t self:process    { signal fork setpgid setrlimit dyntransition getpgid }; 
 # type=AVC msg=audit(1372668674.152:1177): avc:  denied  { dyntransition } for  pid=22437 comm="scotty-pastebin" scontext=unconfined_u:system_r:idia_web_t:s0-s0:c0.c1023 tcontext=system_u:system_r:idia_restricted_t:s0-s0:c0.c1023 tclass=process
 #        Was caused by:
 #                Policy constraint violation.
@@ -66,6 +70,10 @@ allow idia_web_t self:process    { fork setpgid setrlimit dyntransition getpgid 
 
 #                Constraints are defined in the policy sources in policy/constraints (general), policy/mcs (MCS), and policy/mls (MLS).
 # The problem is that dyntransition requires that the user and the role of the subject and the target are the same
+
+# Limits & restrictions
+allow idia_web_t idia_restricted_t:process sigkill;
+allow idia_web_t self:process sigkill; # otherwise it would violate the typebounds restriction
 
 domain_dyntrans_type(idia_web_t)
 dyntrans_pattern(idia_web_t, idia_restricted_t)
@@ -81,28 +89,26 @@ allow idia_web_t self:fd use;
 allow idia_web_t self:fifo_file { read write ioctl getattr };
 allow idia_web_t sshd_t:fd use; # sshd_t?
 
-# no idea why do we need this
-# TODO
 allow idia_web_t self:process { execmem };
 
 # it needs to access /home/vagrant and /home/vagrant/ghc for some reason
-# TODO
-# search should be alright tho
-allow idia_web_t user_home_t:dir search;
+# TODO: search should be alright tho
+allow idia_web_t user_home_t:dir { getattr search };
 allow idia_web_t user_home_dir_t:dir search;
+# this is for GHC settings and ghc-prim
+allow idia_web_t user_home_t:file { read getattr ioctl open execute };
 #============= idia_web_t ==============
-allow idia_web_t default_t:dir search;
-allow idia_web_t fs_t:filesystem getattr;
-allow idia_web_t security_t:filesystem getattr; # why??
-allow idia_web_t proc_t:file { read getattr };
-# won't print to stdin without this ^
-allow idia_web_t home_root_t:dir search;
-allow idia_web_t proc_t:file open;
+# allow idia_web_t default_t:dir search;
+# allow idia_web_t fs_t:filesystem getattr;
+# allow idia_web_t proc_t:file { read getattr };
+# # won't print to stdin without this ^
+# allow idia_web_t home_root_t:dir search;
+# allow idia_web_t proc_t:file open;
 allow idia_web_t security_t:dir { getattr search }; # sys/fs/selinux
+allow idia_web_t security_t:filesystem getattr; # why??
 allow idia_web_t idia_restricted_t:fd use;
 allow idia_web_t idia_restricted_t:fifo_file read;
 allow idia_web_t security_t:file { read open };
-# allow idia_web_t user_tmp_t:file { read getattr open ioctl };
 
 # networking, because the block below doesn't work :-(
 # some of this can be removed with proper setup
@@ -114,9 +120,11 @@ allow idia_web_t self:udp_socket { create connect getattr };
 
 
 # Temp file
-allow idia_web_t tmp_t:dir { write add_name create open getattr };
 # the directory with temp files should be labeled with tmp_t
-allow idia_web_t tmp_t:file { write getattr read create open ioctl };
+# allow idia_web_t tmp_t:file { write getattr read create open ioctl };
+allow idia_web_t self:unix_stream_socket connectto;
+allow idia_web_t tmp_t:dir { write create add_name remove_name search };
+allow idia_web_t tmp_t:sock_file { write create unlink getattr };
 
 # Common files (css, js, html)
 read_files_pattern(idia_web_t, idia_web_common_t, idia_web_common_t)
@@ -151,41 +159,43 @@ allow idia_web_t bin_t:lnk_file { read getattr };
 # worker process
 allow idia_restricted_t self:process { getpgid };
 
-# Communication is done via tmp files
-# the directory with temp files should be labeled with tmp_t
-allow idia_restricted_t tmp_t:file { write read getattr create open ioctl };
-allow idia_restricted_t tmp_t:dir getattr;
-# TODO: the process can still mess with other tmp files, possibly 
-# creating race conditions
-
 # For running gcc
-allow idia_restricted_t bin_t:dir getattr;
+# TODO: this should be fixed, restricted process should no be
+# able to just execute random binary files
+allow idia_restricted_t bin_t:dir { getattr search };
 allow idia_restricted_t bin_t:file { read execute open getattr execute_no_trans };
 allow idia_restricted_t bin_t:lnk_file { read getattr };
+allow idia_restricted_t self:fifo_file { read write ioctl getattr };
+
 # For locale stuff
 allow idia_restricted_t etc_t:file { read getattr open };
 allow idia_restricted_t locale_t:file { read getattr open };
+allow idia_restricted_t locale_t:dir { search };
 allow idia_restricted_t locale_t:lnk_file read;
 
 # Packages. TODO: fix this
 allow idia_restricted_t idia_pkg_t:dir search;
 allow idia_restricted_t idia_pkg_t:file { read getattr ioctl open execute };
 
-# Helper.hs
+# TODO: Helper.hs
 allow idia_restricted_t idia_web_exec_t:file { read getattr open ioctl };
 
 # No idea what is thiis for
-allow idia_restricted_t idia_web_t:fd use;
-allow idia_restricted_t idia_web_t:fifo_file write;
-allow idia_restricted_t self:fifo_file { read write ioctl getattr };
+# allow idia_restricted_t idia_web_t:fd use;
+# allow idia_restricted_t idia_web_t:fifo_file write;
+# allow idia_restricted_t self:fifo_file { read write ioctl getattr };
 allow idia_restricted_t self:process { setsched execmem };
 
 # This is probably something to do with libdir
-# TODO: fix this
 allow idia_restricted_t user_home_dir_t:dir search;
 allow idia_restricted_t user_home_t:dir search;
 #allow idia_restricted_t user_tmp_t:file { write getattr open ioctl };
 
+# For communicating with the server
+allow idia_restricted_t tmp_t:sock_file write;
+allow idia_restricted_t idia_web_t:fifo_file write;
+allow idia_restricted_t idia_web_t:unix_stream_socket { connectto getattr };
+allow idia_restricted_t tmp_t:dir search;
 
 ########################################
 # hmm this doesn't seem to work
@@ -194,3 +204,18 @@ corenet_port(idia_web_t)
 
 allow idia_web_t idia_web_port_t:tcp_socket name_bind;
 
+##################################################
+
+allow idia_web_t home_root_t:dir search;
+allow idia_restricted_t idia_web_t:fd use;
+allow idia_restricted_t home_root_t:dir search;
+
+# /dev/pts1
+allow idia_restricted_t sshd_t:fd use;
+allow idia_web_t user_devpts_t:chr_file { write ioctl };
+allow idia_restricted_t user_devpts_t:chr_file { write ioctl };
+#============= semanage_t ==============
+allow semanage_t setfiles_t:process { siginh noatsecure rlimitinh };
+
+#============= unconfined_t ==============
+allow unconfined_t idia_web_t:process transition;
