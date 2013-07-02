@@ -24,10 +24,17 @@ install:
   - git clone git://github.com/diagrams/diagrams-svg.git
   - cd diagrams-svg && cabal install && cd ..
   - cd $START 
-  - cd display-src
-  - cabal install
+  - mkdir deps; cd deps
+  - git clone git://github.com/simonmar/async.git
+  - cd async && cabal install && cd ..
+  - git clone git://github.com/yesodweb/persistent.git
+  - cd persistent
+  - cd persistent && cabal install && cd ..
+  - cd persistent-template && cabal install && cd ..
+  - cd persistent-sqlite && cabal install && cd ..
   - cd $START
   
 script: 
+  - cabal install display-src/
   - cabal install eval-api/
   - cabal install scotty-pastebin/
