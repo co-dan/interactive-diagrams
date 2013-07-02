@@ -1,9 +1,11 @@
 language: haskell
 before_install:
+  - cd $HOME
   - wget --prefer-family=IPv4 http://hdiff.luite.com/ghcjs/ghcjs-test.tar.xz
   - tar -xJf $HOME/ghcjs-test.tar.xz --strip-components=1
   - rm ghcjs-test.tar.xz
   - export PATH=$HOME/ghc/bin:$HOME/.cabal/bin:$HOME/jsshell:$HOME/node/bin:$PATH
+  - cd $START
 install:
   - cd eval-api
   - cabal install 
