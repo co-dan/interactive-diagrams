@@ -191,7 +191,9 @@ execTimeLimit act set soc sess = do
   pid <- liftIO . forkProcess . flip run' set $ do
     liftIO $ do
       mapM_ setRLimits (rlimits set)
-      setupSELinuxCntx (secontext set)      
+      case secontext set of
+        Just cntx -> setupSELinuxCntx cntx
+        Nothing   -> return ()
     setSession sess
     hndl <- liftIO $ connectTo "localhost" =<< socketPort soc
     liftEvalM $ runToHandle act hndl

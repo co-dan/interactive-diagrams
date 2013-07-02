@@ -2,7 +2,6 @@
 *.hi
 cabal-dev/
 dist/
-test/
 scotty-pastebin/pastes.db
 scotty-pastebin/bla.hs
 *.if

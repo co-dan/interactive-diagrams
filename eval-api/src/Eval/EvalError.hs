@@ -31,10 +31,10 @@ instance Exception TooLong
 -- | Position in the source code         
 data SrcPos = SrcPos
     { startLine :: Int
-    , startCol :: Int
-    , endLine :: Int
-    , endCol :: Int
-    } deriving (Generic)
+    , startCol  :: Int
+    , endLine   :: Int
+    , endCol    :: Int
+    } deriving (Generic, Eq)
 
 srcPos :: RealSrcSpan -> SrcPos               
 srcPos sp = SrcPos 
@@ -47,9 +47,10 @@ data EvalError = EvalError
     { severity :: Severity     -- ^ The severity of the error
     , errMsg   :: String       -- ^ The error message
     , srcSpan  :: SrcPos  -- ^ Position of the error in the source code
-    } deriving (Generic)
+    } deriving (Generic, Eq)
 
 deriving instance Generic Severity
+deriving instance Eq Severity
 instance Serialize Severity
 instance Serialize SrcPos  
 instance Serialize EvalError

@@ -47,7 +47,7 @@ data EvalSettings = EvalSettings
     , rlimits     :: Maybe RLimits
       -- | SELinux security context under which the worker 
       -- process will be running.
-    , secontext   :: SecurityContext
+    , secontext   :: Maybe SecurityContext
     }
 
     
@@ -59,7 +59,7 @@ defaultSettings = EvalSettings
     , timeout    = 3
     , niceness   = 10
     , rlimits    = Nothing
-    , secontext  = "idia_restricted_t"
+    , secontext  = Just "idia_restricted_t"
     }
 
 instance Default EvalSettings where

@@ -7,24 +7,29 @@ name:                eval-api
 --                   | | | +--- code changes with no API change
 version:             0.1.0.0
 synopsis:            Evaluation API for Interactive Diagrams
+
 description:         Evaluation API for the Interactive Diagrams projects.
-                     Provides means of safe compilation and interpretation of Haskell code
-                     (including Diagrams) using GHC API.
+                     Provides means of safe compilation and interpretation of Haskell code (including Diagrams) using GHC API.
+
 homepage:            http://github.com/co-dan/interactive-diagrams
 license:             BSD3
 license-file:        LICENSE
-author:              Daniil Frumin
-maintainer:          difrumin@gmail.com
--- A copyright notice.
--- copyright:           
--- category:            
+author:              Daniil Frumin <difrumin@gmail.com>
+maintainer:          Dan Frumin <difrumin@gmail.com>
+category:            Compilers/Interpreters
 build-type:          Simple
 cabal-version:       >=1.8
 
 library
-  exposed-modules:     Eval, Eval.EvalError, Eval.EvalM, Eval.EvalSettings, Eval.Helpers, Eval.Limits
+  hs-source-dirs:      src
+  exposed-modules:     Eval,
+                       Eval.EvalError,
+                       Eval.EvalM,
+                       Eval.EvalSettings,
+                       Eval.Helpers,
+                       Eval.Limits
   other-modules:       SignalHandlers
-  
+  ghc-options:         -Wall  
   build-depends:       base >=4.6 && <5,
                        transformers ==0.3.*,
                        mtl ==2.1.*,
@@ -37,18 +42,16 @@ library
                        data-default ==0.5.*,
                        ghc >= 7.6,
                        display ==0.1.*,
-                       network,
-                       directory,
+                       network ==2.4.*,
+                       directory ==1.2.*,
                        selinux
-                       
-  
-  hs-source-dirs:      src
+
   
 
 executable evali
-  main-is:             EvalInteractive.hs
-  ghc-options:         -threaded -O2
   hs-source-dirs:      src-bin
+  main-is:             EvalInteractive.hs
+  ghc-options:         -threaded -O2 -Wall
   build-depends:       base,
                        transformers,
                        readline,
@@ -57,3 +60,23 @@ executable evali
                        text,
                        eval-api,
                        display
+
+test-suite spec
+  main-is:             Spec.hs
+  hs-source-dirs:      test
+  type:                exitcode-stdio-1.0
+  build-depends:       base,
+                       transformers,
+                       readline,
+                       data-default,
+                       time,
+                       text,
+                       eval-api,
+                       display,
+                       QuickCheck,
+                       hspec
+  
+
+source-repository head
+  type:                 git
+  location:             git://github.com/co-dan/interactive-diagrams.git
