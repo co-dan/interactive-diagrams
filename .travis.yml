@@ -10,6 +10,19 @@ before_install:
   
 install:
   - export START=`pwd`
+  - mkdir dia; cd dia
+  - git clone git://github.com/diagrams/diagrams-core.git
+  - cd diagrams-core && cabal install && cd ..
+  - cabal unpack active
+  - cd active-0.1*
+  - wget http://co-dan.github.io/patched/active.patch
+  - patch active.cabal < active.patch
+  - cabal install
+  - cd .. 
+  - git clone git://github.com/diagrams/diagrams-lib.git
+  - cd diagrams-lib && cabal install && cd ..
+  - git clone git://github.com/diagrams/diagrams-svg.git
+  - cd diagrams-svg && cabal install && cd ..
   - cd display-src
   - cabal install
   - cd $START
