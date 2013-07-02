@@ -23,6 +23,7 @@ install:
   - cd diagrams-lib && cabal install && cd ..
   - git clone git://github.com/diagrams/diagrams-svg.git
   - cd diagrams-svg && cabal install && cd ..
+  - cd $START 
   - cd display-src
   - cabal install
   - cd $START
