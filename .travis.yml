@@ -9,8 +9,10 @@ before_install:
   - cd $START
   
 install:
-  - cd eval-api
+  - export START=`pwd`
+  - cd display-src
   - cabal install
+  - cd $START
   
 script: 
   - cabal install eval-api/
