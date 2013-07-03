@@ -1,52 +1,54 @@
 {-# LANGUAGE ScopedTypeVariables, RankNTypes, DeriveDataTypeable #-}
 {-# LANGUAGE RecordWildCards #-}
+-- | Main entry point of the library
 module Eval where
 
 import Prelude hiding (writeFile, readFile, mapM_)
 
+import Control.Concurrent (ThreadId, forkIO)
+import Control.Concurrent.Async (race)
+import Control.Concurrent.Chan (Chan, newChan, readChan, writeChan)
+import Control.Concurrent.MVar (MVar, newEmptyMVar, putMVar, takeMVar)
 import Control.Monad (forever, liftM, when)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.Reader (MonadReader(..))
-import Data.IORef (IORef, newIORef, modifyIORef',
-                   readIORef)
-import Data.Foldable (mapM_)
-import Control.Concurrent (ThreadId, forkIO)
-import Control.Concurrent.MVar (MVar, newEmptyMVar, putMVar, takeMVar)
-import Control.Concurrent.Chan (Chan, newChan, readChan, writeChan)
 import Data.ByteString (writeFile, readFile, hGetContents, hPutStr)
-import System.FilePath.Posix ((</>))
-import System.Posix.Process (nice, forkProcess, getProcessStatus)
-import System.Posix.Signals (signalProcess, killProcess)
-import Control.Concurrent.Async (race)
+import Data.Foldable (mapM_)
+import Data.IORef (IORef, newIORef, modifyIORef', readIORef)
 import Data.Serialize (encode, decode, Serialize)
-import Network (listenOn, connectTo, accept,
-                socketPort, PortID(..), Socket(..))
+import Network (listenOn, connectTo, accept, socketPort, PortID(..), Socket(..))
+import System.Directory (doesFileExist)
+import System.FilePath.Posix ((</>))
 import System.IO (Handle, hClose)
 import System.Posix.Files (removeLink)
-import System.Directory (doesFileExist)
+import System.Posix.Process (nice, forkProcess, getProcessStatus)
+import System.Posix.Signals (signalProcess, killProcess)
 
-import GHC
 import DynFlags
+import Exception
+import GHC
 import MonadUtils hiding (MonadIO, liftIO)
 import Outputable
-import Exception
 import Panic
 
 
 import Display
-import SignalHandlers
 import Eval.EvalError
-import Eval.EvalSettings
 import Eval.EvalM
+import Eval.EvalSettings
 import Eval.Helpers
 import Eval.Limits
+import SignalHandlers
 
 import Debug.Trace hiding (traceM)
+-- | Debug function  
 traceM :: Monad m => String -> m ()
 traceM s = trace s $ return ()
   
-
+-- | Evaluation result together with a list of errors/warnings
 type EvalResultWithErrors = (EvalResult, [EvalError])
+
+-- | A queue for evaluator                            
 newtype EvalQueue =
   EvalQueue (Chan (EvalM DisplayResult, MVar EvalResultWithErrors))
 
@@ -69,12 +71,12 @@ initGhc ref = do
   dfs <- getSessionDynFlags
   setSessionDynFlags $ dfs { hscTarget = HscInterpreted
                            , ghcLink = LinkInMemory
-                           -- , log_action = logHandler ref }
+                           , log_action = logHandler ref 
                            }
   return ()
 
 
--- | A log handler for GHC API. Saves the errors and warnings in an @IORef@
+-- | A log handler for GHC API. Saves the errors and warnings in an 'IORef'
 -- LogAction == DynFlags -> Severity -> SrcSpan -> PprStyle -> MsgDoc -> IO ()
 logHandler :: IORef [EvalError] -> LogAction
 logHandler ref dflags severity srcSpan style msg =
@@ -84,19 +86,13 @@ logHandler ref dflags severity srcSpan style msg =
       errors <- readIORef ref
       print errors
     UnhelpfulSpan _ -> return ()
-  -- case severity of
-  --   SevError ->   modifyIORef' ref (++ [printDoc])
-  --   SevFatal ->   modifyIORef' ref (++ [printDoc])
-  --   _ -> return ()
   where err sp = EvalError severity msg' (srcPos sp)
         cntx = initSDocContext dflags style
         msg' = show (runSDoc msg cntx)
-        -- locMsg = mkLocMessage severity srcSpan msg
-        -- printDoc = show (runSDoc locMsg cntx)
 
-
--- | Exception handler for GHC API. Catches all exceptions
--- and restores handlers.        
+        
+-- | Exception handler for GHC API.
+-- Catches all exceptions and restores handlers.        
 handleException :: (ExceptionMonad m, MonadIO m)
                    => m a -> m (Either String a)
 handleException m =
@@ -108,8 +104,9 @@ handleException m =
 
 
 -- | Spawn a new evaluator
-prepareEvalQueue :: EvalSettings -> IO (EvalQueue, ThreadId)
-prepareEvalQueue set = do
+prepareEvalQueue :: EvalSettings             -- ^ Settings to use for compilation
+                 -> IO (EvalQueue, ThreadId) -- ^ A queue to send requests to and the resulting thread ID           
+prepareEvalQueue set = do                    
   chan <- EvalQueue <$> newChan
   tid <- forkIO $ do
     run (do
@@ -122,14 +119,17 @@ prepareEvalQueue set = do
   return (chan, tid)
   
 
-sendEvaluator :: EvalQueue -> EvalM DisplayResult -> IO (EvalResult, [EvalError])
+-- | Send a request to the evaluator
+sendEvaluator :: EvalQueue           -- ^ Queue created by 'prepareEvalQueue'
+              -> EvalM DisplayResult -- ^ 'EvalM' code that renders to 'DisplayResult'
+              -> IO EvalResultWithErrors
 sendEvaluator (EvalQueue chan) act = do
   mv <- newEmptyMVar
   writeChan chan (act, mv)
   takeMVar mv
   
   
--- | Function that handles requests from the @EvalQueue@
+-- | Function that handles requests from the 'EvalQueue'
 handleQueue :: EvalQueue -> HscEnv -> EvalM ()  
 handleQueue (EvalQueue chan) sess = do
   (act', resultMVar) <- liftIO $ readChan chan
@@ -153,7 +153,7 @@ runWithLimits act' sess = do
   liftEvalM $ execTimeLimit act set soc sess
     
   
--- | Compiles a source code file using @compileFile@ and writes
+-- | Compiles a source code file using 'compileFile' and writes
 -- the result to a file
 runToFile :: Serialize a => Ghc a -> FilePath -> Ghc ()
 runToFile act f = do
@@ -179,13 +179,13 @@ runToHandle act hndl = do
   
   
 -- | Result of the deserialization
-type DecodeResult = Either String (EvalResult, [EvalError])
+type DecodeResult = Either String EvalResultWithErrors
 
 -- | Executes an action using time restrictions
 execTimeLimit :: Ghc DisplayResult -- ^ Action to be executed
-              -> EvalSettings -- ^ Settings with time limit
-              -> Socket -- ^ A socket that should be used for communication
-              -> HscEnv -- ^ Session in which the action will be executed
+              -> EvalSettings      -- ^ Settings with time limit
+              -> Socket            -- ^ A socket that should be used for communication
+              -> HscEnv            -- ^ Session in which the action will be executed
               -> Ghc (EvalResult, [EvalError])
 execTimeLimit act set soc sess = do
   pid <- liftIO . forkProcess . flip run' set $ do
