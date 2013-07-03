@@ -21,11 +21,11 @@ settings :: EvalSettings
 settings = def {
   rlimits = Just def {
      totalMemoryLimit = ResourceLimits memlim memlim
-     },
-  secontext = Nothing
+     }
+  -- , secontext = Nothing
   }
-  where memlim = ResourceLimit $ 104857600 * 2
-                                 --- 100mb * 2
+  where memlim = ResourceLimit $ 104857600 * 4
+                                 --- 100mb * 4
 main :: IO ()
 main = liftM fst (prepareEvalQueue settings)
        >>= loop "> "

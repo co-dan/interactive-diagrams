@@ -51,7 +51,7 @@ library
 executable evali
   hs-source-dirs:      src-bin
   main-is:             EvalInteractive.hs
-  ghc-options:         -threaded -O2 -Wall
+  ghc-options:         -O2 -Wall
   build-depends:       base,
                        transformers,
                        readline,
