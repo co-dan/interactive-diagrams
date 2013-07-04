@@ -2,34 +2,39 @@
 {-# LANGUAGE TypeFamilies, StandaloneDeriving, RecordWildCards #-}
 {-# LANGUAGE FlexibleContexts, EmptyDataDecls, ScopedTypeVariables #-}
 {-# LANGUAGE TypeHoles #-}
-module Eval.Worker where
+module Eval.Worker
+       (
+         -- * The 'Worker' type
+         Worker(..), initialized,
+         startWorker,
+         -- ** IOWorker
+         IOWorker, startIOWorker,
+         -- ** EvalWorker
+         EvalWorker, startEvalWorker,
+         sendCompileFileRequest, sendEvalStringRequest
+       ) where
 
 import Prelude hiding (putStr)
   
 import Control.Monad (when, forever)
-import Control.Monad.IO.Class (MonadIO, liftIO)
+import Control.Monad.IO.Class (liftIO)
 import Control.Applicative ((<$>))
 import Data.ByteString (hGetContents, hPutStr, hGetLine, putStr)
 import Data.Typeable
 import Data.Maybe (isJust)
-import Data.Serialize (encode, decode, Serialize)
-import Network (listenOn, connectTo, accept, socketPort, PortID(..), Socket(..))
+import Data.Serialize (encode, decode)
+import Network (listenOn, connectTo, accept, PortID(..), Socket)
 import Network.Socket (close)
 import System.Directory (doesFileExist)
 import System.FilePath.Posix ((</>))
 import System.IO (Handle, hClose)
 import System.Posix.Files (removeLink)
-import System.Posix.Process (nice, forkProcess, getProcessStatus)
+import System.Posix.Process (forkProcess)
 import System.Posix.Types (ProcessID)
 
 import DynFlags
-import Exception
 import GHC hiding (compileExpr)
 import MonadUtils hiding (MonadIO, liftIO)
-import Outputable
-import Panic
-
-
 
 import Eval
 import Eval.Helpers
@@ -39,11 +44,19 @@ import Eval.EvalM
 import Eval.Worker.EvalCmd
 import Display
 
+-- | A datatype representing a worker of type 'a'
 data Worker a = Worker
-    { workerName     :: String
+    { -- | Name of the worker
+      workerName     :: String
+      -- | A filepath to the Unix socket that will be
+      -- used for communicating with the worker.
+      -- If the file is already present it will be unliked
+      -- during the initializatin step
     , workerSocket   :: FilePath
+      -- | Security restrictions for the worker
     , workerLimits   :: LimitSettings
-    -- | 'Nothing' if the worker is not active
+      -- | 'Just pid' if the worker's process ID is 'pid',
+      -- Nothing' if the worker is not active/initialized
     , workerPid      :: Maybe ProcessID 
     } deriving (Typeable, Eq, Show)
 
@@ -51,10 +64,11 @@ data Worker a = Worker
 data IOWorker
 data EvalWorker
 
-isActive :: Worker a -> Bool
-isActive = isJust . workerPid
+-- | Check whether the worker is initialized
+initialized :: Worker a -> Bool
+initialized = isJust . workerPid
 
--- | Starts a general type of worker
+-- | Start a general type of worker
 startWorker :: Worker a -- ^ A non-active worker
             -> (Socket -> IO ()) 
             -> IO (Worker a)
@@ -71,6 +85,7 @@ forkWorker Worker{..} cb = do
     return ()
 
 
+-- | Start a worker of type 'IOWorker'
 startIOWorker :: Worker IOWorker -- ^ A non-active worker
               -> (Handle -> IO ())
               -> IO (Worker IOWorker)
@@ -120,14 +135,15 @@ evalWorkerAction hndl = do
     Left str -> error str
     Right x -> return (evalCmdToEvalM x)
 
-    
+
+-- | Send the 'Worker' a request to compile a file
 sendCompileFileRequest :: Worker EvalWorker -> FilePath -> IO DisplayResult
 sendCompileFileRequest w fpath = do
   hndl <- connectToWorker w
   hPutStr hndl (encode (CompileFile fpath))
   return (DisplayResult [])
                           
-
+-- | Send the 'Worker' a request to compile an expression
 sendEvalStringRequest :: Worker EvalWorker -> String -> IO DisplayResult
 sendEvalStringRequest w str = do
   hndl <- connectToWorker w

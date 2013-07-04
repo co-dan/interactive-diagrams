@@ -23,6 +23,8 @@ cabal-version:       >=1.8
 library
   hs-source-dirs:      src
   exposed-modules:     Eval,
+                       Eval.Worker,
+                       Eval.Worker.EvalCmd,
                        Eval.EvalError,
                        Eval.EvalM,
                        Eval.EvalSettings,
@@ -46,7 +48,24 @@ library
                        directory ==1.2.*,
                        selinux
 
-  
+
+executable eval-service  
+  hs-source-dirs:      src-service
+  main-is:             Main.hs
+  ghc-options:         -O2 -Wall
+  build-depends:       base,
+                       transformers,
+                       network ==2.4.*,
+                       data-default,
+                       cereal,
+                       time,
+                       text,
+                       unix,
+                       filepath,
+                       directory,
+                       bytestring,
+                       eval-api,
+                       display
 
 executable evali
   hs-source-dirs:      src-bin
