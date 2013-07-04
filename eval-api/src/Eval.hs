@@ -1,5 +1,5 @@
 {-# LANGUAGE ScopedTypeVariables, RankNTypes, DeriveDataTypeable #-}
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE RecordWildCards, OverloadedStrings #-}
 -- | Main entry point of the library
 module Eval where
 
@@ -166,17 +166,17 @@ runToFile act f = do
   return ()
 
 -- | Runs a Ghc monad code and outputs the result to a handle  
-runToHandle :: (Serialize a, Show a) => Ghc a -> Handle -> Ghc ()
+runToHandle :: (Serialize a, Show a)
+            => Ghc a -> Handle -> Ghc (Either String a, [EvalError])
 runToHandle act hndl = do
   ref <- liftIO $ newIORef []
   dfs <- getSessionDynFlags
   setSessionDynFlags $ dfs { log_action = logHandler ref }
   dr <- handleException act
-  liftIO $ putStrLn "res" >> print dr >> putStrLn "/res"
   errors <- liftIO $ readIORef ref
   liftIO $ hPutStr hndl (encode (dr,errors))
-  liftIO $ hClose hndl
-  return ()
+  liftIO $ hPutStr hndl "\n"
+  return (dr, errors)
   
   
 -- | Result of the deserialization
@@ -198,6 +198,7 @@ execTimeLimit act set soc sess = do
     setSession sess
     hndl <- liftIO $ connectTo "localhost" =<< socketPort soc
     liftEvalM $ runToHandle act hndl
+    return ()
   (hndl, _, _) <- liftIO $ accept soc
   r <- liftIO $ race (processTimeout pid (timeout (limitSet set))) $ do
       tc <- getProcessStatus True False pid

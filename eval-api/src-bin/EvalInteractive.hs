@@ -16,22 +16,27 @@ import Eval.EvalM
 import Eval.EvalSettings
 import Eval.Helpers  
 import Eval.EvalError
+import Eval.Worker
 
 settings :: EvalSettings
 settings = def {
-  limitSet = def { rlimits = Just def {
-     totalMemoryLimit = ResourceLimits memlim memlim
-     } }
-  -- , secontext = Nothing
+  limitSet = def {
+     rlimits = Just def {
+        totalMemoryLimit = ResourceLimits memlim memlim
+        },
+     secontext = Nothing
+     }
   }
   where memlim = ResourceLimit $ 104857600 * 4
                                  --- 100mb * 4
+
+
 main :: IO ()
-main = liftM fst (prepareEvalQueue settings)
+main = startEvalWorker "evali" settings
        >>= loop "> "
 
-loop :: String -> EvalQueue -> IO ()
-loop c q = do
+loop :: String -> Worker EvalWorker -> IO ()
+loop c worker = do
   mbln <- readline c
   case mbln of
     Nothing -> return ()
@@ -40,7 +45,7 @@ loop c q = do
     Just ln -> do
       addHistory ln
       measureTime $ do
-        (r, errors) <- sendEvaluator q (evalLn ln)
+        (r, errors) <- evalLn ln worker
         case r of
           Right (DisplayResult res) ->
             mapM_ (putStr . TL.unpack . result) res
@@ -48,14 +53,15 @@ loop c q = do
           Left err -> putStrLn err
         putStrLn "Errors:"
         mapM_ print errors   
-      loop c q
+      loop c worker
 
-evalLn :: String -> EvalM DisplayResult
-evalLn s
+evalLn :: String -> Worker EvalWorker -> IO EvalResultWithErrors
+evalLn s wrk
   | ":load" `isPrefixOf` s = 
     let fname = dropWhile (==' ') $ drop 5 s
-    in (loadFile fname >> compileExpr "return . display =<< main")
-  | otherwise = compileExpr ("(return $ display (" ++ s ++ ")) :: IO DisplayResult")
+    in sendCompileFileRequest wrk fname
+  | otherwise = let expr = ("(return $ display (" ++ s ++ ")) :: IO DisplayResult")
+                in sendEvalStringRequest wrk expr
 
 
 measureTime :: MonadIO m => m a -> m a

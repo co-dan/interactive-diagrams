@@ -2,6 +2,7 @@
 module Main where
 
 import Control.Monad (when)
+import Control.Concurrent (threadDelay)
 import Data.Typeable (Typeable)
 import Data.Default
 import Data.ByteString (hGetContents, hPutStr)
@@ -29,5 +30,5 @@ settings = (def { limitSet = def { secontext = Nothing } })
 main :: IO ()
 main = do
   worker <- startEvalWorker "1" settings
-  sendCompileFileRequest worker "/home/vagrant/test.hs"
+  print =<< sendCompileFileRequest worker "/home/vagrant/test.hs"
   return ()

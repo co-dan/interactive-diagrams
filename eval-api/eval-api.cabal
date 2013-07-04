@@ -52,7 +52,7 @@ library
 executable eval-service  
   hs-source-dirs:      src-service
   main-is:             Main.hs
-  ghc-options:         -O2 -Wall
+  ghc-options:         -O2 -Wall 
   build-depends:       base,
                        transformers,
                        network ==2.4.*,
