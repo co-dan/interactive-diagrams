@@ -143,7 +143,7 @@ runWithLimits :: EvalM DisplayResult -> HscEnv -> EvalM EvalResultWithErrors
 runWithLimits act' sess = do
   (set@EvalSettings{..}) <- ask
   let act = do
-        liftIO $ nice niceness
+        liftIO $ nice (niceness limitSet)
         runEvalM act' set
 
   liftIO $ do
@@ -166,12 +166,13 @@ runToFile act f = do
   return ()
 
 -- | Runs a Ghc monad code and outputs the result to a handle  
-runToHandle :: (Serialize a) => Ghc a -> Handle -> Ghc ()
+runToHandle :: (Serialize a, Show a) => Ghc a -> Handle -> Ghc ()
 runToHandle act hndl = do
   ref <- liftIO $ newIORef []
   dfs <- getSessionDynFlags
   setSessionDynFlags $ dfs { log_action = logHandler ref }
   dr <- handleException act
+  liftIO $ putStrLn "res" >> print dr >> putStrLn "/res"
   errors <- liftIO $ readIORef ref
   liftIO $ hPutStr hndl (encode (dr,errors))
   liftIO $ hClose hndl
@@ -179,7 +180,7 @@ runToHandle act hndl = do
   
   
 -- | Result of the deserialization
-type DecodeResult = Either String EvalResultWithErrors
+type DecodeResult a = Either String a
 
 -- | Executes an action using time restrictions
 execTimeLimit :: Ghc DisplayResult -- ^ Action to be executed
@@ -190,19 +191,19 @@ execTimeLimit :: Ghc DisplayResult -- ^ Action to be executed
 execTimeLimit act set soc sess = do
   pid <- liftIO . forkProcess . flip run' set $ do
     liftIO $ do
-      mapM_ setRLimits (rlimits set)
-      case secontext set of
+      mapM_ setRLimits (rlimits (limitSet set))
+      case secontext (limitSet set) of
         Just cntx -> setupSELinuxCntx cntx
         Nothing   -> return ()
     setSession sess
     hndl <- liftIO $ connectTo "localhost" =<< socketPort soc
     liftEvalM $ runToHandle act hndl
   (hndl, _, _) <- liftIO $ accept soc
-  r <- liftIO $ race (processTimeout pid (timeout set)) $ do
+  r <- liftIO $ race (processTimeout pid (timeout (limitSet set))) $ do
       tc <- getProcessStatus True False pid
       case tc of
         Just exitSt -> do
-          r :: DecodeResult <- decode <$> hGetContents hndl
+          (r :: DecodeResult EvalResultWithErrors) <- decode <$> hGetContents hndl
           case r of
             Right eres -> return eres
             Left str -> return (Left $ "Deserialization error:\n" ++

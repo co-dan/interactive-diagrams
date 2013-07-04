@@ -19,9 +19,9 @@ import Eval.EvalError
 
 settings :: EvalSettings
 settings = def {
-  rlimits = Just def {
+  limitSet = def { rlimits = Just def {
      totalMemoryLimit = ResourceLimits memlim memlim
-     }
+     } }
   -- , secontext = Nothing
   }
   where memlim = ResourceLimit $ 104857600 * 4

@@ -2,6 +2,7 @@
 module Eval.EvalSettings
     (
      EvalSettings(..), defaultSettings,
+     LimitSettings(..), defaultLimits,
      RLimits(..),
      ResourceLimits(..), ResourceLimit(..), Resource(..),
      SecurityContext
@@ -22,7 +23,7 @@ data RLimits = RLimits
     , openFilesLimit    :: ResourceLimits
     , stackSizeLimit    :: ResourceLimits
     , totalMemoryLimit  :: ResourceLimits
-    } deriving (Show)
+    } deriving (Eq, Show)
 
 deriving instance Show ResourceLimits
 deriving instance Show ResourceLimit
@@ -37,9 +38,17 @@ data EvalSettings = EvalSettings
       -- | File name that will be used for source code.
       -- The result will be written to '<filename>.res'
     , fileName    :: FilePath
-      -- | Maximum time for which the code is allowed to run
+      -- | Security restrictions
+    , limitSet    :: LimitSettings
+      -- | File that has to be preloaded
+    , preloadFile :: FilePath
+    } deriving (Eq, Show)
+
+
+data LimitSettings = LimitSettings
+    { -- | Maximum time for which the code is allowed to run
       -- (in seconds)
-    , timeout     :: Int
+      timeout     :: Int
       -- | Process priority for the 'nice' syscall.
       -- -20 is the highest, 20 is the lowest
     , niceness    :: Int
@@ -48,20 +57,29 @@ data EvalSettings = EvalSettings
       -- | SELinux security context under which the worker 
       -- process will be running.
     , secontext   :: Maybe SecurityContext
-    }
+    } deriving (Eq, Show)
 
-    
+
 defaultSettings :: EvalSettings
 defaultSettings = EvalSettings
-    { tmpDirPath = "/tmp"
-    , libDirPath = Just libdir
-    , fileName   = "test.hs"
-    , timeout    = 3
+    { tmpDirPath  = "/tmp"
+    , libDirPath  = Just libdir
+    , fileName    = "test.hs"
+    , limitSet    = def
+    , preloadFile = "Preload.hs"
+    }
+
+defaultLimits :: LimitSettings
+defaultLimits = LimitSettings
+    { timeout    = 3
     , niceness   = 10
     , rlimits    = Nothing
     , secontext  = Just "idia_restricted_t"
     }
 
+instance Default LimitSettings where
+  def = defaultLimits
+    
 instance Default EvalSettings where
   def = defaultSettings
 
