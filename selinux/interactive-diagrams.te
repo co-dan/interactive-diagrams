@@ -195,7 +195,7 @@ allow idia_restricted_t user_home_t:dir search;
 allow idia_restricted_t tmp_t:sock_file write;
 allow idia_restricted_t idia_web_t:unix_stream_socket { sendto connectto getattr };
 allow idia_restricted_t tmp_t:dir search;
-allow idia_restricted_t tmp_t:file getattr;
+allow idia_restricted_t tmp_t:file { getattr open read };
 
 ##################################################
 
