@@ -97,13 +97,7 @@ allow idia_web_t user_home_t:dir { getattr search };
 allow idia_web_t user_home_dir_t:dir search;
 # this is for GHC settings and ghc-prim
 allow idia_web_t user_home_t:file { read getattr ioctl open execute };
-#============= idia_web_t ==============
-# allow idia_web_t default_t:dir search;
-# allow idia_web_t fs_t:filesystem getattr;
-# allow idia_web_t proc_t:file { read getattr };
-# # won't print to stdin without this ^
-# allow idia_web_t home_root_t:dir search;
-# allow idia_web_t proc_t:file open;
+
 allow idia_web_t security_t:dir { getattr search }; # sys/fs/selinux
 allow idia_web_t security_t:filesystem getattr; # why??
 allow idia_web_t idia_restricted_t:fd use;
@@ -121,8 +115,8 @@ allow idia_web_t self:udp_socket { create connect getattr };
 
 # Temp file
 # the directory with temp files should be labeled with tmp_t
-# allow idia_web_t tmp_t:file { write getattr read create open ioctl };
-allow idia_web_t self:unix_stream_socket connectto;
+allow idia_web_t tmp_t:file { write getattr read create open ioctl };
+allow idia_web_t self:unix_stream_socket { sendto connectto };
 allow idia_web_t tmp_t:dir { write create add_name remove_name search };
 allow idia_web_t tmp_t:sock_file { write create unlink getattr };
 
@@ -141,6 +135,8 @@ allow idia_web_t idia_web_exec_t:file { create unlink };
 
 # Access to DB
 rw_files_pattern(idia_web_t, idia_db_t, idia_db_t)
+# this seems to be neccessary for accessing the db file, but I have no idea why
+allow idia_web_t default_t:dir search;
 
 # Allow web worker to access GHC & idia packages
 getattr_dirs_pattern(idia_web_t, idia_pkg_t, idia_pkg_t)
@@ -160,18 +156,20 @@ allow idia_web_t bin_t:lnk_file { read getattr };
 allow idia_restricted_t self:process { getpgid };
 
 # For running gcc
-# TODO: this should be fixed, restricted process should no be
+# TODO: this should be fixed, restricted process should *not* be
 # able to just execute random binary files
 allow idia_restricted_t bin_t:dir { getattr search };
 allow idia_restricted_t bin_t:file { read execute open getattr execute_no_trans };
 allow idia_restricted_t bin_t:lnk_file { read getattr };
 allow idia_restricted_t self:fifo_file { read write ioctl getattr };
 
+##
 # For locale stuff
-allow idia_restricted_t etc_t:file { read getattr open };
-allow idia_restricted_t locale_t:file { read getattr open };
-allow idia_restricted_t locale_t:dir { search };
-allow idia_restricted_t locale_t:lnk_file read;
+# It actually works fine without having to access locales
+# allow idia_restricted_t etc_t:file { read getattr open };
+# allow idia_restricted_t locale_t:file { read getattr open };
+# allow idia_restricted_t locale_t:dir { search };
+# allow idia_restricted_t locale_t:lnk_file read;
 
 # Packages. TODO: fix this
 allow idia_restricted_t idia_pkg_t:dir search;
@@ -179,23 +177,54 @@ allow idia_restricted_t idia_pkg_t:file { read getattr ioctl open execute };
 
 # TODO: Helper.hs
 allow idia_restricted_t idia_web_exec_t:file { read getattr open ioctl };
+allow idia_restricted_t idia_web_exec_t:dir search;
 
-# No idea what is thiis for
-# allow idia_restricted_t idia_web_t:fd use;
-# allow idia_restricted_t idia_web_t:fifo_file write;
+# No idae what this is for
 # allow idia_restricted_t self:fifo_file { read write ioctl getattr };
 allow idia_restricted_t self:process { setsched execmem };
+# it appears that because of -threaded, idia_restricted_t wants
+# to access inherited file descriptors and fifos from idia_web_t
+# allow idia_restricted_t idia_web_t:fd use;
+# allow idia_restricted_t idia_web_t:fifo_file write;
 
 # This is probably something to do with libdir
 allow idia_restricted_t user_home_dir_t:dir search;
 allow idia_restricted_t user_home_t:dir search;
-#allow idia_restricted_t user_tmp_t:file { write getattr open ioctl };
 
 # For communicating with the server
 allow idia_restricted_t tmp_t:sock_file write;
-allow idia_restricted_t idia_web_t:fifo_file write;
-allow idia_restricted_t idia_web_t:unix_stream_socket { connectto getattr };
+allow idia_restricted_t idia_web_t:unix_stream_socket { sendto connectto getattr };
 allow idia_restricted_t tmp_t:dir search;
+allow idia_restricted_t tmp_t:file getattr;
+
+##################################################
+
+# whut
+allow idia_web_t home_root_t:dir search;
+allow idia_restricted_t home_root_t:dir search;
+
+# /dev/pts1
+# TODO: Why does it need stdout?
+# <stdout>: commitBuffer: permission denied (Permission denied)
+allow idia_restricted_t sshd_t:fd use;
+allow idia_web_t user_devpts_t:chr_file { write ioctl };
+allow idia_restricted_t user_devpts_t:chr_file { write ioctl };
+
+
+
+##################################################
+# ATTN
+# For dev purpuses only
+#============= semanage_t ==============
+allow semanage_t setfiles_t:process { siginh noatsecure rlimitinh };
+
+
+#============= unconfined_t ==============
+allow unconfined_t idia_web_t:process transition;
+allow unconfined_t idia_db_t:file getattr;
+
+#============= idia_restricted_t ==============
+allow idia_restricted_t user_home_t:file { getattr open ioctl read };
 
 ########################################
 # hmm this doesn't seem to work
@@ -204,18 +233,3 @@ corenet_port(idia_web_t)
 
 allow idia_web_t idia_web_port_t:tcp_socket name_bind;
 
-##################################################
-
-allow idia_web_t home_root_t:dir search;
-allow idia_restricted_t idia_web_t:fd use;
-allow idia_restricted_t home_root_t:dir search;
-
-# /dev/pts1
-allow idia_restricted_t sshd_t:fd use;
-allow idia_web_t user_devpts_t:chr_file { write ioctl };
-allow idia_restricted_t user_devpts_t:chr_file { write ioctl };
-#============= semanage_t ==============
-allow semanage_t setfiles_t:process { siginh noatsecure rlimitinh };
-
-#============= unconfined_t ==============
-allow unconfined_t idia_web_t:process transition;
