@@ -1,12 +1,16 @@
 {-# LANGUAGE RecordWildCards #-}
 module Eval.Limits where
 
+import Prelude hiding (mapM_)
+
 import Control.Concurrent (threadDelay)
 import Control.Applicative ((<$>))
 import Control.Monad (when)
 import Data.Monoid (mconcat)
 import Data.List (intersperse)
+import Data.Foldable (mapM_)
 import System.Posix.Signals (signalProcess, killProcess)
+import System.Posix.Process (nice)
 import System.Posix.Types (ProcessID)
 import System.Posix.Resource (setResourceLimit)
 import System.Linux.SELinux (getCon, setCon, SecurityContext)
@@ -14,6 +18,14 @@ import System.Linux.SELinux (getCon, setCon, SecurityContext)
 import Eval.EvalM
 import Eval.EvalError
 import Eval.EvalSettings
+
+
+setLimits :: LimitSettings -> IO ()
+setLimits LimitSettings{..} = do
+  mapM_ setRLimits rlimits
+  nice niceness
+  mapM_ setupSELinuxCntx secontext
+    
 
 -- | Waits for a certain period of time (3 seconds)
 -- and then kills the process
