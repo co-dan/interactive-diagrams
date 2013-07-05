@@ -172,8 +172,8 @@ runToHandle act hndl = do
   ref <- liftIO $ newIORef []
   dfs <- getSessionDynFlags
   setSessionDynFlags $ dfs { log_action = logHandler ref }
-  dr <- handleException act
-  errors <- liftIO $ readIORef ref
+  dr :: Either String a <- handleException act
+  errors :: [EvalError] <- liftIO $ readIORef ref
   liftIO $ hPutStr hndl (encode (dr,errors))
   liftIO $ hPutStr hndl "\n"
   return (dr, errors)

@@ -30,5 +30,5 @@ settings = (def { limitSet = def { secontext = Nothing } })
 main :: IO ()
 main = do
   worker <- startEvalWorker "1" settings
-  print =<< sendCompileFileRequest worker "/home/vagrant/test.hs"
+  print . fst =<< sendCompileFileRequest worker "/home/vagrant/test.hs"
   return ()

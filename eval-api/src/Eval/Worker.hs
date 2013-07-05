@@ -8,7 +8,7 @@ module Eval.Worker
          module Eval.Worker.EvalCmd,
          -- * The 'Worker' type
          Worker(..), initialized,
-         startWorker,
+         startWorker, killWorker,
          -- ** IOWorker
          IOWorker, startIOWorker,
          -- ** EvalWorker
@@ -18,14 +18,20 @@ module Eval.Worker
 
 import Prelude hiding (putStr)
   
-import Control.Monad (when, forever)
+import Control.Monad (when, forever, unless)
 import Control.Monad.IO.Class (liftIO)
 import Control.Applicative ((<$>))
+import Control.Concurrent.Async (race)
+import Control.Exception (IOException)
 import Data.ByteString (hGetContents, hPutStr, hGetLine, putStr)
+import qualified Data.ByteString as BS
 import Data.Typeable
-import Data.Maybe (isJust)
+import Data.Default
+import Data.Function (fix)
+import Data.Maybe (isJust, fromJust)
+import Data.Monoid ((<>))
 import Data.IORef (IORef, newIORef, modifyIORef', readIORef)
-import Data.Serialize (encode, decode)
+import Data.Serialize (encode, decode, Serialize)
 import GHC.IO.Handle (hSetBuffering, BufferMode(..), hFlush)
 import Network (listenOn, connectTo, accept, PortID(..), Socket)
 import Network.Socket (close)
@@ -33,44 +39,25 @@ import System.Directory (doesFileExist)
 import System.FilePath.Posix ((</>))
 import System.IO (Handle, hClose)
 import System.Posix.Files (removeLink)
-import System.Posix.Process (forkProcess)
+import System.Posix.Process (forkProcess, getProcessStatus, ProcessStatus(..))
+import System.Posix.Signals (signalProcess, killProcess, Handler(..), installHandler, setStoppedChildFlag, processStatusChanged)
 import System.Posix.Types (ProcessID)
 
 import DynFlags
 import GHC hiding (compileExpr)
 import MonadUtils hiding (MonadIO, liftIO)
 
-import Eval
+import Eval hiding (runToHandle)
+import Eval.EvalError
 import Eval.Helpers
 import Eval.Limits
 import Eval.EvalSettings (LimitSettings(..), EvalSettings(..))
 import Eval.EvalM
 import Eval.Worker.EvalCmd
+import Eval.Worker.Protocol
+import Eval.Worker.Types
 import Display
 
--- | A datatype representing a worker of type 'a'
-data Worker a = Worker
-    { -- | Name of the worker
-      workerName     :: String
-      -- | A filepath to the Unix socket that will be
-      -- used for communicating with the worker.
-      -- If the file is already present it will be unliked
-      -- during the initializatin step
-    , workerSocket   :: FilePath
-      -- | Security restrictions for the worker
-    , workerLimits   :: LimitSettings
-      -- | 'Just pid' if the worker's process ID is 'pid',
-      -- Nothing' if the worker is not active/initialized
-    , workerPid      :: Maybe ProcessID 
-    } deriving (Typeable, Eq, Show)
-
-
-data IOWorker
-data EvalWorker
-
--- | Check whether the worker is initialized
-initialized :: Worker a -> Bool
-initialized = isJust . workerPid
 
 -- | Start a general type of worker
 startWorker :: Worker a -- ^ A non-active worker
@@ -82,12 +69,15 @@ startWorker w cb = do
 
 forkWorker :: Worker a -> (Socket -> IO ()) -> IO ProcessID
 forkWorker Worker{..} cb = do
+  -- setStoppedChildFlag True
+  -- installHandler processStatusChanged Ignore Nothing
   soc <- mkSock workerSocket
   forkProcess $ do
-    setLimits workerLimits
+    setStoppedChildFlag False
+    -- installHandler processStatusChanged Default Nothing
+    -- setLimits workerLimits
     cb soc
     return ()
-
 
 -- | Start a worker of type 'IOWorker'
 startIOWorker :: Worker IOWorker -- ^ A non-active worker
@@ -99,6 +89,14 @@ startIOWorker w callb = startWorker w $ \soc -> do
     callb hndl
     
 
+killWorker :: Worker a -> IO ()
+killWorker w@Worker{..} = do
+  when (initialized w) $ do
+    tc <- getProcessStatus False False (fromJust workerPid)
+    case tc of
+      Just _  -> return ()
+      Nothing -> signalProcess killProcess (fromJust workerPid)
+  
 -- | Starts a specialized worker for running EvalM
 -- preloads stuff, etc
 startEvalWorker :: String                   -- ^ Name of the worker
@@ -116,12 +114,11 @@ startEvalWorker name eset = do
     liftIO $ forkWorker worker $ \soc -> do
       forever $ do
         (hndl, _, _) <- accept soc
-        hSetBuffering hndl LineBuffering
         act <- evalWorkerAction hndl
         flip run' eset $ do
           setSession sess
-          r <- liftEvalM $ runToHandle (runEvalM act eset) hndl
-          traceM $ "Got: " ++ show r
+          r :: EvalResultWithErrors <- liftEvalM $
+                                       runToHandle (runEvalM act eset) hndl
           liftIO $ hFlush hndl
           return r
   return $ worker { workerPid = Just pid }
@@ -134,39 +131,69 @@ startEvalWorker name eset = do
 
 evalWorkerAction :: Handle -> IO (EvalM DisplayResult)
 evalWorkerAction hndl = do
-  (cmd :: DecodeResult EvalCmd) <- decode <$> hGetLine hndl
-  case cmd of
-    Left str -> error str
-    Right x -> return (evalCmdToEvalM x)
+  (cmd :: EvalCmd) <- getData hndl
+                      -- `gcatch` \(e :: ProtocolException) ->
+                      -- return (Left (show e))
+  return (evalCmdToEvalM cmd)
 
+-- | Runs a Ghc monad code and outputs the result to a handle  
+runToHandle :: (Serialize a, Show a)
+            => Ghc a -> Handle -> Ghc (Either String a, [EvalError])
+runToHandle act hndl = do
+  ref <- liftIO $ newIORef []
+  dfs <- getSessionDynFlags
+  setSessionDynFlags $ dfs { log_action = logHandler ref }
+  dr :: Either String a <- handleException act
+  errors :: [EvalError] <- liftIO $ readIORef ref
+  liftIO $ sendData hndl (dr, errors)
+  return (dr, errors)
+
+
+performEvalRequest :: Handle -> EvalCmd -> IO (DecodeResult EvalResultWithErrors)
+performEvalRequest hndl cmd = do
+  sendData hndl cmd
+  (Right <$> getData hndl) `gcatch` \(e :: ProtocolException) ->
+    return (Left (show e))
+
+sendEvalRequest :: Worker EvalWorker
+                -> EvalCmd
+                -> IO (EvalResultWithErrors, Worker EvalWorker)
+sendEvalRequest w cmd = do
+  hndl <- connectToWorker w
+  let pid = fromJust . workerPid $ w
+  let timelimit = timeout . workerLimits $ w
+  -- r <- performEvalRequest hndl cmd
+  r <- race (processTimeout pid timelimit) $ do
+    requestResult <- performEvalRequest hndl cmd
+    -- tc <- getProcessStatus False False pid
+    -- case tc of
+    --   Just (Stopped _) -> signalProcess killProcess pid
+    --   Nothing          -> signalProcess killProcess pid
+    --   _                -> return ()
+    return requestResult
+  r `seq` hClose hndl
+  tc <- getProcessStatus False False pid
+  w' <- case tc of
+    Nothing -> return w 
+    Just _  -> startEvalWorker (workerName w) (def { limitSet = workerLimits w })
+  let evres = case r of
+        Left _ -> (Left "Process timedout", [])
+        Right (Right x) ->  x
+        Right (Left str) -> (Left $ "Deserialization error:\n" ++
+                             str, [])
+  return (evres, w')
 
 -- | Send the 'Worker' a request to compile a file
-sendCompileFileRequest :: Worker EvalWorker -> FilePath -> IO EvalResultWithErrors
-sendCompileFileRequest w fpath = do
-  hndl <- connectToWorker w
-  hSetBuffering hndl LineBuffering
-  hPutStr hndl (encode (CompileFile fpath))
-  hPutStr hndl "\n"
-  r :: DecodeResult EvalResultWithErrors <- decode <$> hGetLine hndl
-  r `seq` hClose hndl
-  case r of
-    Right x -> return x
-    Left str -> return (Left $ "Deserialization error:\n" ++
-                        str, [])
-
+sendCompileFileRequest :: Worker EvalWorker
+                       -> FilePath
+                       -> IO (EvalResultWithErrors, Worker EvalWorker)
+sendCompileFileRequest w fpath = sendEvalRequest w (CompileFile fpath)
+  
 -- | Send the 'Worker' a request to compile an expression
-sendEvalStringRequest :: Worker EvalWorker -> String -> IO EvalResultWithErrors
-sendEvalStringRequest w str = do
-  hndl <- connectToWorker w
-  hSetBuffering hndl LineBuffering
-  hPutStr hndl (encode (EvalString str))
-  hPutStr hndl "\n"
-  r :: DecodeResult EvalResultWithErrors <- decode <$> hGetLine hndl
-  r `seq` hClose hndl
-  case r of
-    Right re -> return re
-    Left str -> return (Left $ "Deserialization error:\n" ++
-                        str, [])
+sendEvalStringRequest :: Worker EvalWorker
+                      -> String
+                      -> IO (EvalResultWithErrors, Worker EvalWorker)
+sendEvalStringRequest w str = sendEvalRequest w (EvalString str)
                           
 ------------------------------------------------------------
 

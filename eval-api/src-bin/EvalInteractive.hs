@@ -27,8 +27,8 @@ settings = def {
      secontext = Nothing
      }
   }
-  where memlim = ResourceLimit $ 104857600 * 4
-                                 --- 100mb * 4
+  where memlim = ResourceLimit $ 104857600 * 2
+                                 --- 100mb * 2
 
 
 main :: IO ()
@@ -40,22 +40,23 @@ loop c worker = do
   mbln <- readline c
   case mbln of
     Nothing -> return ()
-    Just ":q" -> return ()
-    Just ":quit" -> return ()
+    Just ":q" -> cleanUp worker >> return ()
+    Just ":quit" -> cleanUp worker >> return ()
     Just ln -> do
       addHistory ln
-      measureTime $ do
-        (r, errors) <- evalLn ln worker
+      worker' <- measureTime $ do
+        ((r, errors), w') <- evalLn ln worker
         case r of
           Right (DisplayResult res) ->
             mapM_ (putStr . TL.unpack . result) res
             >> putStrLn ""
           Left err -> putStrLn err
         putStrLn "Errors:"
-        mapM_ print errors   
-      loop c worker
+        mapM_ print errors
+        return w'
+      loop c worker'
 
-evalLn :: String -> Worker EvalWorker -> IO EvalResultWithErrors
+evalLn :: String -> Worker EvalWorker -> IO (EvalResultWithErrors, Worker EvalWorker)
 evalLn s wrk
   | ":load" `isPrefixOf` s = 
     let fname = dropWhile (==' ') $ drop 5 s
@@ -63,7 +64,9 @@ evalLn s wrk
   | otherwise = let expr = ("(return $ display (" ++ s ++ ")) :: IO DisplayResult")
                 in sendEvalStringRequest wrk expr
 
-
+cleanUp :: Worker a -> IO ()
+cleanUp w = killWorker w
+                   
 measureTime :: MonadIO m => m a -> m a
 measureTime act = do
   t0 <- liftIO getCurrentTime

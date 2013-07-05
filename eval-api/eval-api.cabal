@@ -25,6 +25,8 @@ library
   exposed-modules:     Eval,
                        Eval.Worker,
                        Eval.Worker.EvalCmd,
+                       Eval.Worker.Protocol,
+                       Eval.Worker.Types,
                        Eval.EvalError,
                        Eval.EvalM,
                        Eval.EvalSettings,
