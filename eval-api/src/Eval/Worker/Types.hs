@@ -10,6 +10,8 @@ import System.Posix.Types (ProcessID)
 
 import Eval.EvalSettings
 
+type RestartWorker m a = Worker a -> m (Worker a)
+
 -- | A datatype representing a worker of type 'a'
 data Worker a = Worker
     { -- | Name of the worker

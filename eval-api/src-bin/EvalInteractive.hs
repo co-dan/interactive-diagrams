@@ -65,7 +65,7 @@ evalLn s wrk
                 in sendEvalStringRequest wrk expr
 
 cleanUp :: Worker a -> IO ()
-cleanUp w = killWorker w
+cleanUp w = void $ killWorker w 
                    
 measureTime :: MonadIO m => m a -> m a
 measureTime act = do

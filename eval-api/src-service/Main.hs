@@ -11,24 +11,29 @@ import Network (listenOn, connectTo, accept, socketPort, PortID(..), Socket(..))
 import Network.Socket (close)
 import System.Directory (doesFileExist)
 import System.FilePath.Posix ((</>))
-import System.IO (Handle, hClose)
+import System.IO (Handle, hClose, stdin, stdout, hSetBuffering, BufferMode(..), hGetLine)
 import System.Posix.Files (removeLink)
 
 import Eval.Worker
 import Eval.EvalSettings
 
-data ServCmd = WorkerReq
-             | KillWorker (forall a. Worker a)
-             deriving (Typeable)
+
+echoHandle :: Handle -> IO ()
+echoHandle h = do
+  hSetBuffering h LineBuffering
+  s <- hGetLine h
+  putStrLn $ "Got: " ++ s
+  hClose h
   
-sockFile :: FilePath
-sockFile = "/idia/run/control.sock"
-
-settings :: EvalSettings
-settings = (def { limitSet = def { secontext = Nothing } })
-
 main :: IO ()
 main = do
-  worker <- startEvalWorker "1" settings
-  print . fst =<< sendCompileFileRequest worker "/home/vagrant/test.hs"
+  hSetBuffering stdin NoBuffering
+  loop =<< startIOWorker "Testworker" "/tmp/1.sock" echoHandle
   return ()
+
+loop :: (Worker IOWorker, RestartWorker IO IOWorker) -> IO ()
+loop (w, restart) = do
+  putStrLn "Press <ENTER> to restart the worker"
+  _ <- getChar
+  w' <- restart w
+  loop (w', restart)

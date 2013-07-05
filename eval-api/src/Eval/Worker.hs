@@ -7,7 +7,7 @@ module Eval.Worker
        (
          module Eval.Worker.EvalCmd,
          -- * The 'Worker' type
-         Worker(..), initialized,
+         Worker(..), initialized, RestartWorker,
          startWorker, killWorker,
          -- ** IOWorker
          IOWorker, startIOWorker,
@@ -19,10 +19,10 @@ module Eval.Worker
 import Prelude hiding (putStr)
   
 import Control.Monad (when, forever, unless)
-import Control.Monad.IO.Class (liftIO)
+import Control.Monad.IO.Class (liftIO, MonadIO)
 import Control.Applicative ((<$>))
 import Control.Concurrent.Async (race)
-import Control.Exception (IOException)
+import Control.Exception (IOException, handle)
 import Data.ByteString (hGetContents, hPutStr, hGetLine, putStr)
 import qualified Data.ByteString as BS
 import Data.Typeable
@@ -58,44 +58,67 @@ import Eval.Worker.Protocol
 import Eval.Worker.Types
 import Display
 
+mkDefaultWorker :: String -> FilePath -> LimitSettings -> Worker a
+mkDefaultWorker name sock set = Worker
+    { workerName    = name
+    , workerSocket  = sock
+    , workerLimits  = set -- def { secontext = Nothing }
+    , workerPid     = Nothing
+    }
 
 -- | Start a general type of worker
-startWorker :: Worker a -- ^ A non-active worker
-            -> (Socket -> IO ()) 
-            -> IO (Worker a)
-startWorker w cb = do
-  pid <- forkWorker w cb
-  return $ w { workerPid = Just pid }
+startWorker :: MonadIO m
+            => String         --  ^ Name
+            -> FilePath       --  ^ Socket
+            -> LimitSettings  --  ^ Restrictions
+            -> (IO ProcessID -> m ProcessID) -- ^ A hook that
+            -- ^ takes a forking action and does pre-loading
+            -- ^ and unloading
+            -> (Socket -> IO ()) -- ^ Socket callback
+            -> m (Worker a, RestartWorker m a) -- ^ Worker and its restart function
+startWorker name sock set forkHook cb = do
+  let w = mkDefaultWorker name sock set
+  let restarter w = do
+        w' <- liftIO $ killWorker w
+        pid <- forkHook (forkWorker w' cb)
+        return $ w' { workerPid = Just pid }
+  w' <- restarter w
+  return (w', restarter)
 
 forkWorker :: Worker a -> (Socket -> IO ()) -> IO ProcessID
 forkWorker Worker{..} cb = do
-  -- setStoppedChildFlag True
-  -- installHandler processStatusChanged Ignore Nothing
+  setStoppedChildFlag True
+  installHandler processStatusChanged Ignore Nothing
   soc <- mkSock workerSocket
   forkProcess $ do
     setStoppedChildFlag False
-    -- installHandler processStatusChanged Default Nothing
-    -- setLimits workerLimits
+    installHandler processStatusChanged Default Nothing
+    setLimits workerLimits
     cb soc
     return ()
 
 -- | Start a worker of type 'IOWorker'
-startIOWorker :: Worker IOWorker -- ^ A non-active worker
+startIOWorker :: String
+              -> FilePath 
               -> (Handle -> IO ())
-              -> IO (Worker IOWorker)
-startIOWorker w callb = startWorker w $ \soc -> do
-  forever $ do
-    (hndl, _, _) <- accept soc
-    callb hndl
-    
-
-killWorker :: Worker a -> IO ()
+              -> IO (Worker IOWorker, RestartWorker IO IOWorker)
+startIOWorker name sock callb = startWorker name sock defSet pre handle
+  where handle soc = forever $ do
+          (hndl, _, _) <- accept soc
+          callb hndl
+        pre fork =  putStrLn ("Starting worker " ++ show name)
+                 >> fork
+        defSet = def { secontext = Nothing }
+        
+killWorker :: Worker a -> IO (Worker a)
 killWorker w@Worker{..} = do
   when (initialized w) $ do
+    signalProcess killProcess (fromJust workerPid)
     tc <- getProcessStatus False False (fromJust workerPid)
     case tc of
       Just _  -> return ()
       Nothing -> signalProcess killProcess (fromJust workerPid)
+  return (w { workerPid = Nothing })
   
 -- | Starts a specialized worker for running EvalM
 -- preloads stuff, etc
@@ -165,23 +188,26 @@ sendEvalRequest w cmd = do
   -- r <- performEvalRequest hndl cmd
   r <- race (processTimeout pid timelimit) $ do
     requestResult <- performEvalRequest hndl cmd
-    -- tc <- getProcessStatus False False pid
-    -- case tc of
-    --   Just (Stopped _) -> signalProcess killProcess pid
-    --   Nothing          -> signalProcess killProcess pid
-    --   _                -> return ()
     return requestResult
   r `seq` hClose hndl
-  tc <- getProcessStatus False False pid
-  w' <- case tc of
-    Nothing -> return w 
-    Just _  -> startEvalWorker (workerName w) (def { limitSet = workerLimits w })
+  alive <- processAlive pid
+  w' <- case alive of
+    True  -> return w 
+    False -> startEvalWorker (workerName w) (def { limitSet = workerLimits w })
   let evres = case r of
         Left _ -> (Left "Process timedout", [])
         Right (Right x) ->  x
         Right (Left str) -> (Left $ "Deserialization error:\n" ++
                              str, [])
   return (evres, w')
+
+
+processAlive :: ProcessID -> IO Bool
+processAlive pid = do
+  handle (\(e :: IOException) -> return False) $ do
+    tc <- getProcessStatus False False pid
+    return True
+        
 
 -- | Send the 'Worker' a request to compile a file
 sendCompileFileRequest :: Worker EvalWorker
