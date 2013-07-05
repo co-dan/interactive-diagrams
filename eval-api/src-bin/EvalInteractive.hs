@@ -35,8 +35,8 @@ main :: IO ()
 main = startEvalWorker "evali" settings
        >>= loop "> "
 
-loop :: String -> Worker EvalWorker -> IO ()
-loop c worker = do
+loop :: String -> (Worker EvalWorker, RestartWorker IO EvalWorker) -> IO ()
+loop c (worker, restart) = do
   mbln <- readline c
   case mbln of
     Nothing -> return ()
@@ -45,7 +45,7 @@ loop c worker = do
     Just ln -> do
       addHistory ln
       worker' <- measureTime $ do
-        ((r, errors), w') <- evalLn ln worker
+        ((r, errors), w') <- evalLn ln (worker, restart)
         case r of
           Right (DisplayResult res) ->
             mapM_ (putStr . TL.unpack . result) res
@@ -54,9 +54,11 @@ loop c worker = do
         putStrLn "Errors:"
         mapM_ print errors
         return w'
-      loop c worker'
+      loop c (worker', restart)
 
-evalLn :: String -> Worker EvalWorker -> IO (EvalResultWithErrors, Worker EvalWorker)
+evalLn :: String
+       -> (Worker EvalWorker, RestartWorker IO EvalWorker)
+       -> IO (EvalResultWithErrors, Worker EvalWorker)
 evalLn s wrk
   | ":load" `isPrefixOf` s = 
     let fname = dropWhile (==' ') $ drop 5 s

@@ -28,7 +28,7 @@ import qualified Data.ByteString as BS
 import Data.Typeable
 import Data.Default
 import Data.Function (fix)
-import Data.Maybe (isJust, fromJust)
+import Data.Maybe (isJust, fromJust, fromMaybe)
 import Data.Monoid ((<>))
 import Data.IORef (IORef, newIORef, modifyIORef', readIORef)
 import Data.Serialize (encode, decode, Serialize)
@@ -66,21 +66,21 @@ mkDefaultWorker name sock set = Worker
     , workerPid     = Nothing
     }
 
+
 -- | Start a general type of worker
-startWorker :: MonadIO m
+startWorker :: (WorkerData w, MonadIO (WMonad w))
             => String         --  ^ Name
             -> FilePath       --  ^ Socket
             -> LimitSettings  --  ^ Restrictions
-            -> (IO ProcessID -> m ProcessID) -- ^ A hook that
-            -- ^ takes a forking action and does pre-loading
-            -- ^ and unloading
-            -> (Socket -> IO ()) -- ^ Socket callback
-            -> m (Worker a, RestartWorker m a) -- ^ Worker and its restart function
-startWorker name sock set forkHook cb = do
+            -> WMonad w (WData w) --  ^ Pre-forking function
+            -> (WData w -> Socket -> IO ()) -- ^ Socket callback
+            -> WMonad w (Worker w, RestartWorker (WMonad w) w) 
+startWorker name sock set pre cb = do 
   let w = mkDefaultWorker name sock set
   let restarter w = do
         w' <- liftIO $ killWorker w
-        pid <- forkHook (forkWorker w' cb)
+        dat <- pre
+        pid <- liftIO $ forkWorker w' (cb dat)
         return $ w' { workerPid = Just pid }
   w' <- restarter w
   return (w', restarter)
@@ -97,59 +97,84 @@ forkWorker Worker{..} cb = do
     cb soc
     return ()
 
+-- | Kills a worker, take an initialized worker,
+-- returns non-initialized one.
+killWorker :: Worker a -> IO (Worker a)
+killWorker w@Worker{..} = do
+  when (initialized w) $ do
+    alive <- processAlive (fromJust workerPid)
+    when alive $ do
+      signalProcess killProcess (fromJust workerPid)
+      tc <- getProcessStatus False False (fromJust workerPid)
+      case tc of
+        Just _  -> return ()
+        Nothing -> signalProcess killProcess (fromJust workerPid)
+  return (w { workerPid = Nothing })    
+
 -- | Start a worker of type 'IOWorker'
 startIOWorker :: String
               -> FilePath 
               -> (Handle -> IO ())
               -> IO (Worker IOWorker, RestartWorker IO IOWorker)
-startIOWorker name sock callb = startWorker name sock defSet pre handle
-  where handle soc = forever $ do
+startIOWorker name sock callb = startWorker name sock defSet preFork handle
+  where handle () soc = forever $ do
           (hndl, _, _) <- accept soc
           callb hndl
-        pre fork =  putStrLn ("Starting worker " ++ show name)
-                 >> fork
         defSet = def { secontext = Nothing }
+        preFork =  putStrLn ("Starting worker " ++ show name)
+                >> return ()
         
-killWorker :: Worker a -> IO (Worker a)
-killWorker w@Worker{..} = do
-  when (initialized w) $ do
-    signalProcess killProcess (fromJust workerPid)
-    tc <- getProcessStatus False False (fromJust workerPid)
-    case tc of
-      Just _  -> return ()
-      Nothing -> signalProcess killProcess (fromJust workerPid)
-  return (w { workerPid = Nothing })
   
 -- | Starts a specialized worker for running EvalM
 -- preloads stuff, etc
 startEvalWorker :: String                   -- ^ Name of the worker
                 -> EvalSettings             -- ^ Evaluation settings that will be used
-                -> IO (Worker EvalWorker)
-startEvalWorker name eset = do
-  pid <- flip run' eset $ do
-    -- liftEvalM $ initGhc _
-    dfs <- getSessionDynFlags
-    setSessionDynFlags $ dfs { hscTarget = HscInterpreted
-                             , ghcLink = LinkInMemory
-                             }
-    loadFile (preloadFile eset)
-    sess <- getSession
-    liftIO $ forkWorker worker $ \soc -> do
-      forever $ do
-        (hndl, _, _) <- accept soc
-        act <- evalWorkerAction hndl
-        flip run' eset $ do
-          setSession sess
-          r :: EvalResultWithErrors <- liftEvalM $
-                                       runToHandle (runEvalM act eset) hndl
-          liftIO $ hFlush hndl
-          return r
-  return $ worker { workerPid = Just pid }
-  where worker = Worker { workerName   = name
-                        , workerSocket = tmpDirPath eset </> (name ++ ".sock")
-                        , workerLimits = limitSet eset
-                        , workerPid    = Nothing
-                        }
+                -> IO (Worker EvalWorker, RestartWorker IO EvalWorker)
+startEvalWorker name eset = startWorker name sock set pre callback
+  where sock = tmpDirPath eset </> (name ++ ".sock")
+        set  = limitSet eset
+        pre  = flip run' eset $ do
+          dfs <- getSessionDynFlags
+          setSessionDynFlags $ dfs { hscTarget = HscInterpreted
+                                   , ghcLink = LinkInMemory
+                                   }
+          loadFile (preloadFile eset)
+          getSession
+        callback sess soc = forever $ do
+          (hndl, _, _) <- accept soc
+          act <- evalWorkerAction hndl
+          flip run' eset $ do
+            setSession sess
+            r :: EvalResultWithErrors <- liftEvalM $
+                                         runToHandle (runEvalM act eset) hndl
+            liftIO $ hFlush hndl
+            return r
+
+  -- do
+  -- pid <- flip run' eset $ do
+  --   -- liftEvalM $ initGhc _
+  --   dfs <- getSessionDynFlags
+  --   setSessionDynFlags $ dfs { hscTarget = HscInterpreted
+  --                            , ghcLink = LinkInMemory
+  --                            }
+  --   loadFile (preloadFile eset)
+  --   sess <- getSession
+  --   liftIO $ forkWorker worker $ \soc -> do
+  --     forever $ do
+  --       (hndl, _, _) <- accept soc
+  --       act <- evalWorkerAction hndl
+  --       flip run' eset $ do
+  --         setSession sess
+  --         r :: EvalResultWithErrors <- liftEvalM $
+  --                                      runToHandle (runEvalM act eset) hndl
+  --         liftIO $ hFlush hndl
+  --         return r
+  -- return $ worker { workerPid = Just pid }
+  -- where worker = Worker { workerName   = name
+  --                       , workerSocket = tmpDirPath eset </> (name ++ ".sock")
+  --                       , workerLimits = limitSet eset
+  --                       , workerPid    = Nothing
+  --                       }
 
 
 evalWorkerAction :: Handle -> IO (EvalM DisplayResult)
@@ -178,10 +203,10 @@ performEvalRequest hndl cmd = do
   (Right <$> getData hndl) `gcatch` \(e :: ProtocolException) ->
     return (Left (show e))
 
-sendEvalRequest :: Worker EvalWorker
+sendEvalRequest :: (Worker EvalWorker, RestartWorker IO EvalWorker)
                 -> EvalCmd
                 -> IO (EvalResultWithErrors, Worker EvalWorker)
-sendEvalRequest w cmd = do
+sendEvalRequest (w, restart) cmd = do
   hndl <- connectToWorker w
   let pid = fromJust . workerPid $ w
   let timelimit = timeout . workerLimits $ w
@@ -193,7 +218,8 @@ sendEvalRequest w cmd = do
   alive <- processAlive pid
   w' <- case alive of
     True  -> return w 
-    False -> startEvalWorker (workerName w) (def { limitSet = workerLimits w })
+    -- False -> startEvalWorker (workerName w) (def { limitSet = workerLimits w })
+    False -> restart w
   let evres = case r of
         Left _ -> (Left "Process timedout", [])
         Right (Right x) ->  x
@@ -210,13 +236,13 @@ processAlive pid = do
         
 
 -- | Send the 'Worker' a request to compile a file
-sendCompileFileRequest :: Worker EvalWorker
+sendCompileFileRequest :: (Worker EvalWorker, RestartWorker IO EvalWorker)
                        -> FilePath
                        -> IO (EvalResultWithErrors, Worker EvalWorker)
 sendCompileFileRequest w fpath = sendEvalRequest w (CompileFile fpath)
   
 -- | Send the 'Worker' a request to compile an expression
-sendEvalStringRequest :: Worker EvalWorker
+sendEvalStringRequest :: (Worker EvalWorker, RestartWorker IO EvalWorker)
                       -> String
                       -> IO (EvalResultWithErrors, Worker EvalWorker)
 sendEvalStringRequest w str = sendEvalRequest w (EvalString str)

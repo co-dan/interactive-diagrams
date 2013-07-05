@@ -1,12 +1,15 @@
-{-# LANGUAGE EmptyDataDecls, DeriveDataTypeable #-}
+{-# LANGUAGE EmptyDataDecls, DeriveDataTypeable, RecordWildCards #-}
+{-# LANGUAGE TypeFamilies #-}
 module Eval.Worker.Types where
 
 import Network (Socket)
 import Control.Exception (IOException, Exception)
+import Control.Monad.IO.Class (MonadIO)
 import Data.Typeable
 import Data.Maybe (isJust)
 import System.Posix.Types (ProcessID)
 
+import GHC
 
 import Eval.EvalSettings
 
@@ -32,6 +35,29 @@ data Worker a = Worker
 data IOWorker
 data EvalWorker
 
+class WorkerData w where
+  -- | Data that saves after restarts
+  type WData w :: *
+  type WMonad w :: * -> *
+  -- -- | A hook that is run prior/after forking the process                  
+  -- forkHook :: Worker w                 -- ^ Worker (inactive) that will be forked
+  --          -> IO ProcessID             -- ^ Forking action
+  --          -> IO (ProcessID, WData w)  -- ^ The resulting PID and data
+
+instance WorkerData IOWorker where
+  type WData IOWorker = ()
+  type WMonad IOWorker = IO
+  -- forkHook Worker{..} forkCall = do
+  --   putStrLn ("Starting worker " ++ show workerName)
+  --   pid <- forkCall
+  --   return (pid, ())
+  
+instance WorkerData EvalWorker where
+  type WData EvalWorker = HscEnv
+  type WMonad EvalWorker = IO
+  -- forkHook Worker{..} forkCall = flip run' 
+    
+    
 -- | Check whether the worker is initialized
 initialized :: Worker a -> Bool
 initialized = isJust . workerPid
