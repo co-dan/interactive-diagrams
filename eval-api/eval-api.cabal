@@ -12,13 +12,17 @@ description:         Evaluation API for the Interactive Diagrams projects.
                      Provides means of safe compilation and interpretation of Haskell code (including Diagrams) using GHC API.
 
 homepage:            http://github.com/co-dan/interactive-diagrams
-license:             BSD3
-license-file:        LICENSE
+bug-reports:         https://github.com/co-dan/interactive-diagrams/issues
 author:              Daniil Frumin <difrumin@gmail.com>
 maintainer:          Dan Frumin <difrumin@gmail.com>
+license:             BSD3
+license-file:        LICENSE
+
 category:            Compilers/Interpreters
 build-type:          Simple
 cabal-version:       >=1.8
+
+extra-source-files:  examples/*.hs
 
 library
   hs-source-dirs:      src
@@ -27,6 +31,7 @@ library
                        Eval.Worker.EvalCmd,
                        Eval.Worker.Protocol,
                        Eval.Worker.Types,
+                       Eval.Worker.RestartingPool,
                        Eval.EvalError,
                        Eval.EvalM,
                        Eval.EvalSettings,
@@ -46,6 +51,10 @@ library
                        data-default ==0.5.*,
                        ghc >= 7.6,
                        display ==0.1.*,
+                       vector ==0.10.*,
+                       hashable, 
+                       stm,
+                       monad-control,
                        network ==2.4.*,
                        directory ==1.2.*,
                        selinux
@@ -54,7 +63,7 @@ library
 executable eval-service  
   hs-source-dirs:      src-service
   main-is:             Main.hs
-  ghc-options:         -O2 -Wall 
+  ghc-options:         -O2 -Wall
   build-depends:       base,
                        transformers,
                        network ==2.4.*,

@@ -1,10 +1,13 @@
 {-# LANGUAGE EmptyDataDecls, DeriveDataTypeable, RecordWildCards #-}
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeFamilies, ScopedTypeVariables #-}
 module Eval.Worker.Types where
 
-import Control.Exception (IOException, Exception)
-import Data.Maybe (isJust)
+import Control.Monad (when)
+import Control.Exception (IOException, Exception, handle)
+import Data.Maybe (isJust, fromJust)
 import Data.Typeable
+import System.Posix.Signals (signalProcess, killProcess)
+import System.Posix.Process (getProcessStatus)
 import System.Posix.Types (ProcessID)
 
 import GHC
@@ -28,7 +31,7 @@ data Worker a = Worker
       -- | 'Just pid' if the worker's process ID is 'pid',
       -- Nothing' if the worker is not active/initialized
     , workerPid      :: Maybe ProcessID
-    } 
+    } deriving (Show)
 
 
 data IOWorker
@@ -62,3 +65,34 @@ data ProtocolException =
   deriving (Typeable, Show)
                                 
 instance Exception ProtocolException                         
+
+-----------------------
+
+-- | Checks whether the process is alive
+-- /hacky/  
+processAlive :: ProcessID -> IO Bool
+processAlive pid = do
+  handle (\(e :: IOException) -> return False) $ do
+    tc <- getProcessStatus False False pid
+    return True
+
+workerAlive :: Worker a -> IO Bool
+workerAlive w = do
+  case (workerPid w) of
+    Nothing  -> return False
+    Just pid -> processAlive pid
+
+-- | Kills a worker, take an initialized worker,
+-- returns non-initialized one.
+killWorker :: Worker a -> IO (Worker a)
+killWorker w@Worker{..} = do
+  when (initialized w) $ do
+    alive <- processAlive (fromJust workerPid)
+    when alive $ do
+      signalProcess killProcess (fromJust workerPid)
+      tc <- getProcessStatus False False (fromJust workerPid)
+      case tc of
+        Just _  -> return ()
+        Nothing -> signalProcess killProcess (fromJust workerPid)
+  return (w { workerPid = Nothing })    
+  

@@ -3,6 +3,18 @@
 {-# LANGUAGE FlexibleContexts, EmptyDataDecls, ScopedTypeVariables #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeHoles #-}
+{-|
+  Worker can be in one of three states
+
+    [Uninitialized] Uninitialized worker is a worker that has a name,
+    a socket, possibly 'WData' but has not been forker
+
+    [Initialized] Initialized worker has an associated forker process.
+
+    [Active] A worker is active if it's initialized and it's being used
+    a client. Active/inactive workers are managed by a 'WorkersPool'.
+-}
+
 module Eval.Worker
        (
          module Eval.Worker.EvalCmd,
@@ -98,20 +110,6 @@ forkWorker Worker{..} cb = do
     setLimits workerLimits
     cb soc
     return ()
-
--- | Kills a worker, take an initialized worker,
--- returns non-initialized one.
-killWorker :: Worker a -> IO (Worker a)
-killWorker w@Worker{..} = do
-  when (initialized w) $ do
-    alive <- processAlive (fromJust workerPid)
-    when alive $ do
-      signalProcess killProcess (fromJust workerPid)
-      tc <- getProcessStatus False False (fromJust workerPid)
-      case tc of
-        Just _  -> return ()
-        Nothing -> signalProcess killProcess (fromJust workerPid)
-  return (w { workerPid = Nothing })    
 
 -- | Start a worker of type 'IOWorker'
 -- The callback function is called every time a connectino is established
@@ -209,14 +207,6 @@ sendEvalRequest (w, restart) cmd = do
                              str, [])
   return (evres, w')
 
--- | Checks whether the process is alive
--- /hacky/  
-processAlive :: ProcessID -> IO Bool
-processAlive pid = do
-  handle (\(e :: IOException) -> return False) $ do
-    tc <- getProcessStatus False False pid
-    return True
-        
 
 -- | Send the 'Worker' a request to compile a file
 sendCompileFileRequest :: (Worker EvalWorker, RestartWorker IO EvalWorker)
