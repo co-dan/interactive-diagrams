@@ -16,7 +16,7 @@ cabal-version:       >=1.8
 
 executable scotty-pastebin
   main-is:             Pastebin.hs
-  ghc-options:         -threaded -O2
+  ghc-options:         -O2 -threaded
   hs-source-dirs:      src       
   -- other-modules:       
   build-depends:       base >=4.5,
@@ -28,6 +28,7 @@ executable scotty-pastebin
                        persistent-sqlite >=1.2,
                        persistent-template >=1.2,
                        scotty,
+                       network,
                        http-types ==0.8.*,
                        blaze-html,
                        wai-extra,

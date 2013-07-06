@@ -11,6 +11,8 @@ import Control.Monad.Trans.Either (EitherT(..), eitherT)
 import Data.Monoid ((<>), mempty)
 import Data.Foldable (foldMap)
 import Control.Monad.Trans.Maybe (MaybeT(..))
+import Network (listenOn, connectTo, accept, socketPort, PortID(..), Socket(..))
+import System.IO (hClose, Handle)
 
 import Data.Default
 import Data.EitherR (throwT, catchT)
@@ -48,6 +50,10 @@ import Eval.EvalError
 import Eval.EvalSettings
 import Eval.EvalM
 import Eval.Helpers
+import Eval.Worker.EvalCmd
+import Eval.Worker.Protocol
+import Eval.Worker.Types
+import Eval.Worker.Internal
 
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistUpperCase|
 Paste
@@ -142,25 +148,29 @@ errPage code (msg, errors) =
             foldMap ((<> H.br) . H.toHtml . T.pack) (lines errMsg)
         
   
-newPaste :: EvalQueue
-            -> EitherT (Text, (Text, [EvalError])) ActionM Int
-newPaste queue = do
+newPaste :: EitherT (Text, (Text, [EvalError])) ActionM Int
+newPaste = do
   code <- lift (param "code")
   when (T.null code) $ throwT (code, ("Empty input", []))
-  pid <- compilePaste queue code
+  pid <- compilePaste code
          `catchT` \e -> throwT (code, e)
   return (keyToInt pid)
 
-compilePaste :: EvalQueue
-                -> Text
-                -> EitherT (Text, [EvalError]) ActionM (Key Paste)
-compilePaste queue code = do
+compilePaste :: Text
+             -> EitherT (Text, [EvalError]) ActionM (Key Paste)
+compilePaste code = do
   fname <- liftIO $ hash code
   let fpath = getPastesDir </> show fname ++ ".hs"
   liftIO $ T.writeFile fpath code
-  (res, errors) <- liftIO $ sendEvaluator queue $ do
-    loadFile fpath
-    compileExpr "return . display =<< main"
+  hndl <- liftIO $ connectTo "localhost" (UnixSocket "/tmp/control.sock")
+  liftIO $ sendData hndl RequestWorker
+  (worker :: Worker EvalWorker) <- liftIO $ getData hndl
+  -- liftIO $ hClose hndl
+  ((res, errors), status) <- liftIO $ sendEvalRequestNoRestart worker $
+                             CompileFile fpath
+  hndl <- liftIO $ connectTo "localhost" (UnixSocket "/tmp/control.sock")
+  liftIO $ sendData hndl (ReturnWorker status worker)
+  -- liftIO $ hClose hndl
   case res of
     Left err -> throwT (pack err, errors)
     Right r -> liftIO . runWithSql $ insert $
@@ -186,11 +196,11 @@ measureTime act = do
 main :: IO ()
 main = do
   runWithSql (runMigration migrateAll)
-  (queue, _) <- prepareEvalQueue (def {tmpDirPath = getPastesDir, rlimits = Just def})
+  -- (queue, _) <- prepareEvalQueue (def {tmpDirPath = getPastesDir, rlimits = Just def})
   scotty 3000 $ do
     middleware logStdoutDev
     middleware $ staticPolicy (addBase "../common/static")
     S.get "/get/:id" $ maybeT page404 renderPaste getPaste
     S.get "/" listPastes
-    S.post "/new" $ eitherT (uncurry errPage) redirPaste (measureTime (newPaste queue))
+    S.post "/new" $ eitherT (uncurry errPage) redirPaste (measureTime newPaste)
 

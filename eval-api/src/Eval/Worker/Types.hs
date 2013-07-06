@@ -1,14 +1,17 @@
 {-# LANGUAGE EmptyDataDecls, DeriveDataTypeable, RecordWildCards #-}
 {-# LANGUAGE TypeFamilies, ScopedTypeVariables #-}
+{-# LANGUAGE DeriveGeneric, StandaloneDeriving #-}
 module Eval.Worker.Types where
 
 import Control.Monad (when)
 import Control.Exception (IOException, Exception, handle)
 import Data.Maybe (isJust, fromJust)
 import Data.Typeable
+import GHC.Generics
+import Data.Serialize (Serialize)
 import System.Posix.Signals (signalProcess, killProcess)
 import System.Posix.Process (getProcessStatus)
-import System.Posix.Types (ProcessID)
+import System.Posix.Types (ProcessID, CPid(..))
 
 import GHC
 
@@ -31,8 +34,11 @@ data Worker a = Worker
       -- | 'Just pid' if the worker's process ID is 'pid',
       -- Nothing' if the worker is not active/initialized
     , workerPid      :: Maybe ProcessID
-    } deriving (Show)
+    } deriving (Show, Eq, Typeable, Generic)
 
+deriving instance Generic CPid
+instance Serialize CPid
+instance Serialize (Worker a)
 
 data IOWorker
 data EvalWorker

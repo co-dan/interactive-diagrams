@@ -1,4 +1,4 @@
-{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE StandaloneDeriving, DeriveGeneric #-}
 module Eval.EvalSettings
     (
      EvalSettings(..), defaultSettings,
@@ -9,11 +9,13 @@ module Eval.EvalSettings
     ) where
 
 import Data.Default
+import Data.Serialize (Serialize)
 import System.Posix.Resource (ResourceLimit(..),
                               ResourceLimits(..),
                               Resource(..))
 import System.Linux.SELinux (SecurityContext)  
 import GHC.Paths
+import GHC.Generics
 
 data RLimits = RLimits
     { coreFileSizeLimit :: ResourceLimits
@@ -23,12 +25,18 @@ data RLimits = RLimits
     , openFilesLimit    :: ResourceLimits
     , stackSizeLimit    :: ResourceLimits
     , totalMemoryLimit  :: ResourceLimits
-    } deriving (Eq, Show)
+    } deriving (Eq, Show, Generic)
 
 deriving instance Show ResourceLimits
 deriving instance Show ResourceLimit
 deriving instance Show Resource
-
+deriving instance Generic ResourceLimit
+deriving instance Generic ResourceLimits
+instance Serialize ResourceLimit
+instance Serialize ResourceLimits
+instance Serialize RLimits
+         
+         
 -- | Datastructure holding the settings for the interpreter  
 data EvalSettings = EvalSettings
     { -- | Path to the directory with Haskell libraries
@@ -57,8 +65,9 @@ data LimitSettings = LimitSettings
       -- | SELinux security context under which the worker 
       -- process will be running.
     , secontext   :: Maybe SecurityContext
-    } deriving (Eq, Show)
+    } deriving (Eq, Show, Generic)
 
+instance Serialize LimitSettings               
 
 defaultSettings :: EvalSettings
 defaultSettings = EvalSettings

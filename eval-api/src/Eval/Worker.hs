@@ -30,38 +30,29 @@ module Eval.Worker
 
 import Prelude hiding (putStr)
   
-import Control.Applicative ((<$>))
-import Control.Concurrent.Async (race)
-import Control.Exception (IOException, handle)
-import Control.Monad (when, forever)
+import Control.Monad (forever)
 import Control.Monad.IO.Class (liftIO, MonadIO)
 import Data.Default
-import Data.IORef (newIORef, readIORef)
-import Data.Maybe (fromJust)
-import Data.Serialize (Serialize)
 import Data.Typeable ()
-import Network (listenOn, connectTo, accept, PortID(..), Socket)
-import System.Directory (doesFileExist)
+import Network (accept, Socket)
 import System.FilePath.Posix ((</>))
-import System.IO (Handle, hClose)
-import System.Posix.Files (removeLink)
-import System.Posix.Process (forkProcess, getProcessStatus)
-import System.Posix.Signals (signalProcess, killProcess, Handler(..), installHandler, setStoppedChildFlag, processStatusChanged)
+import System.IO (Handle)
+import System.Posix.Process (forkProcess)
+import System.Posix.Signals (Handler(..), installHandler, setStoppedChildFlag, processStatusChanged)
 import System.Posix.Types (ProcessID)
 
 import DynFlags
 import GHC hiding (compileExpr)
-import MonadUtils hiding (MonadIO, liftIO)
 
 import Display
 import Eval hiding (runToHandle)
-import Eval.EvalError
 import Eval.EvalM
 import Eval.EvalSettings (LimitSettings(..), EvalSettings(..))
 import Eval.Helpers
 import Eval.Limits
 import Eval.Worker.EvalCmd
 import Eval.Worker.Protocol
+import Eval.Worker.Internal
 import Eval.Worker.Types
 
 -- | Create an uninitialized worker
@@ -162,52 +153,6 @@ evalWorkerAction hndl = do
                       -- return (Left (show e))
   return (evalCmdToEvalM cmd)
 
--- | Runs a Ghc monad code and outputs the result to a handle  
-runToHandle :: (Serialize a, Show a)
-            => Ghc a -> Handle -> Ghc (Either String a, [EvalError])
-runToHandle act hndl = do
-  ref <- liftIO $ newIORef []
-  dfs <- getSessionDynFlags
-  setSessionDynFlags $ dfs { log_action = logHandler ref }
-  dr :: Either String a <- handleException act
-  errors :: [EvalError] <- liftIO $ readIORef ref
-  liftIO $ sendData hndl (dr, errors)
-  return (dr, errors)
-
-
-performEvalRequest :: Handle -> EvalCmd -> IO (DecodeResult EvalResultWithErrors)
-performEvalRequest hndl cmd = do
-  sendData hndl cmd
-  (Right <$> getData hndl) `gcatch` \(e :: ProtocolException) ->
-    return (Left (show e))
-
--- | Send the worker a request to evaluate something.
--- If the process dies because of hitting limits, it is restarted
-sendEvalRequest :: (Worker EvalWorker, RestartWorker IO EvalWorker)
-                -> EvalCmd
-                -> IO (EvalResultWithErrors, Worker EvalWorker)
-sendEvalRequest (w, restart) cmd = do
-  hndl <- connectToWorker w
-  let pid = fromJust . workerPid $ w
-  let timelimit = timeout . workerLimits $ w
-  -- r <- performEvalRequest hndl cmd
-  r <- race (processTimeout pid timelimit) $ do
-    requestResult <- performEvalRequest hndl cmd
-    return requestResult
-  r `seq` hClose hndl
-  alive <- processAlive pid
-  w' <- case alive of
-    True  -> return w 
-    -- False -> startEvalWorker (workerName w) (def { limitSet = workerLimits w })
-    False -> restart w
-  let evres = case r of
-        Left _ -> (Left "Process timedout", [])
-        Right (Right x) ->  x
-        Right (Left str) -> (Left $ "Deserialization error:\n" ++
-                             str, [])
-  return (evres, w')
-
-
 -- | Send the 'Worker' a request to compile a file
 sendCompileFileRequest :: (Worker EvalWorker, RestartWorker IO EvalWorker)
                        -> FilePath
@@ -219,15 +164,5 @@ sendEvalStringRequest :: (Worker EvalWorker, RestartWorker IO EvalWorker)
                       -> String
                       -> IO (EvalResultWithErrors, Worker EvalWorker)
 sendEvalStringRequest w str = sendEvalRequest w (EvalString str)
-                          
-------------------------------------------------------------
 
-connectToWorker :: Worker a -> IO Handle
-connectToWorker Worker{..} = connectTo "localhost" (UnixSocket workerSocket)
-  
-mkSock :: FilePath -> IO Socket
-mkSock sf = do
-  exists <- doesFileExist sf
-  when exists $ removeLink sf
-  listenOn (UnixSocket sf)
-                  
+

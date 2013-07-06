@@ -27,17 +27,18 @@ extra-source-files:  examples/*.hs
 library
   hs-source-dirs:      src
   exposed-modules:     Eval,
-                       Eval.Worker,
-                       Eval.Worker.EvalCmd,
-                       Eval.Worker.Protocol,
-                       Eval.Worker.Types,
-                       Eval.Worker.RestartingPool,
                        Eval.EvalError,
                        Eval.EvalM,
                        Eval.EvalSettings,
                        Eval.Helpers,
-                       Eval.Limits
-  other-modules:       SignalHandlers
+                       Eval.Limits,
+                       Eval.Worker,
+                       Eval.Worker.EvalCmd,
+                       Eval.Worker.Internal,
+                       Eval.Worker.Protocol,
+                       Eval.Worker.RestartingPool,
+                       Eval.Worker.Types,
+                       SignalHandlers
   ghc-options:         -Wall  
   build-depends:       base >=4.6 && <5,
                        transformers ==0.3.*,
