@@ -58,6 +58,7 @@ import Eval.Worker.Protocol
 import Eval.Worker.Types
 import Display
 
+-- | Create an uninitialized worker
 mkDefaultWorker :: String -> FilePath -> LimitSettings -> Worker a
 mkDefaultWorker name sock set = Worker
     { workerName    = name
@@ -67,12 +68,19 @@ mkDefaultWorker name sock set = Worker
     }
 
 
--- | Start a general type of worker
+{-|
+  Start a general type of worker.
+
+  The pre-forking action is a monadic action that will be run prior to
+  calling 'forkWorker'. It might be some intialization code, running the
+  DB query, anything you want. The resuling 'WData' will be passed to
+  the callback.
+-}
 startWorker :: (WorkerData w, MonadIO (WMonad w))
             => String         --  ^ Name
             -> FilePath       --  ^ Socket
             -> LimitSettings  --  ^ Restrictions
-            -> WMonad w (WData w) --  ^ Pre-forking function
+            -> WMonad w (WData w) --  ^ Pre-forking action
             -> (WData w -> Socket -> IO ()) -- ^ Socket callback
             -> WMonad w (Worker w, RestartWorker (WMonad w) w) 
 startWorker name sock set pre cb = do 
@@ -112,9 +120,13 @@ killWorker w@Worker{..} = do
   return (w { workerPid = Nothing })    
 
 -- | Start a worker of type 'IOWorker'
-startIOWorker :: String
-              -> FilePath 
-              -> (Handle -> IO ())
+-- The callback function is called every time a connectino is established
+-- 
+-- >>> startIOWorker "test" "/tmp/test.sock" $ \h -> hPutStrLn h "hello, world"
+--   
+startIOWorker :: String              -- ^ Name
+              -> FilePath            -- ^ UNIX socket
+              -> (Handle -> IO ())   -- ^ Callback
               -> IO (Worker IOWorker, RestartWorker IO IOWorker)
 startIOWorker name sock callb = startWorker name sock defSet preFork handle
   where handle () soc = forever $ do
@@ -147,36 +159,10 @@ startEvalWorker name eset = startWorker name sock set pre callback
             setSession sess
             r :: EvalResultWithErrors <- liftEvalM $
                                          runToHandle (runEvalM act eset) hndl
-            liftIO $ hFlush hndl
             return r
 
-  -- do
-  -- pid <- flip run' eset $ do
-  --   -- liftEvalM $ initGhc _
-  --   dfs <- getSessionDynFlags
-  --   setSessionDynFlags $ dfs { hscTarget = HscInterpreted
-  --                            , ghcLink = LinkInMemory
-  --                            }
-  --   loadFile (preloadFile eset)
-  --   sess <- getSession
-  --   liftIO $ forkWorker worker $ \soc -> do
-  --     forever $ do
-  --       (hndl, _, _) <- accept soc
-  --       act <- evalWorkerAction hndl
-  --       flip run' eset $ do
-  --         setSession sess
-  --         r :: EvalResultWithErrors <- liftEvalM $
-  --                                      runToHandle (runEvalM act eset) hndl
-  --         liftIO $ hFlush hndl
-  --         return r
-  -- return $ worker { workerPid = Just pid }
-  -- where worker = Worker { workerName   = name
-  --                       , workerSocket = tmpDirPath eset </> (name ++ ".sock")
-  --                       , workerLimits = limitSet eset
-  --                       , workerPid    = Nothing
-  --                       }
 
-
+-- | Read data from a handle and convert it to 'EvalM' action        
 evalWorkerAction :: Handle -> IO (EvalM DisplayResult)
 evalWorkerAction hndl = do
   (cmd :: EvalCmd) <- getData hndl
@@ -203,6 +189,8 @@ performEvalRequest hndl cmd = do
   (Right <$> getData hndl) `gcatch` \(e :: ProtocolException) ->
     return (Left (show e))
 
+-- | Send the worker a request to evaluate something.
+-- If the process dies because of hitting limits, it is restarted
 sendEvalRequest :: (Worker EvalWorker, RestartWorker IO EvalWorker)
                 -> EvalCmd
                 -> IO (EvalResultWithErrors, Worker EvalWorker)
@@ -227,7 +215,8 @@ sendEvalRequest (w, restart) cmd = do
                              str, [])
   return (evres, w')
 
-
+-- | Checks whether the process is alive
+-- /hacky/  
 processAlive :: ProcessID -> IO Bool
 processAlive pid = do
   handle (\(e :: IOException) -> return False) $ do

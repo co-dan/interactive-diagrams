@@ -13,6 +13,7 @@ import GHC
 
 import Eval.EvalSettings
 
+-- | A worker restarting function
 type RestartWorker m a = Worker a -> m (Worker a)
 
 -- | A datatype representing a worker of type 'a'
@@ -38,24 +39,16 @@ data EvalWorker
 class WorkerData w where
   -- | Data that saves after restarts
   type WData w :: *
+  -- | Monad in which the worker runs
   type WMonad w :: * -> *
-  -- -- | A hook that is run prior/after forking the process                  
-  -- forkHook :: Worker w                 -- ^ Worker (inactive) that will be forked
-  --          -> IO ProcessID             -- ^ Forking action
-  --          -> IO (ProcessID, WData w)  -- ^ The resulting PID and data
 
 instance WorkerData IOWorker where
   type WData IOWorker = ()
   type WMonad IOWorker = IO
-  -- forkHook Worker{..} forkCall = do
-  --   putStrLn ("Starting worker " ++ show workerName)
-  --   pid <- forkCall
-  --   return (pid, ())
   
 instance WorkerData EvalWorker where
   type WData EvalWorker = HscEnv
   type WMonad EvalWorker = IO
-  -- forkHook Worker{..} forkCall = flip run' 
     
     
 -- | Check whether the worker is initialized
