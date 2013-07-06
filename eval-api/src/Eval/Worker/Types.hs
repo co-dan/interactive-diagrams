@@ -2,11 +2,9 @@
 {-# LANGUAGE TypeFamilies #-}
 module Eval.Worker.Types where
 
-import Network (Socket)
 import Control.Exception (IOException, Exception)
-import Control.Monad.IO.Class (MonadIO)
-import Data.Typeable
 import Data.Maybe (isJust)
+import Data.Typeable
 import System.Posix.Types (ProcessID)
 
 import GHC

@@ -5,9 +5,9 @@ import Data.Serialize (Serialize)
 import Data.Typeable
 import GHC.Generics
   
+import Display
 import Eval.EvalM
 import Eval.Helpers  
-import Display
 
 data EvalCmd = CompileFile FilePath
              | EvalString  String

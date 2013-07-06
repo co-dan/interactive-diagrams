@@ -1,25 +1,25 @@
 {-# LANGUAGE OverloadedStrings, ScopedTypeVariables #-}
-module Eval.Worker.Protocol where
+-- | A simple protocol for sending serializable data over handles
+module Eval.Worker.Protocol (sendData, getData) where
 
-import Control.Exception (IOException, throw, catch)
 import Control.Applicative ((<$>))
-import Data.ByteString (ByteString, hGetContents, hPutStr, hGetLine, putStr, hPut, hGet)
+import Control.Exception (IOException, throw, catch)
+import Data.ByteString (ByteString, hGetLine, hPut, hGet)
 import qualified Data.ByteString as BS
-import qualified Data.ByteString.Char8 as BS8
 import Data.Serialize (encode, decode, Serialize)
-import Data.Maybe (maybe)
-import GHC.IO.Handle (Handle, hSetBuffering, BufferMode(..), hFlush)
+import GHC.IO.Handle (Handle, hFlush)
 
 import Eval (traceM, DecodeResult)  
 import Eval.Worker.Types
-import Eval.Worker.EvalCmd
-import Display
 
+-- | Send some serialiazable data over a handle.
+-- Returns 'ByteString' representing the encoded data
 sendData :: Serialize a => Handle -> a -> IO ByteString
 sendData h d = sendData' h d
                `catch` \(e :: IOException) ->
                throw (HandleException e)
 
+-- | Read the data from a handle and deserialize it.               
 getData :: Serialize a => Handle -> IO a
 getData h = getData' h
             `catch` \(e :: IOException) ->

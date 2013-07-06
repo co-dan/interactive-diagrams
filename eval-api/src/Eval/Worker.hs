@@ -18,28 +18,22 @@ module Eval.Worker
 
 import Prelude hiding (putStr)
   
-import Control.Monad (when, forever, unless)
-import Control.Monad.IO.Class (liftIO, MonadIO)
 import Control.Applicative ((<$>))
 import Control.Concurrent.Async (race)
 import Control.Exception (IOException, handle)
-import Data.ByteString (hGetContents, hPutStr, hGetLine, putStr)
-import qualified Data.ByteString as BS
-import Data.Typeable
+import Control.Monad (when, forever)
+import Control.Monad.IO.Class (liftIO, MonadIO)
 import Data.Default
-import Data.Function (fix)
-import Data.Maybe (isJust, fromJust, fromMaybe)
-import Data.Monoid ((<>))
-import Data.IORef (IORef, newIORef, modifyIORef', readIORef)
-import Data.Serialize (encode, decode, Serialize)
-import GHC.IO.Handle (hSetBuffering, BufferMode(..), hFlush)
+import Data.IORef (newIORef, readIORef)
+import Data.Maybe (fromJust)
+import Data.Serialize (Serialize)
+import Data.Typeable ()
 import Network (listenOn, connectTo, accept, PortID(..), Socket)
-import Network.Socket (close)
 import System.Directory (doesFileExist)
 import System.FilePath.Posix ((</>))
 import System.IO (Handle, hClose)
 import System.Posix.Files (removeLink)
-import System.Posix.Process (forkProcess, getProcessStatus, ProcessStatus(..))
+import System.Posix.Process (forkProcess, getProcessStatus)
 import System.Posix.Signals (signalProcess, killProcess, Handler(..), installHandler, setStoppedChildFlag, processStatusChanged)
 import System.Posix.Types (ProcessID)
 
@@ -47,16 +41,16 @@ import DynFlags
 import GHC hiding (compileExpr)
 import MonadUtils hiding (MonadIO, liftIO)
 
+import Display
 import Eval hiding (runToHandle)
 import Eval.EvalError
+import Eval.EvalM
+import Eval.EvalSettings (LimitSettings(..), EvalSettings(..))
 import Eval.Helpers
 import Eval.Limits
-import Eval.EvalSettings (LimitSettings(..), EvalSettings(..))
-import Eval.EvalM
 import Eval.Worker.EvalCmd
 import Eval.Worker.Protocol
 import Eval.Worker.Types
-import Display
 
 -- | Create an uninitialized worker
 mkDefaultWorker :: String -> FilePath -> LimitSettings -> Worker a
