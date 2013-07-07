@@ -63,7 +63,7 @@ allow idia_web_t self:fifo_file { read write ioctl getattr };
 allow idia_web_t sshd_t:fd use; # sshd_t?
 
 # Securit & other 
-allow idia_web_t self:process { execmem };
+allow idia_web_t self:process { execmem signal };
 allow idia_web_t security_t:dir { getattr search }; # sys/fs/selinux
 allow idia_web_t security_t:filesystem getattr; # why??
 allow idia_web_t security_t:file { read open };
@@ -78,6 +78,7 @@ allow idia_web_t self:udp_socket { create connect getattr };
 
 # Communication with service
 allow idia_web_t idia_service_sock_t:sock_file write;
+allow idia_web_t idia_service_sock_t:dir search;
 allow idia_web_t idia_service_t:unix_stream_socket connectto;
 # killing processes that timeout
 allow idia_web_t idia_restricted_t:process sigkill;
@@ -258,6 +259,7 @@ allow idia_restricted_t tmp_t:file { write create unlink execute };
 # whut
 allow idia_service_t home_root_t:dir search;
 allow idia_restricted_t home_root_t:dir search;
+allow idia_service_t default_t:dir search;
 
 # # /dev/pts1
 # # TODO: Why does it need stdout?
