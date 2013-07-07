@@ -7,6 +7,7 @@ import Control.Exception (IOException, throw, catch)
 import Data.ByteString (ByteString, hGetLine, hPut, hGet)
 import qualified Data.ByteString as BS
 import Data.Serialize (encode, decode, Serialize)
+import Data.Word (Word32)
 import GHC.IO.Handle (Handle, hFlush)
 
 import Eval (traceM, DecodeResult)  
@@ -28,22 +29,18 @@ getData h = getData' h
 sendData' :: Serialize a => Handle -> a -> IO ByteString
 sendData' hndl datum = do
   let encoded = encode datum
-  let len     = BS.length encoded
-  -- we don't know what is the length of output
-  -- but maybe we should use 'BS.singleton' and 'Char' for length?      
+  let len     = (fromIntegral . BS.length $ encoded) :: Word32
   hPut hndl (encode len)
-  hPut hndl "\n"
   hFlush hndl
   hPut hndl encoded
-  hPut hndl "\n"
   hFlush hndl
   return encoded
 
 getData' :: Serialize a => Handle -> IO a
 getData' hndl = do
-  lenS :: DecodeResult Int <- decode <$> hGetLine hndl
-  let len = case lenS of
-        Right i -> i
+  lenD :: DecodeResult Word32 <- decode <$> hGet hndl 4
+  let len = case lenD of
+        Right i -> fromIntegral i
         Left str -> throw (ConversionException $ "length\n" ++ str)
   res <- decode <$> hGet hndl len
   case res of

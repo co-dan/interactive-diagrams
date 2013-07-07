@@ -83,8 +83,6 @@ logHandler ref dflags severity srcSpan style msg =
   case srcSpan of
     RealSrcSpan sp -> do
       modifyIORef' ref (++ [err sp])
-      errors <- readIORef ref
-      print errors
     UnhelpfulSpan _ -> return ()
   where err sp = EvalError severity msg' (srcPos sp)
         cntx = initSDocContext dflags style

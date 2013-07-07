@@ -19,7 +19,7 @@ instance Serialize EvalCmd
 evalCmdToEvalM :: EvalCmd -> EvalM DisplayResult
 evalCmdToEvalM (CompileFile fpath) = do
   loadFile fpath
-  compileExpr "return . display =<< main"
+  compileExpr "(return . display =<< main) :: IO DisplayResult"
 evalCmdToEvalM (EvalString s) = compileExpr s
 
 
