@@ -26,7 +26,9 @@ require {
 type idia_restricted_t; # child process, should be very restricted
 type idia_web_t; # scotty-pastebin security context
 type idia_web_exec_t; # scotty-pastebin executable file context
-
+type idia_service_t; # eval-service security context
+type idia_service_exec_t; # eval-service executable file context
+type idia_service_sock_t; # UNIX socket files used for communication
 
 type idia_db_t; # SQLite database
 type idia_pkg_t; # directory with GHC packages
@@ -36,21 +38,17 @@ type idia_web_common_t; # html templates, css and other static content
 role system_r types idia_web_t;
 
 init_daemon_domain(idia_web_t, idia_web_exec_t)
+init_daemon_domain(idia_service_t, idia_service_exec_t)
 
 domain_type(idia_restricted_t)
 role system_r types idia_restricted_t;
-
-# domain_type(idia_compile_t)
-# role system_r types idia_compile_t;
-
-# domain_type(idia_worker_notify_t)
-# role system_r types idia_worker_notify_t;
 
 files_type(idia_pkg_t)
 files_type(idia_web_common_t)
 
 ############################################################
-# idia web service
+# idia web 
+############################################################
 
 # Locale
 allow idia_web_t locale_t:dir search;
@@ -59,49 +57,15 @@ allow idia_web_t locale_t:lnk_file read;
 # TODO: need this for /etc/locale.alias access 
 allow idia_web_t etc_t:file { read open getattr };
 
-# Forking new processes & transitioning
-allow idia_web_t self:capability { setuid setgid kill };
-allow idia_web_t self:process    { signal fork setpgid setrlimit dyntransition getpgid }; 
-# type=AVC msg=audit(1372668674.152:1177): avc:  denied  { dyntransition } for  pid=22437 comm="scotty-pastebin" scontext=unconfined_u:system_r:idia_web_t:s0-s0:c0.c1023 tcontext=system_u:system_r:idia_restricted_t:s0-s0:c0.c1023 tclass=process
-#        Was caused by:
-#                Policy constraint violation.
-
-#                May require adding a type attribute to the domain or type to satisfy the constraint.
-
-#                Constraints are defined in the policy sources in policy/constraints (general), policy/mcs (MCS), and policy/mls (MLS).
-# The problem is that dyntransition requires that the user and the role of the subject and the target are the same
-
-# Limits & restrictions
-allow idia_web_t idia_restricted_t:process sigkill;
-allow idia_web_t self:process sigkill; # otherwise it would violate the typebounds restriction
-
-domain_dyntrans_type(idia_web_t)
-dyntrans_pattern(idia_web_t, idia_restricted_t)
-dyntrans_pattern(idia_web_t, idia_web_t)
-typebounds idia_web_t idia_restricted_t;
-# When setcon(3) is used to set a different context on a new thread without an
-# associated typebounds policy statement, then the call will return 'Operation not
-# permitted' 
-allow idia_web_t self:process setsched;
-
 # I/O
 allow idia_web_t self:fd use;
 allow idia_web_t self:fifo_file { read write ioctl getattr };
 allow idia_web_t sshd_t:fd use; # sshd_t?
 
+# Securit & other 
 allow idia_web_t self:process { execmem };
-
-# it needs to access /home/vagrant and /home/vagrant/ghc for some reason
-# TODO: search should be alright tho
-allow idia_web_t user_home_t:dir { getattr search };
-allow idia_web_t user_home_dir_t:dir search;
-# this is for GHC settings and ghc-prim
-allow idia_web_t user_home_t:file { read getattr ioctl open execute };
-
 allow idia_web_t security_t:dir { getattr search }; # sys/fs/selinux
 allow idia_web_t security_t:filesystem getattr; # why??
-allow idia_web_t idia_restricted_t:fd use;
-allow idia_web_t idia_restricted_t:fifo_file read;
 allow idia_web_t security_t:file { read open };
 
 # networking, because the block below doesn't work :-(
@@ -112,6 +76,12 @@ allow idia_web_t self:netlink_route_socket { write getattr read bind create nlms
 allow idia_web_t self:tcp_socket { read write bind create setopt accept listen };
 allow idia_web_t self:udp_socket { create connect getattr };
 
+# Communication with service
+allow idia_web_t idia_service_sock_t:sock_file write;
+allow idia_web_t idia_service_t:unix_stream_socket connectto;
+# killing processes that timeout
+allow idia_web_t idia_restricted_t:process sigkill;
+allow idia_web_t idia_service_t:process sigkill;
 
 # Temp file
 # the directory with temp files should be labeled with tmp_t
@@ -144,15 +114,96 @@ exec_files_pattern(idia_web_t, idia_pkg_t, idia_pkg_t)
 read_files_pattern(idia_web_t, idia_pkg_t, idia_pkg_t)
 read_files_pattern(idia_web_t, idia_pkg_t, idia_pkg_t)
 
-# for running gcc
-allow idia_web_t bin_t:dir { search getattr };
-allow idia_web_t bin_t:file { execute read open execute_no_trans getattr };
-allow idia_web_t bin_t:lnk_file { read getattr };
 
+############################################################
+# idia service
+############################################################
+
+# Locale
+allow idia_service_t locale_t:dir search;
+allow idia_service_t locale_t:file { read getattr open };
+allow idia_service_t locale_t:lnk_file read;
+# TODO: need this for /etc/locale.alias access 
+allow idia_service_t etc_t:file { read open getattr };
+
+# Security & other
+allow idia_service_t security_t:dir { getattr search }; # sys/fs/selinux
+allow idia_service_t security_t:filesystem getattr; # why??
+allow idia_service_t security_t:file { read open };
+allow idia_service_t self:process { execmem setsched };
+
+# I/O
+allow idia_service_t self:fd use;
+allow idia_service_t self:fifo_file { read write ioctl getattr };
+allow idia_service_t sshd_t:fd use; # sshd_t?
+
+# Tmp files
+# the directory with temp files should be labeled with tmp_t
+allow idia_service_t tmp_t:file { write getattr read create open ioctl };
+allow idia_service_t self:unix_stream_socket { sendto connectto };
+allow idia_service_t tmp_t:dir { write getattr create add_name remove_name search };
+allow idia_service_t tmp_t:sock_file { write create unlink getattr };
+allow idia_service_t tmp_t:dir { write remove_name add_name };
+allow idia_service_t tmp_t:file { write create unlink execute };
+
+
+# For communication with the web interface
+allow idia_service_sock_t fs_t:filesystem associate;
+allow idia_service_t idia_service_sock_t:dir { write remove_name search add_name };
+allow idia_service_t idia_service_sock_t:sock_file { getattr unlink create };
+
+# for running gcc
+allow idia_service_t bin_t:dir { search getattr };
+allow idia_service_t bin_t:file { execute read open execute_no_trans getattr };
+allow idia_service_t bin_t:lnk_file { read getattr };
+
+# Dyntransition
+domain_dyntrans_type(idia_service_t)
+dyntrans_pattern(idia_service_t, idia_restricted_t)
+dyntrans_pattern(idia_service_t, idia_service_t)
+typebounds idia_service_t idia_restricted_t;
+# When setcon(3) is used to set a different context on a new thread without an
+# associated typebounds policy statement, then the call will return 'Operation not
+# permitted' 
+
+
+# Forking new processes & transitioning
+allow idia_service_t self:capability { setuid setgid kill };
+allow idia_service_t self:process    { signal fork setpgid setrlimit dyntransition getpgid }; 
+# type=AVC msg=audit(1372668674.152:1177): avc:  denied  { dyntransition } for  pid=22437 comm="scotty-pastebin" scontext=unconfined_u:system_r:idia_service_t:s0-s0:c0.c1023 tcontext=system_u:system_r:idia_restricted_t:s0-s0:c0.c1023 tclass=process
+#        Was caused by:
+#                Policy constraint violation.
+
+#                May require adding a type attribute to the domain or type to satisfy the constraint.
+
+#                Constraints are defined in the policy sources in policy/constraints (general), policy/mcs (MCS), and policy/mls (MLS).
+# The problem is that dyntransition requires that the user and the role of the subject and the target are the same
+
+# Limits & restrictions
+allow idia_service_t idia_restricted_t:process sigkill;
+allow idia_service_t self:process sigkill; # otherwise it would violate the typebounds restriction
+
+
+# it needs to access /home/vagrant and /home/vagrant/ghc for some reason
+# TODO: search should be alright tho
+allow idia_service_t user_home_t:dir { getattr search };
+allow idia_service_t user_home_dir_t:dir search;
+# this is for GHC settings and ghc-prim
+allow idia_service_t user_home_t:file { read getattr ioctl open execute };
+
+# Packages.
+allow idia_service_t idia_pkg_t:dir { search getattr };
+allow idia_service_t idia_pkg_t:file { read getattr ioctl open execute };
+
+# TODO: Helper.hs
+allow idia_service_t idia_web_exec_t:file { read getattr open ioctl };
+allow idia_service_t idia_web_exec_t:dir { search getattr };
 
 
 ############################################################
-# worker process
+# idia worker
+############################################################
+
 allow idia_restricted_t self:process { getpgid };
 
 # For running gcc
@@ -166,10 +217,10 @@ allow idia_restricted_t self:fifo_file { read write ioctl getattr };
 ##
 # For locale stuff
 # It actually works fine without having to access locales
-# allow idia_restricted_t etc_t:file { read getattr open };
-# allow idia_restricted_t locale_t:file { read getattr open };
-# allow idia_restricted_t locale_t:dir { search };
-# allow idia_restricted_t locale_t:lnk_file read;
+allow idia_restricted_t etc_t:file { read getattr open };
+allow idia_restricted_t locale_t:file { read getattr open };
+allow idia_restricted_t locale_t:dir { search };
+allow idia_restricted_t locale_t:lnk_file read;
 
 # Packages. TODO: fix this
 allow idia_restricted_t idia_pkg_t:dir search;
@@ -179,9 +230,11 @@ allow idia_restricted_t idia_pkg_t:file { read getattr ioctl open execute };
 allow idia_restricted_t idia_web_exec_t:file { read getattr open ioctl };
 allow idia_restricted_t idia_web_exec_t:dir search;
 
-# No idae what this is for
-# allow idia_restricted_t self:fifo_file { read write ioctl getattr };
+# No idia what this is for
 allow idia_restricted_t self:process { setsched execmem };
+allow idia_restricted_t fs_t:filesystem getattr;
+allow idia_service_t fs_t:filesystem getattr;
+
 # it appears that because of -threaded, idia_restricted_t wants
 # to access inherited file descriptors and fifos from idia_web_t
 # allow idia_restricted_t idia_web_t:fd use;
@@ -193,21 +246,24 @@ allow idia_restricted_t user_home_t:dir search;
 
 # For communicating with the server
 allow idia_restricted_t tmp_t:sock_file write;
-allow idia_restricted_t idia_web_t:unix_stream_socket { sendto connectto getattr };
-allow idia_restricted_t tmp_t:dir search;
-allow idia_restricted_t tmp_t:file { getattr open read };
+#allow idia_restricted_t idia_web_t:unix_stream_socket { sendto connectto getattr };
+allow idia_restricted_t idia_service_t:unix_stream_socket { read write ioctl accept };
+allow idia_restricted_t tmp_t:dir { search getattr };
+allow idia_restricted_t tmp_t:file { getattr open read ioctl };
+allow idia_restricted_t tmp_t:dir { write remove_name add_name };
+allow idia_restricted_t tmp_t:file { write create unlink execute };
 
 ##################################################
 
 # whut
-allow idia_web_t home_root_t:dir search;
+allow idia_service_t home_root_t:dir search;
 allow idia_restricted_t home_root_t:dir search;
 
-# /dev/pts1
-# TODO: Why does it need stdout?
-# <stdout>: commitBuffer: permission denied (Permission denied)
+# # /dev/pts1
+# # TODO: Why does it need stdout?
+# # <stdout>: commitBuffer: permission denied (Permission denied)
 allow idia_restricted_t sshd_t:fd use;
-allow idia_web_t user_devpts_t:chr_file { write ioctl };
+allow idia_service_t user_devpts_t:chr_file { write ioctl };
 allow idia_restricted_t user_devpts_t:chr_file { write ioctl };
 
 
@@ -222,6 +278,7 @@ allow semanage_t setfiles_t:process { siginh noatsecure rlimitinh };
 #============= unconfined_t ==============
 allow unconfined_t idia_web_t:process transition;
 allow unconfined_t idia_db_t:file getattr;
+allow unconfined_t idia_service_exec_t:file { read execute open getattr execute_no_trans };
 
 #============= idia_restricted_t ==============
 allow idia_restricted_t user_home_t:file { getattr open ioctl read };
@@ -232,4 +289,8 @@ type idia_web_port_t;
 corenet_port(idia_web_t)
 
 allow idia_web_t idia_web_port_t:tcp_socket name_bind;
+
+
+
+############################################################
 

@@ -43,7 +43,7 @@ import Database.Persist.Sqlite as P
   
 import Display hiding (text,html)
 import DisplayPersist
-import Util (runWithSql, getDR, intToKey,
+import Util (controlSock, runWithSql, getDR, intToKey,
              keyToInt, hash, getPastesDir)
 import Eval
 import Eval.EvalError  
@@ -162,13 +162,13 @@ compilePaste code = do
   fname <- liftIO $ hash code
   let fpath = getPastesDir </> show fname ++ ".hs"
   liftIO $ T.writeFile fpath code
-  hndl <- liftIO $ connectTo "localhost" (UnixSocket "/tmp/control.sock")
+  hndl <- liftIO $ connectTo "localhost" (UnixSocket controlSock)
   liftIO $ sendData hndl RequestWorker
   (worker :: Worker EvalWorker) <- liftIO $ getData hndl
   -- liftIO $ hClose hndl
   ((res, errors), status) <- liftIO $ sendEvalRequestNoRestart worker $
                              CompileFile fpath
-  hndl <- liftIO $ connectTo "localhost" (UnixSocket "/tmp/control.sock")
+  hndl <- liftIO $ connectTo "localhost" (UnixSocket controlSock)
   liftIO $ sendData hndl (ReturnWorker status worker)
   -- liftIO $ hClose hndl
   case res of

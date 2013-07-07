@@ -28,7 +28,7 @@ import Eval.Worker.EvalCmd
 import SignalHandlers
 
 sockFile :: FilePath
-sockFile = "/tmp/control.sock"
+sockFile = "/idia/run/sock/control.sock"
 
 settings :: EvalSettings
 settings = def {
@@ -36,7 +36,7 @@ settings = def {
      rlimits = Just def {
         totalMemoryLimit = ResourceLimits memlim memlim
         },
-     secontext = Nothing
+     secontext = Just "idia_restricted_t"
      }
   }
   where memlim = ResourceLimit $ 104857600 * 2

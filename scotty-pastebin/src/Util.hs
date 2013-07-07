@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings, TemplateHaskell, QuasiQuotes #-}
 module Util (
+  controlSock,
   runWithSql,
   getDR,
   intToKey,
@@ -19,6 +20,9 @@ import Control.Applicative
 import Control.Monad
 
 import Display
+
+controlSock :: FilePath
+controlSock = "/idia/run/sock/control.sock"
 
 runWithSql :: SqlPersistT (LoggingT (ResourceT IO)) a -> IO a
 runWithSql = runResourceT
