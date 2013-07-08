@@ -13,6 +13,7 @@ import Data.Serialize (Serialize)
 import System.Posix.Resource (ResourceLimit(..),
                               ResourceLimits(..),
                               Resource(..))
+import System.Posix.Types (UserID, CUid(..))
 import System.Linux.SELinux (SecurityContext)  
 import GHC.Paths
 import GHC.Generics
@@ -42,10 +43,11 @@ data EvalSettings = EvalSettings
     { -- | Path to the directory with Haskell libraries
       libDirPath  :: Maybe FilePath
       -- | Path to the directory where temporary files are held
+      -- the sockets will be stored there
     , tmpDirPath  :: FilePath
-      -- | File name that will be used for source code.
-      -- The result will be written to '<filename>.res'
-    , fileName    :: FilePath
+      -- File name that will be used for source code.
+      -- /Warning: obsolete/
+      --, fileName    :: FilePath
       -- | Security restrictions
     , limitSet    :: LimitSettings
       -- | File that has to be preloaded
@@ -62,18 +64,26 @@ data LimitSettings = LimitSettings
     , niceness    :: Int
       -- | Resource limits for the 'setrlimit' syscall
     , rlimits     :: Maybe RLimits
+      -- | The directory that the evaluator process will be
+      -- 'chroot'ed into. Please note that if chroot is applied,
+      -- the 'tmpDirPath' will be calculated relatively to this
+      -- value.
+    , chrootPath  :: Maybe FilePath
+      -- | The UID that will be set after the call to chroot.
+    , euid        :: Maybe UserID
       -- | SELinux security context under which the worker 
       -- process will be running.
     , secontext   :: Maybe SecurityContext
     } deriving (Eq, Show, Generic)
 
+deriving instance Generic CUid               
+instance Serialize CUid
 instance Serialize LimitSettings               
 
 defaultSettings :: EvalSettings
 defaultSettings = EvalSettings
-    { tmpDirPath  = "/tmp"
+    { tmpDirPath  = "/tmp"  
     , libDirPath  = Just libdir
-    , fileName    = "test.hs"
     , limitSet    = def
     , preloadFile = "Preload.hs"
     }
@@ -83,6 +93,8 @@ defaultLimits = LimitSettings
     { timeout    = 3
     , niceness   = 10
     , rlimits    = Nothing
+    , chrootPath = Nothing
+    , euid       = Nothing
     , secontext  = Just "idia_restricted_t"
     }
 

@@ -5,17 +5,19 @@ module Main where
 import Control.Applicative ((<$>))
 import Control.Concurrent (threadDelay, forkIO)
 import Control.Concurrent.MVar  
-import Control.Monad (when, void, forever, liftM)
+import Control.Monad (when, unless, void, forever, liftM)
 import Data.ByteString (hGetContents)
 import Data.Default
 import Data.Serialize (encode, decode, Serialize)
 import Data.Typeable (Typeable)
 import Network (listenOn, connectTo, accept, socketPort, PortID(..), Socket(..))
 import Network.Socket (close)
-import System.Directory (doesFileExist)
+import System.Directory (doesFileExist, doesDirectoryExist, createDirectory)
 import System.FilePath.Posix ((</>))
 import System.IO (Handle, hClose, stdin, stdout, hSetBuffering, BufferMode(..), hGetLine, hPutStrLn)
-import System.Posix.Files (removeLink)
+import System.Posix.Files (removeLink, setOwnerAndGroup)
+import System.Posix.User (getUserEntryForName, UserEntry(..))
+import System.Posix.Types (UserID)
 
 import Eval (traceM)
 import Eval.Worker
@@ -30,27 +32,51 @@ import SignalHandlers
 sockFile :: FilePath
 sockFile = "/idia/run/sock/control.sock"
 
-settings :: EvalSettings
-settings = def {
-  limitSet = def {
+username :: String
+username = "vagrant"
+
+workersDir :: FilePath
+workersDir = "/idia/run/workers/"
+
+limSettings :: LimitSettings
+limSettings = def {
      rlimits = Just def {
         totalMemoryLimit = ResourceLimits memlim memlim
         },
      secontext = Just "idia_restricted_t"
+--     euid      = Just "vagrant"
      }
-  }
   where memlim = ResourceLimit $ 104857600 * 2
                                  --- 100mb * 2
 
-newWorkerAct i = startEvalWorker wname settings
-  where wname = "EvalWorker" ++ show i
+settings :: EvalSettings
+settings = def {
+  limitSet = limSettings
+  }
+
+
+setOwner :: FilePath -> UserID -> IO ()
+setOwner fp u = setOwnerAndGroup fp u (-1)
+
+newWorkerAct i = do
+  let wname = "EvalWorker" ++ show i
+      wdir  = workersDir </> ("worker" ++ show i)
+  uid <- userID <$> getUserEntryForName username      
+  doesDirectoryExist wdir >>= \e -> unless e $
+    createDirectory wdir
+  startEvalWorker wname (settings { tmpDirPath = wdir
+                                  , limitSet = limSettings {
+                                       chrootPath = Just wdir
+                                     , euid = Just uid }})
 
 main :: IO ()
 main = do
   hSetBuffering stdin NoBuffering
-  pool <- mkPool newWorkerAct 2
+  pool <- mkPool newWorkerAct 1
   currentWorkers <- newMVar []
   soc <- mkSock sockFile
+  userID <$> getUserEntryForName username      
+   >>= setOwner sockFile 
   loop soc pool currentWorkers
   return ()
 

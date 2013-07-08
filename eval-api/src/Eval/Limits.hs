@@ -1,4 +1,4 @@
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE RecordWildCards, ForeignFunctionInterface #-}
 module Eval.Limits where
 
 import Prelude hiding (mapM_)
@@ -9,23 +9,39 @@ import Control.Monad (when)
 import Data.Monoid (mconcat)
 import Data.List (intersperse)
 import Data.Foldable (mapM_)
+import System.Posix.Directory (changeWorkingDirectory)
 import System.Posix.Signals (signalProcess, killProcess)
 import System.Posix.Process (nice)
 import System.Posix.Types (ProcessID)
+import System.Posix.User (setUserID, setEffectiveUserID)
 import System.Posix.Resource (setResourceLimit)
 import System.Linux.SELinux (getCon, setCon, SecurityContext)
+import Foreign.C
+import Foreign.C.Types
+import Foreign.C.String
+import Foreign.C.Error
 
 import Eval.EvalM
 import Eval.EvalError
 import Eval.EvalSettings
 
+foreign import ccall unsafe "unistd.h chroot"
+  c_chroot :: CString -> IO CInt
+
+chroot :: FilePath -> IO ()
+chroot fp = withCString fp $ \c_fp -> do
+  throwErrnoIfMinus1 "chroot" (c_chroot c_fp)
+  changeWorkingDirectory "/" 
+  return ()
 
 setLimits :: LimitSettings -> IO ()
 setLimits LimitSettings{..} = do
+  mapM_ chroot chrootPath
   mapM_ setRLimits rlimits
-  nice niceness
   mapM_ setupSELinuxCntx secontext
-    
+  nice niceness
+  mapM_ setEffectiveUserID euid
+  
 
 -- | Waits for a certain period of time (3 seconds)
 -- and then kills the process

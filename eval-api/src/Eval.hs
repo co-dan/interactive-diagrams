@@ -101,54 +101,54 @@ handleException m =
   
 
 
--- | Spawn a new evaluator
-prepareEvalQueue :: EvalSettings             -- ^ Settings to use for compilation
-                 -> IO (EvalQueue, ThreadId) -- ^ A queue to send requests to and the resulting thread ID           
-prepareEvalQueue set = do                    
-  chan <- EvalQueue <$> newChan
-  tid <- forkIO $ do
-    run (do
-      loadFile "Preload.hs"
-      sess <- getSession
-      -- this is causing problems (memory leaks?):
-      -- forever $ liftIO $ forkIO $ run' (handleQueue chan sess) set) set
-      forever $ handleQueue chan sess) set
-    return ()
-  return (chan, tid)
+-- -- | Spawn a new evaluator
+-- prepareEvalQueue :: EvalSettings             -- ^ Settings to use for compilation
+--                  -> IO (EvalQueue, ThreadId) -- ^ A queue to send requests to and the resulting thread ID           
+-- prepareEvalQueue set = do                    
+--   chan <- EvalQueue <$> newChan
+--   tid <- forkIO $ do
+--     run (do
+--       loadFile "Preload.hs"
+--       sess <- getSession
+--       -- this is causing problems (memory leaks?):
+--       -- forever $ liftIO $ forkIO $ run' (handleQueue chan sess) set) set
+--       forever $ handleQueue chan sess) set
+--     return ()
+--   return (chan, tid)
   
 
--- | Send a request to the evaluator
-sendEvaluator :: EvalQueue           -- ^ Queue created by 'prepareEvalQueue'
-              -> EvalM DisplayResult -- ^ 'EvalM' code that renders to 'DisplayResult'
-              -> IO EvalResultWithErrors
-sendEvaluator (EvalQueue chan) act = do
-  mv <- newEmptyMVar
-  writeChan chan (act, mv)
-  takeMVar mv
+-- -- | Send a request to the evaluator
+-- sendEvaluator :: EvalQueue           -- ^ Queue created by 'prepareEvalQueue'
+--               -> EvalM DisplayResult -- ^ 'EvalM' code that renders to 'DisplayResult'
+--               -> IO EvalResultWithErrors
+-- sendEvaluator (EvalQueue chan) act = do
+--   mv <- newEmptyMVar
+--   writeChan chan (act, mv)
+--   takeMVar mv
   
   
--- | Function that handles requests from the 'EvalQueue'
-handleQueue :: EvalQueue -> HscEnv -> EvalM ()  
-handleQueue (EvalQueue chan) sess = do
-  (act', resultMVar) <- liftIO $ readChan chan
-  r <- runWithLimits act' sess
-  liftIO $ putMVar resultMVar r
-  return ()
+-- -- | Function that handles requests from the 'EvalQueue'
+-- handleQueue :: EvalQueue -> HscEnv -> EvalM ()  
+-- handleQueue (EvalQueue chan) sess = do
+--   (act', resultMVar) <- liftIO $ readChan chan
+--   r <- runWithLimits act' sess
+--   liftIO $ putMVar resultMVar r
+--   return ()
 
--- | Sets up initial limits, prepares the socket and the monadic action
--- and runs it in a restricted environment
-runWithLimits :: EvalM DisplayResult -> HscEnv -> EvalM EvalResultWithErrors
-runWithLimits act' sess = do
-  (set@EvalSettings{..}) <- ask
-  let act = do
-        liftIO $ nice (niceness limitSet)
-        runEvalM act' set
+-- -- | Sets up initial limits, prepares the socket and the monadic action
+-- -- and runs it in a restricted environment
+-- runWithLimits :: EvalM DisplayResult -> HscEnv -> EvalM EvalResultWithErrors
+-- runWithLimits act' sess = do
+--   (set@EvalSettings{..}) <- ask
+--   let act = do
+--         liftIO $ nice (niceness limitSet)
+--         runEvalM act' set
 
-  liftIO $ do
-    exists <- doesFileExist (tmpDirPath </> fileName)
-    when exists $ removeLink (tmpDirPath </> fileName)
-  soc <- liftIO $ listenOn (UnixSocket (tmpDirPath </> fileName))
-  liftEvalM $ execTimeLimit act set soc sess
+--   liftIO $ do
+--     exists <- doesFileExist (tmpDirPath </> fileName)
+--     when exists $ removeLink (tmpDirPath </> fileName)
+--   soc <- liftIO $ listenOn (UnixSocket (tmpDirPath </> fileName))
+--   liftEvalM $ execTimeLimit act set soc sess
     
   
 -- | Compiles a source code file using 'compileFile' and writes
