@@ -23,6 +23,7 @@ import           Data.Word
 import           Data.Int
 import           Data.Monoid
 import qualified Data.Text                     as T
+import qualified Data.Text.Encoding            as T
 import qualified Data.Text.Lazy                as TL
 import qualified Data.Text.Lazy.Encoding       as TL
 import           Data.Typeable
@@ -58,6 +59,10 @@ instance Serialize TL.Text where
   put = put . TL.encodeUtf8
   get = liftM TL.decodeUtf8 get
 
+instance Serialize T.Text where
+  put = put . T.encodeUtf8
+  get = liftM T.decodeUtf8 get
+  
 instance Serialize DR
 
 text :: TL.Text -> DisplayResult

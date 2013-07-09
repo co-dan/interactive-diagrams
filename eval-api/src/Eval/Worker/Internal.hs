@@ -95,8 +95,7 @@ runToHandle :: (Serialize a, Show a)
             => Ghc a -> Handle -> Ghc (Either String a, [EvalError])
 runToHandle act hndl = do
   ref <- liftIO $ newIORef []
-  dfs <- getSessionDynFlags
-  setSessionDynFlags $ dfs { log_action = logHandler ref }
+  initGhc ref
   dr :: Either String a <- handleException act
   errors :: [EvalError] <- liftIO $ readIORef ref
   liftIO $ sendData hndl (dr, errors)

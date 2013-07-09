@@ -71,7 +71,8 @@ initGhc ref = do
   dfs <- getSessionDynFlags
   setSessionDynFlags $ dfs { hscTarget = HscInterpreted
                            , ghcLink = LinkInMemory
-                           , log_action = logHandler ref 
+                           -- , log_action = logHandler ref
+                           , verbosity  = 3
                            }
   return ()
 

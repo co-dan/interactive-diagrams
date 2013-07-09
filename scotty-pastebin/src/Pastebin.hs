@@ -99,6 +99,7 @@ renderPaste Paste{..} = html . renderHtml . mainPage "Paste" $ do
       H.pre $
         foldMap (H.preEscapedToHtml . Display.result) (getDR pasteResult)
 
+
 -- | * Database access and logic
 
 
@@ -160,14 +161,15 @@ compilePaste :: Text
              -> EitherT (Text, [EvalError]) ActionM (Key Paste)
 compilePaste code = do
   fname <- liftIO $ hash code
-  let fpath = getPastesDir </> show fname ++ ".hs"
-  liftIO $ T.writeFile fpath code
+  -- let fpath = getPastesDir </> show fname ++ ".hs"
+  -- liftIO $ T.writeFile fpath code
   hndl <- liftIO $ connectTo "localhost" (UnixSocket controlSock)
   liftIO $ sendData hndl RequestWorker
   (worker :: Worker EvalWorker) <- liftIO $ getData hndl
   -- liftIO $ hClose hndl
   ((res, errors), status) <- liftIO $ sendEvalRequestNoRestart worker $
-                             CompileFile fpath
+                             EvalFile (show fname ++ ".hs") code
+                             -- CompileFile fpath
   hndl <- liftIO $ connectTo "localhost" (UnixSocket controlSock)
   liftIO $ sendData hndl (ReturnWorker status worker)
   -- liftIO $ hClose hndl

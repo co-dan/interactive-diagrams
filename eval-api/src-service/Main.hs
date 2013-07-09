@@ -44,7 +44,6 @@ limSettings = def {
         totalMemoryLimit = ResourceLimits memlim memlim
         },
      secontext = Just "idia_restricted_t"
---     euid      = Just "vagrant"
      }
   where memlim = ResourceLimit $ 104857600 * 2
                                  --- 100mb * 2
@@ -64,8 +63,7 @@ newWorkerAct i = do
   uid <- userID <$> getUserEntryForName username      
   doesDirectoryExist wdir >>= \e -> unless e $
     createDirectory wdir
-  startEvalWorker wname (settings { tmpDirPath = wdir
-                                  , limitSet = limSettings {
+  startEvalWorker wname (settings { limitSet = limSettings  {
                                        chrootPath = Just wdir
                                      , euid = Just uid }})
 

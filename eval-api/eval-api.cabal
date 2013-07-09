@@ -54,6 +54,7 @@ library
                        display ==0.1.*,
                        vector ==0.10.*,
                        hashable, 
+                       text,
                        stm,
                        monad-control,
                        network ==2.4.*,

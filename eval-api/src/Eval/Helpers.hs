@@ -7,8 +7,10 @@ import System.IO.Unsafe (unsafePerformIO)
 
 import GHC hiding (compileExpr)
 import qualified GHC
+import DynFlags
 import MonadUtils hiding (MonadIO, liftIO)
 import Outputable
+import Packages
 import Exception
 
 import Eval.EvalError
@@ -32,7 +34,16 @@ compileExpr expr = do
   ty <- exprType expr -- throws exception if doesn't typecheck
   -- output ty
   unsafePerformIO . unsafeCoerce <$> GHC.compileExpr expr
-  
+
+
+-- | Adds a package database to the Ghc monad
+addPkgDb :: GhcMonad m => FilePath -> m ()
+addPkgDb fp = do
+  dfs <- getSessionDynFlags
+  let pkg = PkgConfFile fp
+  setSessionDynFlags $ dfs { extraPkgConfs = (pkg:) . extraPkgConfs dfs }
+  _ <- initPackages <$> getSessionDynFlags
+  return ()
 
 -- | Outputs any value that can be pretty-printed using the default style
 output :: (GhcMonad m, MonadIO m) => Outputable a => a -> m ()

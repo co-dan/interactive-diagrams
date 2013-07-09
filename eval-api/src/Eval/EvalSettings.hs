@@ -76,7 +76,7 @@ data LimitSettings = LimitSettings
     , secontext   :: Maybe SecurityContext
     } deriving (Eq, Show, Generic)
 
-deriving instance Generic CUid               
+deriving instance Generic CUid    
 instance Serialize CUid
 instance Serialize LimitSettings               
 

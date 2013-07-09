@@ -12,8 +12,8 @@ import Data.Foldable (mapM_)
 import System.Posix.Directory (changeWorkingDirectory)
 import System.Posix.Signals (signalProcess, killProcess)
 import System.Posix.Process (nice)
-import System.Posix.Types (ProcessID)
-import System.Posix.User (setUserID, setEffectiveUserID)
+import System.Posix.Types (ProcessID, UserID, CUid(..))
+import System.Posix.User (setUserID, setEffectiveUserID, getRealUserID, getEffectiveUserID)
 import System.Posix.Resource (setResourceLimit)
 import System.Linux.SELinux (getCon, setCon, SecurityContext)
 import Foreign.C
@@ -24,23 +24,29 @@ import Foreign.C.Error
 import Eval.EvalM
 import Eval.EvalError
 import Eval.EvalSettings
+import SignalHandlers
 
 foreign import ccall unsafe "unistd.h chroot"
   c_chroot :: CString -> IO CInt
 
 chroot :: FilePath -> IO ()
-chroot fp = withCString fp $ \c_fp -> do
-  throwErrnoIfMinus1 "chroot" (c_chroot c_fp)
-  changeWorkingDirectory "/" 
-  return ()
+chroot fp = do
+  eid <- getEffectiveUserID
+  setUserID (CUid 0)
+  withCString fp $ \c_fp -> do
+    throwErrnoIfMinus1 "chroot" (c_chroot c_fp)
+    changeWorkingDirectory "/" 
+    return ()
+  setUserID eid
 
 setLimits :: LimitSettings -> IO ()
 setLimits LimitSettings{..} = do
-  mapM_ chroot chrootPath
   mapM_ setRLimits rlimits
   mapM_ setupSELinuxCntx secontext
   nice niceness
-  mapM_ setEffectiveUserID euid
+  mapM_ chroot chrootPath
+  mapM_ setUserID euid
+  restoreHandlers
   
 
 -- | Waits for a certain period of time (3 seconds)

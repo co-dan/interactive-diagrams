@@ -28,18 +28,20 @@ module Eval.Worker
          sendCompileFileRequest, sendEvalStringRequest
        ) where
 
-import Prelude hiding (putStr)
+import Prelude hiding (putStr, mapM_)
   
 import Control.Monad (forever)
 import Control.Monad.IO.Class (liftIO, MonadIO)
 import Data.Default
 import Data.Typeable ()
+import Data.Foldable (mapM_)
 import Network (accept, Socket)
 import System.FilePath.Posix ((</>))
 import System.IO (Handle)
 import System.Posix.Process (forkProcess)
 import System.Posix.Signals (Handler(..), installHandler, setStoppedChildFlag, processStatusChanged)
 import System.Posix.Types (ProcessID)
+import System.Posix.User (getRealUserID, setEffectiveUserID)
 
 import DynFlags
 import GHC hiding (compileExpr)
@@ -128,10 +130,16 @@ startEvalWorker :: String                   -- ^ Name of the worker
 startEvalWorker name eset = startWorker name sock set pre callback
   where sock = tmpDirPath eset </> (name ++ ".sock")
         set  = limitSet eset
+        uid  = euid set
         pre  = flip run' eset $ do
+          liftIO $ mapM_ setEffectiveUserID uid -- this is necessary so that the control socket is accessible by
+          -- non-root processes, probably a hack
+          addPkgDb "/home/vagrant/.ghc/x86_64-linux-7.7.20130704/package.conf.d"
+          traceM . ("getRealUserID "++) . show =<< liftIO (getRealUserID)
           dfs <- getSessionDynFlags
           setSessionDynFlags $ dfs { hscTarget = HscInterpreted
                                    , ghcLink = LinkInMemory
+                                   , verbosity = 3
                                    }
           loadFile (preloadFile eset)
           getSession
