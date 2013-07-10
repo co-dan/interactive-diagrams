@@ -1,5 +1,4 @@
 {-# LANGUAGE RecordWildCards, FlexibleContexts #-}
-{-# LANGUAGE TypeHoles #-}
 -- | A non-stripped pooling abstraction that restarts workers
 -- /Note: right now the module is not desgined for threaded applications/
 -- Some got has been taken from 'Data.Bool' by bos

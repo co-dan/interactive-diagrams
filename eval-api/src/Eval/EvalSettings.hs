@@ -41,17 +41,19 @@ instance Serialize RLimits
 -- | Datastructure holding the settings for the interpreter  
 data EvalSettings = EvalSettings
     { -- | Path to the directory with Haskell libraries
-      libDirPath  :: Maybe FilePath
+      libDirPath   :: Maybe FilePath
+      -- | A list of pathes to @package.conf.d@ directories
+    , pkgDatabases :: [FilePath]
       -- | Path to the directory where temporary files are held
       -- the sockets will be stored there
-    , tmpDirPath  :: FilePath
+    , tmpDirPath   :: FilePath
       -- File name that will be used for source code.
       -- /Warning: obsolete/
       --, fileName    :: FilePath
       -- | Security restrictions
-    , limitSet    :: LimitSettings
+    , limitSet     :: LimitSettings
       -- | File that has to be preloaded
-    , preloadFile :: FilePath
+    , preloadFile  :: FilePath
     } deriving (Eq, Show)
 
 
@@ -64,9 +66,9 @@ data LimitSettings = LimitSettings
     , niceness    :: Int
       -- | Resource limits for the 'setrlimit' syscall
     , rlimits     :: Maybe RLimits
-      -- | The directory that the evaluator process will be
-      -- 'chroot'ed into. Please note that if chroot is applied,
-      -- the 'tmpDirPath' will be calculated relatively to this
+      -- | The directory that the evaluator process will be 'chroot'ed
+      -- into. Please note that if chroot is applied, all the pathes
+      -- in 'EvalSettings' will be calculated relatively to this
       -- value.
     , chrootPath  :: Maybe FilePath
       -- | The UID that will be set after the call to chroot.
@@ -82,10 +84,11 @@ instance Serialize LimitSettings
 
 defaultSettings :: EvalSettings
 defaultSettings = EvalSettings
-    { tmpDirPath  = "/tmp"  
-    , libDirPath  = Just libdir
-    , limitSet    = def
-    , preloadFile = "Preload.hs"
+    { tmpDirPath   = "/tmp"  
+    , libDirPath   = Just libdir
+    , pkgDatabases = []
+    , limitSet     = def
+    , preloadFile  = "Preload.hs"
     }
 
 defaultLimits :: LimitSettings
@@ -95,7 +98,7 @@ defaultLimits = LimitSettings
     , rlimits    = Nothing
     , chrootPath = Nothing
     , euid       = Nothing
-    , secontext  = Just "idia_restricted_t"
+    , secontext  = Nothing -- Just "idia_restricted_t"
     }
 
 instance Default LimitSettings where

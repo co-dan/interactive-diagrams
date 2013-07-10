@@ -42,15 +42,16 @@ limSettings :: LimitSettings
 limSettings = def {
      rlimits = Just def {
         totalMemoryLimit = ResourceLimits memlim memlim
-        },
-     secontext = Just "idia_restricted_t"
+        }
+     , secontext = Just "idia_restricted_t"
      }
   where memlim = ResourceLimit $ 104857600 * 2
                                  --- 100mb * 2
 
 settings :: EvalSettings
-settings = def {
-  limitSet = limSettings
+settings = def
+  { limitSet = limSettings
+  , pkgDatabases = ["/home/vagrant/.ghc/x86_64-linux-7.7.20130704/package.conf.d"]
   }
 
 
@@ -63,9 +64,9 @@ newWorkerAct i = do
   uid <- userID <$> getUserEntryForName username      
   doesDirectoryExist wdir >>= \e -> unless e $
     createDirectory wdir
-  startEvalWorker wname (settings { limitSet = limSettings  {
-                                       chrootPath = Just wdir
-                                     , euid = Just uid }})
+  startEvalWorker wname settings -- (settings { limitSet = limSettings  {
+                        --                chrootPath = Just wdir
+                        --              , euid = Just uid }})
 
 main :: IO ()
 main = do

@@ -1,3 +1,7 @@
+{-# LANGUAGE CPP #-}
+{-|
+  Helper functions for the 'EvalM' and 'Ghc' monads
+-}
 module Eval.Helpers where
 
 import Control.Monad (when)
@@ -36,15 +40,46 @@ compileExpr expr = do
   unsafePerformIO . unsafeCoerce <$> GHC.compileExpr expr
 
 
--- | Adds a package database to the Ghc monad
+-- | Add a package database to the Ghc monad
+#if __GLASGOW_HASKELL_ >= 707  
 addPkgDb :: GhcMonad m => FilePath -> m ()
+#else
+addPkgDb :: (MonadIO m, GhcMonad m) => FilePath -> m ()
+#endif
 addPkgDb fp = do
   dfs <- getSessionDynFlags
-  let pkg = PkgConfFile fp
-  setSessionDynFlags $ dfs { extraPkgConfs = (pkg:) . extraPkgConfs dfs }
-  _ <- initPackages <$> getSessionDynFlags
+  let pkg  = PkgConfFile fp
+  let dfs' = dfs { extraPkgConfs = (pkg:) . extraPkgConfs dfs }
+  setSessionDynFlags dfs'
+#if __GLASGOW_HASKELL_ >= 707    
+  _ <- initPackages dfs'
+#else
+  _ <- liftIO $ initPackages dfs'
+#endif
   return ()
 
+-- | Add a list of package databases to the Ghc monad
+-- This should be equivalen to  
+-- > addPkgDbs ls = mapM_ addPkgDb ls
+-- but it is actaully faster, because it does the package
+-- reintialization after adding all the databases
+#if __GLASGOW_HASKELL_ >= 707      
+addPkgDbs :: GhcMonad m => [FilePath] -> m ()
+#else
+addPkgDbs :: (MonadIO m, GhcMonad m) => [FilePath] -> m ()
+#endif             
+addPkgDbs fps = do 
+  dfs <- getSessionDynFlags
+  let pkgs = map PkgConfFile fps
+  let dfs' = dfs { extraPkgConfs = (pkgs ++) . extraPkgConfs dfs }
+  setSessionDynFlags dfs'
+#if __GLASGOW_HASKELL_ >= 707    
+  _ <- initPackages dfs'
+#else
+  _ <- liftIO $ initPackages dfs'
+#endif       
+  return ()
+  
 -- | Outputs any value that can be pretty-printed using the default style
 output :: (GhcMonad m, MonadIO m) => Outputable a => a -> m ()
 output a = do

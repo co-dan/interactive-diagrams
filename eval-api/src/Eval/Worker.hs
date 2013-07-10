@@ -2,7 +2,6 @@
 {-# LANGUAGE TypeFamilies, StandaloneDeriving, RecordWildCards #-}
 {-# LANGUAGE FlexibleContexts, EmptyDataDecls, ScopedTypeVariables #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TypeHoles #-}
 {-|
   Worker can be in one of three states
 
@@ -134,7 +133,7 @@ startEvalWorker name eset = startWorker name sock set pre callback
         pre  = flip run' eset $ do
           liftIO $ mapM_ setEffectiveUserID uid -- this is necessary so that the control socket is accessible by
           -- non-root processes, probably a hack
-          addPkgDb "/home/vagrant/.ghc/x86_64-linux-7.7.20130704/package.conf.d"
+          addPkgDbs (pkgDatabases eset)
           traceM . ("getRealUserID "++) . show =<< liftIO (getRealUserID)
           dfs <- getSessionDynFlags
           setSessionDynFlags $ dfs { hscTarget = HscInterpreted
