@@ -36,7 +36,7 @@ evalCmdToEvalM (EvalString s) = compileExpr s
 evalCmdToEvalM (EvalFile n txt) = do
   EvalSettings{..} <- ask
   let fpath = tmpDirPath </> n
-  traceM fpath
+--  traceM fpath
   liftIO $ T.writeFile fpath txt
   evalCmdToEvalM (CompileFile fpath)
 

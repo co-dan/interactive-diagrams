@@ -47,6 +47,16 @@ data EvalSettings = EvalSettings
       -- | Path to the directory where temporary files are held
       -- the sockets will be stored there
     , tmpDirPath   :: FilePath
+      -- | Verbosity level
+      -- Note [Verbosity levels]
+      -- ~~~~~~~~~~~~~~~~~~~~~~~
+      -- 0 | log errors & warnings only
+      -- 1 | minimal verbosity: print "compiling M ... done." for each module.
+      -- 2 | equivalent to -dshow-passes
+      -- 3 | equivalent to existing "ghc -v"
+      -- 4 | "ghc -v -ddump-most"
+      -- 5 | "ghc -v -ddump-all"
+    , verbLevel    :: Int
       -- File name that will be used for source code.
       -- /Warning: obsolete/
       --, fileName    :: FilePath
@@ -87,6 +97,7 @@ defaultSettings = EvalSettings
     { tmpDirPath   = "/tmp"  
     , libDirPath   = Just libdir
     , pkgDatabases = []
+    , verbLevel    = 1
     , limitSet     = def
     , preloadFile  = "Preload.hs"
     }

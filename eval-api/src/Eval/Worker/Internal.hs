@@ -13,6 +13,7 @@ module Eval.Worker.Internal
 import Control.Applicative ((<$>))
 import Control.Concurrent.Async (race)
 import Control.Monad (when)
+import Control.Monad.Reader (ask)
 import Control.Monad.IO.Class (liftIO)
 import Data.IORef (newIORef, readIORef)
 import Data.Maybe (fromJust)
@@ -25,6 +26,7 @@ import System.Posix.Files (removeLink)
 import GHC
 
 import Eval hiding (runToHandle)
+import Eval.EvalM
 import Eval.EvalError
 import Eval.EvalSettings (EvalSettings(..), LimitSettings(..))
 import Eval.Limits
@@ -92,10 +94,11 @@ sendEvalRequestNoRestart w cmd = do
   
 -- | Runs a Ghc monad code and outputs the result to a handle  
 runToHandle :: (Serialize a, Show a)
-            => Ghc a -> Handle -> Ghc (Either String a, [EvalError])
+            => EvalM a -> Handle -> EvalM (Either String a, [EvalError])
 runToHandle act hndl = do
   ref <- liftIO $ newIORef []
-  initGhc ref
+  set <- ask
+  liftEvalM $ initGhc ref (verbLevel set)
   dr :: Either String a <- handleException act
   errors :: [EvalError] <- liftIO $ readIORef ref
   liftIO $ sendData hndl (dr, errors)

@@ -134,11 +134,11 @@ startEvalWorker name eset = startWorker name sock set pre callback
           liftIO $ mapM_ setEffectiveUserID uid -- this is necessary so that the control socket is accessible by
           -- non-root processes, probably a hack
           addPkgDbs (pkgDatabases eset)
-          traceM . ("getRealUserID "++) . show =<< liftIO (getRealUserID)
+--          traceM . ("getRealUserID "++) . show =<< liftIO (getRealUserID)
           dfs <- getSessionDynFlags
           setSessionDynFlags $ dfs { hscTarget = HscInterpreted
                                    , ghcLink = LinkInMemory
-                                   , verbosity = 3
+--                                   , verbosity = 3
                                    }
           loadFile (preloadFile eset)
           getSession
@@ -147,8 +147,7 @@ startEvalWorker name eset = startWorker name sock set pre callback
           act <- evalWorkerAction hndl
           flip run' eset $ do
             setSession sess
-            r :: EvalResultWithErrors <- liftEvalM $
-                                         runToHandle (runEvalM act eset) hndl
+            r :: EvalResultWithErrors <- runToHandle act hndl
             return r
 
 

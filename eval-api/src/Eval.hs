@@ -56,7 +56,7 @@ newtype EvalQueue =
 run :: EvalM a -> EvalSettings -> IO (Either String a)
 run m set = do
   ref <- newIORef []
-  r <- handleException $ run' (liftEvalM (initGhc ref) >> m) set
+  r <- handleException $ run' (liftEvalM (initGhc ref (verbLevel set)) >> m) set
   logMsg <- unlines . map show <$> readIORef ref
   case r of
     Left s -> return $ Left $ s ++ "\n" ++ logMsg
@@ -66,13 +66,13 @@ run' :: EvalM a -> EvalSettings -> IO a
 run' m set = runGhc (libDirPath set) (runEvalM m set)
 
 -- | Inits the GHC API, sets the mode and the log handler         
-initGhc :: IORef [EvalError] -> Ghc ()
-initGhc ref = do
+initGhc :: IORef [EvalError] -> Int -> Ghc ()
+initGhc ref vb = do
   dfs <- getSessionDynFlags
   setSessionDynFlags $ dfs { hscTarget = HscInterpreted
                            , ghcLink = LinkInMemory
-                           -- , log_action = logHandler ref
-                           , verbosity  = 3
+                           , log_action = logHandler ref
+                           , verbosity  = vb
                            }
   return ()
 
