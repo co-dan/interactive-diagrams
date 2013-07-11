@@ -129,7 +129,7 @@ startEvalWorker :: String                   -- ^ Name of the worker
 startEvalWorker name eset = startWorker name sock set pre callback
   where sock = tmpDirPath eset </> (name ++ ".sock")
         set  = limitSet eset
-        uid  = euid set
+        uid  = processUid set
         pre  = flip run' eset $ do
           liftIO $ mapM_ setEffectiveUserID uid -- this is necessary so that the control socket is accessible by
           -- non-root processes, probably a hack

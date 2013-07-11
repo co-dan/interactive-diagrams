@@ -51,7 +51,7 @@ limSettings = def {
 settings :: EvalSettings
 settings = def
   { limitSet = limSettings
-  , pkgDatabases = ["/home/vagrant/.ghc/x86_64-linux-7.7.20130704/package.conf.d"]
+  , pkgDatabases = ["/home/vagrant/.ghc/x86_64-linux-7.7.20130628/package.conf.d"]
   }
 
 
@@ -64,9 +64,9 @@ newWorkerAct i = do
   uid <- userID <$> getUserEntryForName username      
   doesDirectoryExist wdir >>= \e -> unless e $
     createDirectory wdir
-  startEvalWorker wname settings -- (settings { limitSet = limSettings  {
-                        --                chrootPath = Just wdir
-                        --              , euid = Just uid }})
+  startEvalWorker wname (settings { limitSet = limSettings  {
+                                      chrootPath = Just wdir,
+                                      processUid = Just uid }})
 
 main :: IO ()
 main = do

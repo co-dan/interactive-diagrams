@@ -4,7 +4,7 @@ module Eval.Limits where
 import Prelude hiding (mapM_)
 
 import Control.Concurrent (threadDelay)
-import Control.Applicative ((<$>))
+import Control.Applicative ((<$>), (<*>))
 import Control.Monad (when)
 import Data.Monoid (mconcat)
 import Data.List (intersperse)
@@ -37,16 +37,22 @@ chroot fp = do
     throwErrnoIfMinus1 "chroot" (c_chroot c_fp)
     changeWorkingDirectory "/" 
     return ()
-  setUserID eid
+  setEffectiveUserID eid
 
+changeUserID :: UserID -> IO ()
+changeUserID uid = do
+  setUserID (CUid 0) -- need to be root in order to setuid()
+  setUserID uid
+  
 setLimits :: LimitSettings -> IO ()
 setLimits LimitSettings{..} = do
   mapM_ setRLimits rlimits
   mapM_ setupSELinuxCntx secontext
   nice niceness
   mapM_ chroot chrootPath
-  mapM_ setUserID euid
+  mapM_ changeUserID processUid
   restoreHandlers
+  where getUserID = (,) <$> getEffectiveUserID <*> getRealUserID
   
 
 -- | Waits for a certain period of time (3 seconds)

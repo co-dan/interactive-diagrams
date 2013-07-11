@@ -72,7 +72,7 @@ data LimitSettings = LimitSettings
       -- value.
     , chrootPath  :: Maybe FilePath
       -- | The UID that will be set after the call to chroot.
-    , euid        :: Maybe UserID
+    , processUid  :: Maybe UserID
       -- | SELinux security context under which the worker 
       -- process will be running.
     , secontext   :: Maybe SecurityContext
@@ -97,7 +97,7 @@ defaultLimits = LimitSettings
     , niceness   = 10
     , rlimits    = Nothing
     , chrootPath = Nothing
-    , euid       = Nothing
+    , processUid = Nothing
     , secontext  = Nothing -- Just "idia_restricted_t"
     }
 
