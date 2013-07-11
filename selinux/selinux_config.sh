@@ -5,3 +5,4 @@ setsebool -P allow_execstack 1
 setsebool -P allow_execmem 1
 setsebool -P global_ssp 1
 setsebool -P allow_daemons_use_tty on
+setsebool -P allow_daemons_dump_core 1

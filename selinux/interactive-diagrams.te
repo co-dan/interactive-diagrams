@@ -33,6 +33,7 @@ type idia_service_sock_t; # UNIX socket files used for communication
 type idia_db_t; # SQLite database
 type idia_pkg_t; # directory with GHC packages
 type idia_web_common_t; # html templates, css and other static content
+type idia_worker_env_t; # worker environemnt
 
 # role system_r types idia_t;
 role system_r types idia_web_t;
@@ -151,7 +152,7 @@ allow idia_service_t tmp_t:file { write create unlink execute };
 # For communication with the web interface
 allow idia_service_sock_t fs_t:filesystem associate;
 allow idia_service_t idia_service_sock_t:dir { write remove_name search add_name };
-allow idia_service_t idia_service_sock_t:sock_file { getattr unlink create };
+allow idia_service_t idia_service_sock_t:sock_file { setattr getattr unlink create };
 
 # for running gcc
 allow idia_service_t bin_t:dir { search getattr };
@@ -167,9 +168,12 @@ typebounds idia_service_t idia_restricted_t;
 # associated typebounds policy statement, then the call will return 'Operation not
 # permitted' 
 
+# setuid & chrooting
+allow idia_service_t self:capability { chown dac_override };
+allow idia_service_t idia_worker_env_t:dir { search getattr };
 
 # Forking new processes & transitioning
-allow idia_service_t self:capability { setuid setgid kill };
+allow idia_service_t self:capability { setuid setgid kill sys_chroot };
 allow idia_service_t self:process    { signal fork setpgid setrlimit dyntransition getpgid }; 
 # type=AVC msg=audit(1372668674.152:1177): avc:  denied  { dyntransition } for  pid=22437 comm="scotty-pastebin" scontext=unconfined_u:system_r:idia_service_t:s0-s0:c0.c1023 tcontext=system_u:system_r:idia_restricted_t:s0-s0:c0.c1023 tclass=process
 #        Was caused by:
@@ -215,6 +219,9 @@ allow idia_restricted_t bin_t:file { read execute open getattr execute_no_trans 
 allow idia_restricted_t bin_t:lnk_file { read getattr };
 allow idia_restricted_t self:fifo_file { read write ioctl getattr };
 
+# For chrooting
+allow idia_restricted_t self:capability { setuid sys_chroot };
+
 ##
 # For locale stuff
 # It actually works fine without having to access locales
@@ -235,15 +242,16 @@ allow idia_restricted_t idia_web_exec_t:dir search;
 allow idia_restricted_t self:process { setsched execmem };
 allow idia_restricted_t fs_t:filesystem getattr;
 allow idia_service_t fs_t:filesystem getattr;
+allow idia_restricted_t idia_worker_env_t:dir { search getattr };
 
 # it appears that because of -threaded, idia_restricted_t wants
 # to access inherited file descriptors and fifos from idia_web_t
 # allow idia_restricted_t idia_web_t:fd use;
 # allow idia_restricted_t idia_web_t:fifo_file write;
 
-# This is probably something to do with libdir
-allow idia_restricted_t user_home_dir_t:dir search;
-allow idia_restricted_t user_home_t:dir search;
+# # This is probably something to do with libdir
+# allow idia_restricted_t user_home_dir_t:dir search;
+# allow idia_restricted_t user_home_t:dir search;
 
 # For communicating with the server
 allow idia_restricted_t tmp_t:sock_file write;
@@ -256,14 +264,14 @@ allow idia_restricted_t tmp_t:file { write create unlink execute };
 
 ##################################################
 
-# whut
+# # whut
 allow idia_service_t home_root_t:dir search;
-allow idia_restricted_t home_root_t:dir search;
+# allow idia_restricted_t home_root_t:dir search;
+allow idia_restricted_t default_t:dir search;
 allow idia_service_t default_t:dir search;
-
-# # /dev/pts1
-# # TODO: Why does it need stdout?
-# # <stdout>: commitBuffer: permission denied (Permission denied)
+# /dev/pts1
+# TODO: Why does it need stdout?
+# <stdout>: commitBuffer: permission denied (Permission denied)
 allow idia_restricted_t sshd_t:fd use;
 allow idia_service_t user_devpts_t:chr_file { write ioctl };
 allow idia_restricted_t user_devpts_t:chr_file { write ioctl };
@@ -273,6 +281,9 @@ allow idia_restricted_t user_devpts_t:chr_file { write ioctl };
 ##################################################
 # ATTN
 # For dev purpuses only
+#============= idia_worker_env_t ==============
+allow idia_worker_env_t fs_t:filesystem associate;
+
 #============= semanage_t ==============
 allow semanage_t setfiles_t:process { siginh noatsecure rlimitinh };
 
@@ -281,6 +292,8 @@ allow semanage_t setfiles_t:process { siginh noatsecure rlimitinh };
 allow unconfined_t idia_web_t:process transition;
 allow unconfined_t idia_db_t:file getattr;
 allow unconfined_t idia_service_exec_t:file { read execute open getattr execute_no_trans };
+allow unconfined_t idia_worker_env_t:dir search;
+allow unconfined_t idia_worker_env_t:dir { read getattr };
 
 #============= idia_restricted_t ==============
 allow idia_restricted_t user_home_t:file { getattr open ioctl read };

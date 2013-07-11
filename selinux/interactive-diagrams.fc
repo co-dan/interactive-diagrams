@@ -2,6 +2,7 @@
 /home/vagrant/ghc/lib/(.*)         gen_context(unconfined_u:object_r:idia_pkg_t, s0)
 /home/vagrant/.cabal(.*)         gen_context(unconfined_u:object_r:idia_pkg_t, s0)
 
+
 /idia/run/bin(/.*)?        gen_context(system_u:object_r:idia_web_exec_t,s0)
 /idia/run/bin/eval-service gen_context(system_u:object_r:idia_service_exec_t,s0)
 /idia/run/bin/pastes.db gen_context(system_u:object_r:idia_db_t,s0)
@@ -9,4 +10,19 @@
 /idia/run/common        gen_context(system_u:object_r:idia_web_common_t,s0)
 
 /idia/run/sock(/.*)?    gen_context(system_u:object_r:idia_service_sock_t,s0)
+
+# workers
+/idia/run/workers(/.*)?  gen_context(system_u:object_r:idia_worker_env_t,s0)
+/idia/run/workers/(.*)/Helper.hs gen_context(system_u:object_r:idia_web_exec_t,s0)
+
+/idia/run/workers/(.*)/home/vagrant/.ghc(/.*)?	   gen_context(unconfined_u:object_r:idia_pkg_t, s0)
+/idia/run/workers/(.*)/home/vagrant/ghc/lib/(.*)         gen_context(unconfined_u:object_r:idia_pkg_t, s0)
+/idia/run/workers/(.*)/home/vagrant/.cabal(.*)         gen_context(unconfined_u:object_r:idia_pkg_t, s0)
+
+/idia/run/workers/(.*)/usr/bin(/.*)? gen_context(system_u:object_r:bin_t,s0)
+/idia/run/workers/(.*)/bin(/.*)? gen_context(system_u:object_r:bin_t,s0)
+/idia/run/workers/(.*)/tmp(/.*)?  gen_context(system_u:object_r:tmp_t,s0)
+/idia/run/workers/(.*)/lib(/.*)?  gen_context(system_u:object_r:lib_t,s0)
+/idia/run/workers/(.*)/lib64(/.*)?  gen_context(system_u:object_r:lib_t,s0)
+/idia/run/workers/(.*)/etc/ld(.*) gen_context(system_u:object_r:ld_so_cache_t,s0)
 
