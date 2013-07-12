@@ -37,10 +37,10 @@ import Data.Foldable (mapM_)
 import Network (accept, Socket)
 import System.FilePath.Posix ((</>))
 import System.IO (Handle)
-import System.Posix.Process (forkProcess)
+import System.Posix.Process (forkProcess, getProcessID)
 import System.Posix.Signals (Handler(..), installHandler, setStoppedChildFlag, processStatusChanged)
 import System.Posix.Types (ProcessID)
-import System.Posix.User (getRealUserID, setEffectiveUserID)
+import System.Posix.User (getRealUserID, setEffectiveUserID, getEffectiveUserID)
 
 import DynFlags
 import GHC hiding (compileExpr)
@@ -85,8 +85,14 @@ startWorker name sock set pre cb = do
   let w = mkDefaultWorker name sock set
   let restarter w = do
         w' <- liftIO $ killWorker w
+        oldId <- liftIO $ getEffectiveUserID
+        liftIO $ mapM_ setEffectiveUserID (processUid set)
+          -- ^ this is necessary so that the control socket is accessible by
+          -- non-root processes, probably a hack
         dat <- pre
         pid <- liftIO $ forkWorker w' (cb dat)
+        liftIO $ setEffectiveUserID oldId
+        liftIO $ setCGroup set pid
         return $ w' { workerPid = Just pid }
   w' <- restarter w
   return (w', restarter)
@@ -131,17 +137,15 @@ startEvalWorker name eset = startWorker name sock set pre callback
         set  = limitSet eset
         uid  = processUid set
         pre  = flip run' eset $ do
-          liftIO $ mapM_ setEffectiveUserID uid -- this is necessary so that the control socket is accessible by
-          -- non-root processes, probably a hack
           addPkgDbs (pkgDatabases eset)
---          traceM . ("getRealUserID "++) . show =<< liftIO (getRealUserID)
           dfs <- getSessionDynFlags
           setSessionDynFlags $ dfs { hscTarget = HscInterpreted
                                    , ghcLink = LinkInMemory
 --                                   , verbosity = 3
                                    }
           loadFile (preloadFile eset)
-          getSession
+          sess <- getSession
+          return sess
         callback sess soc = forever $ do
           (hndl, _, _) <- accept soc
           act <- evalWorkerAction hndl

@@ -38,12 +38,16 @@ username = "vagrant"
 workersDir :: FilePath
 workersDir = "/idia/run/workers/"
 
+cgroups :: FilePath
+cgroups = "/cgroups/cpu/"
+
 limSettings :: LimitSettings
 limSettings = def {
      rlimits = Just def {
         totalMemoryLimit = ResourceLimits memlim memlim
         }
-     , secontext = Just "idia_restricted_t"
+     , secontext  = Just "idia_restricted_t"
+     , cgroupPath = Just $ cgroups </> "idiaworkers"
      }
   where memlim = ResourceLimit $ 104857600 * 2
                                  --- 100mb * 2

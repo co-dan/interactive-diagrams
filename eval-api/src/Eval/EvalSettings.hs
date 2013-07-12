@@ -86,6 +86,13 @@ data LimitSettings = LimitSettings
       -- | SELinux security context under which the worker 
       -- process will be running.
     , secontext   :: Maybe SecurityContext
+      -- | A filepath to the 'tasks' file for the desired cgroup.
+      -- 
+      -- For example, if I have mounted the @cpu@ controller at
+      -- @/cgroups/cpu/@ and I want the evaluator to be running in the
+      -- cgroup 'idiaworkers' then the 'cgroupPath' would be
+      -- @/cgroups/cpu/idiaworkers@
+    , cgroupPath  :: Maybe FilePath
     } deriving (Eq, Show, Generic)
 
 deriving instance Generic CUid    
@@ -110,6 +117,7 @@ defaultLimits = LimitSettings
     , chrootPath = Nothing
     , processUid = Nothing
     , secontext  = Nothing -- Just "idia_restricted_t"
+    , cgroupPath = Nothing
     }
 
 instance Default LimitSettings where

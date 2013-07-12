@@ -9,9 +9,10 @@ import Control.Monad (when)
 import Data.Monoid (mconcat)
 import Data.List (intersperse)
 import Data.Foldable (mapM_)
+import System.FilePath.Posix ((</>))
 import System.Posix.Directory (changeWorkingDirectory)
 import System.Posix.Signals (signalProcess, killProcess)
-import System.Posix.Process (nice)
+import System.Posix.Process (nice, getProcessID)
 import System.Posix.Types (ProcessID, UserID, CUid(..))
 import System.Posix.User (setUserID, setEffectiveUserID, getRealUserID, getEffectiveUserID)
 import System.Posix.Resource (setResourceLimit)
@@ -43,7 +44,14 @@ changeUserID :: UserID -> IO ()
 changeUserID uid = do
   setUserID (CUid 0) -- need to be root in order to setuid()
   setUserID uid
-  
+
+-- | Add a process to a cgroup
+setCGroup :: LimitSettings 
+          -> ProcessID      -- ^ The ID of a process to be added to the group
+          -> IO ()
+setCGroup LimitSettings{..} pid =
+  mapM_ (\fp -> writeFile (fp </> "tasks") $ show pid) cgroupPath
+               
 setLimits :: LimitSettings -> IO ()
 setLimits LimitSettings{..} = do
   mapM_ setRLimits rlimits
@@ -99,3 +107,4 @@ splitBy f (x:xs)
   | f x       = splitBy f xs
   | otherwise = s : splitBy f s'
   where (s, s') = break f (x:xs)
+
