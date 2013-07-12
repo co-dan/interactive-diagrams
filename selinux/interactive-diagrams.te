@@ -15,6 +15,8 @@ require {
   type sshd_t;
   type security_t;
   type user_tmp_t;
+  type cgroup_t;
+  
 
   type semanage_t;
   type unconfined_t;
@@ -171,6 +173,8 @@ typebounds idia_service_t idia_restricted_t;
 # setuid & chrooting
 allow idia_service_t self:capability { chown dac_override };
 allow idia_service_t idia_worker_env_t:dir { search getattr };
+# changing cgroup
+allow idia_service_t cgroup_t:file { write getattr open ioctl };
 
 # Forking new processes & transitioning
 allow idia_service_t self:capability { setuid setgid kill sys_chroot };
@@ -276,8 +280,6 @@ allow idia_restricted_t sshd_t:fd use;
 allow idia_service_t user_devpts_t:chr_file { write ioctl };
 allow idia_restricted_t user_devpts_t:chr_file { write ioctl };
 
-
-
 ##################################################
 # ATTN
 # For dev purpuses only
@@ -296,7 +298,7 @@ allow unconfined_t idia_worker_env_t:dir search;
 allow unconfined_t idia_worker_env_t:dir { read getattr };
 
 #============= idia_restricted_t ==============
-allow idia_restricted_t user_home_t:file { getattr open ioctl read };
+# allow idia_restricted_t user_home_t:file { getattr open ioctl read };
 
 ########################################
 # hmm this doesn't seem to work

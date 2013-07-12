@@ -87,7 +87,7 @@ startWorker name sock set pre cb = do
         w' <- liftIO $ killWorker w
         oldId <- liftIO $ getEffectiveUserID
         liftIO $ mapM_ setEffectiveUserID (processUid set)
-          -- ^ this is necessary so that the control socket is accessible by
+          -- this is necessary so that the control socket is accessible by
           -- non-root processes, probably a hack
         dat <- pre
         pid <- liftIO $ forkWorker w' (cb dat)
@@ -144,8 +144,7 @@ startEvalWorker name eset = startWorker name sock set pre callback
 --                                   , verbosity = 3
                                    }
           loadFile (preloadFile eset)
-          sess <- getSession
-          return sess
+          getSession
         callback sess soc = forever $ do
           (hndl, _, _) <- accept soc
           act <- evalWorkerAction hndl
