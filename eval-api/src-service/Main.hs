@@ -75,7 +75,7 @@ newWorkerAct settings i = do
 main :: IO ()
 main = do
   hSetBuffering stdin NoBuffering
-  devnull <- openFile "/dev/null" WriteMode
+  let devnull = openFile "/dev/null" WriteMode
   let set = settings { outHandle = devnull }
   pool <- mkPool (newWorkerAct set) 1
   currentWorkers <- newMVar []
@@ -83,7 +83,6 @@ main = do
   userID <$> getUserEntryForName username      
    >>= setOwner sockFile 
   loop soc pool currentWorkers
-  hClose devnull
   return ()
 
 loop :: Socket

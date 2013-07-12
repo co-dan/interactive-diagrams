@@ -1,4 +1,4 @@
-{-# LANGUAGE StandaloneDeriving, DeriveGeneric #-}
+{-# LANGUAGE StandaloneDeriving, DeriveGeneric, FlexibleInstances #-}
 module Eval.EvalSettings
     (
      EvalSettings(..), defaultSettings,
@@ -62,13 +62,20 @@ data EvalSettings = EvalSettings
       -- /Warning: obsolete/
       --, fileName    :: FilePath
       -- | A handle where the output will be redirected to
-    , outHandle    :: Handle
+      -- (to be precise, an action that would run in the worker
+      -- environemnt and would return a handle)
+    , outHandle    :: IO Handle
       -- | Security restrictions
     , limitSet     :: LimitSettings
       -- | File that has to be preloaded
     , preloadFile  :: FilePath
     } deriving (Eq, Show)
 
+instance Show (IO Handle) where
+  show _ = "<IO Handle>"
+  
+instance Eq (IO Handle) where
+  _ == _ = False
 
 data LimitSettings = LimitSettings
     { -- | Maximum time for which the code is allowed to run
@@ -108,7 +115,7 @@ defaultSettings = EvalSettings
     , libDirPath   = Just libdir
     , pkgDatabases = []
     , verbLevel    = 1
-    , outHandle    = stdout
+    , outHandle    = return stdout
     , limitSet     = def
     , preloadFile  = "Preload.hs"
     }

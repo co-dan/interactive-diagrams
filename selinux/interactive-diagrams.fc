@@ -25,4 +25,4 @@
 /idia/run/workers/(.*)/lib(/.*)?  gen_context(system_u:object_r:lib_t,s0)
 /idia/run/workers/(.*)/lib64(/.*)?  gen_context(system_u:object_r:lib_t,s0)
 /idia/run/workers/(.*)/etc/ld(.*) gen_context(system_u:object_r:ld_so_cache_t,s0)
-
+/idia/run/workers/(.*)/dev/null    gen_context(system_u:object_r:null_device_t,s0)

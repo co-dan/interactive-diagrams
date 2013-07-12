@@ -28,7 +28,8 @@ module Eval.Worker
        ) where
 
 import Prelude hiding (putStr, mapM_)
-  
+
+import Control.Applicative ((<$>))  
 import Control.Monad (forever, unless)
 import Control.Monad.IO.Class (liftIO, MonadIO)
 import Data.Default
@@ -78,7 +79,7 @@ mkDefaultWorker name sock set = Worker
 startWorker :: (WorkerData w, MonadIO (WMonad w))
             => String         --  ^ Name
             -> FilePath       --  ^ Socket
-            -> Handle         --  ^ Where to redirect stdout, stderr
+            -> IO Handle         --  ^ Where to redirect stdout, stderr
             -> LimitSettings  --  ^ Restrictions
             -> WMonad w (WData w) --  ^ Pre-forking action
             -> (WData w -> Socket -> IO ()) -- ^ Socket callback
@@ -99,18 +100,17 @@ startWorker name sock out set pre cb = do
   w' <- restarter w
   return (w', restarter)
 
-forkWorker :: Worker a -> Handle -> (Socket -> IO ()) -> IO ProcessID
+forkWorker :: Worker a -> IO Handle -> (Socket -> IO ()) -> IO ProcessID
 forkWorker Worker{..} out cb = do
-  fd <- handleToFd out
   setStoppedChildFlag True
   installHandler processStatusChanged Ignore Nothing
   soc <- mkSock workerSocket
   forkProcess $ do
-    -- unless (fd == (Fd 1)) $ closeFd (Fd 1)
-    dupTo fd (Fd 1)
     setStoppedChildFlag False
     installHandler processStatusChanged Default Nothing
     setLimits workerLimits
+    fd <- handleToFd =<< out
+    dupTo fd (Fd 1)
     cb soc
     return ()
 
@@ -123,11 +123,12 @@ startIOWorker :: String              -- ^ Name
               -> FilePath            -- ^ UNIX socket
               -> (Handle -> IO ())   -- ^ Callback
               -> IO (Worker IOWorker, RestartWorker IO IOWorker)
-startIOWorker name sock callb = startWorker name sock stdout defSet preFork handle
+startIOWorker name sock callb = startWorker name sock out defSet preFork handle
   where handle () soc = forever $ do
           (hndl, _, _) <- accept soc
           callb hndl
         defSet = def { secontext = Nothing }
+        out    = return stdout
         preFork =  putStrLn ("Starting worker " ++ show name)
                 >> return ()
         
