@@ -78,6 +78,9 @@ mainPage title content = H.docTypeHtml $ do
           H.h1 (H.toHtml title)
       H.div ! class_ "row-fluid" 
         $ content
+      H.div ! class_ "row-fluid" $
+        H.a ! HA.href "https://github.com/co-dan/interactive-diagrams/releases/tag/first-demo" 
+ 	  $ H.toHtml ("More info" :: Text)
     
 
 formWithCode :: Text -> Html
