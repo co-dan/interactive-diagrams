@@ -13,6 +13,7 @@ import Data.Serialize (Serialize)
 import System.Posix.Resource (ResourceLimit(..),
                               ResourceLimits(..),
                               Resource(..))
+import System.IO (Handle, stdout)
 import System.Posix.Types (UserID, CUid(..))
 import System.Linux.SELinux (SecurityContext)  
 import GHC.Paths
@@ -60,6 +61,8 @@ data EvalSettings = EvalSettings
       -- File name that will be used for source code.
       -- /Warning: obsolete/
       --, fileName    :: FilePath
+      -- | A handle where the output will be redirected to
+    , outHandle    :: Handle
       -- | Security restrictions
     , limitSet     :: LimitSettings
       -- | File that has to be preloaded
@@ -105,6 +108,7 @@ defaultSettings = EvalSettings
     , libDirPath   = Just libdir
     , pkgDatabases = []
     , verbLevel    = 1
+    , outHandle    = stdout
     , limitSet     = def
     , preloadFile  = "Preload.hs"
     }

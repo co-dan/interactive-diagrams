@@ -14,7 +14,7 @@ import Network (listenOn, connectTo, accept, socketPort, PortID(..), Socket(..))
 import Network.Socket (close)
 import System.Directory (doesFileExist, doesDirectoryExist, createDirectory)
 import System.FilePath.Posix ((</>))
-import System.IO (Handle, hClose, stdin, stdout, hSetBuffering, BufferMode(..), hGetLine, hPutStrLn)
+import System.IO (Handle, IOMode(..), openFile, hClose, stdin, stdout, hSetBuffering, BufferMode(..), hGetLine, hPutStrLn)
 import System.Posix.Files (removeLink, setOwnerAndGroup)
 import System.Posix.User (getUserEntryForName, UserEntry(..))
 import System.Posix.Types (UserID)
@@ -62,7 +62,7 @@ settings = def
 setOwner :: FilePath -> UserID -> IO ()
 setOwner fp u = setOwnerAndGroup fp u (-1)
 
-newWorkerAct i = do
+newWorkerAct settings i = do
   let wname = "EvalWorker" ++ show i
       wdir  = workersDir </> ("worker" ++ show i)
   uid <- userID <$> getUserEntryForName username      
@@ -75,12 +75,15 @@ newWorkerAct i = do
 main :: IO ()
 main = do
   hSetBuffering stdin NoBuffering
-  pool <- mkPool newWorkerAct 1
+  devnull <- openFile "/dev/null" WriteMode
+  let set = settings { outHandle = devnull }
+  pool <- mkPool (newWorkerAct set) 1
   currentWorkers <- newMVar []
   soc <- mkSock sockFile
   userID <$> getUserEntryForName username      
    >>= setOwner sockFile 
   loop soc pool currentWorkers
+  hClose devnull
   return ()
 
 loop :: Socket

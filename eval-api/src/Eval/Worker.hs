@@ -29,17 +29,18 @@ module Eval.Worker
 
 import Prelude hiding (putStr, mapM_)
   
-import Control.Monad (forever)
+import Control.Monad (forever, unless)
 import Control.Monad.IO.Class (liftIO, MonadIO)
 import Data.Default
 import Data.Typeable ()
 import Data.Foldable (mapM_)
 import Network (accept, Socket)
 import System.FilePath.Posix ((</>))
-import System.IO (Handle)
+import System.IO (Handle, stdout)
 import System.Posix.Process (forkProcess, getProcessID)
 import System.Posix.Signals (Handler(..), installHandler, setStoppedChildFlag, processStatusChanged)
-import System.Posix.Types (ProcessID)
+import System.Posix.Types (ProcessID, Fd(..))
+import System.Posix.IO (handleToFd, dupTo, closeFd)
 import System.Posix.User (getRealUserID, setEffectiveUserID, getEffectiveUserID)
 
 import DynFlags
@@ -77,11 +78,12 @@ mkDefaultWorker name sock set = Worker
 startWorker :: (WorkerData w, MonadIO (WMonad w))
             => String         --  ^ Name
             -> FilePath       --  ^ Socket
+            -> Handle         --  ^ Where to redirect stdout, stderr
             -> LimitSettings  --  ^ Restrictions
             -> WMonad w (WData w) --  ^ Pre-forking action
             -> (WData w -> Socket -> IO ()) -- ^ Socket callback
             -> WMonad w (Worker w, RestartWorker (WMonad w) w) 
-startWorker name sock set pre cb = do 
+startWorker name sock out set pre cb = do 
   let w = mkDefaultWorker name sock set
   let restarter w = do
         w' <- liftIO $ killWorker w
@@ -90,19 +92,22 @@ startWorker name sock set pre cb = do
           -- this is necessary so that the control socket is accessible by
           -- non-root processes, probably a hack
         dat <- pre
-        pid <- liftIO $ forkWorker w' (cb dat)
+        pid <- liftIO $ forkWorker w' out (cb dat)
         liftIO $ setEffectiveUserID oldId
         liftIO $ setCGroup set pid
         return $ w' { workerPid = Just pid }
   w' <- restarter w
   return (w', restarter)
 
-forkWorker :: Worker a -> (Socket -> IO ()) -> IO ProcessID
-forkWorker Worker{..} cb = do
+forkWorker :: Worker a -> Handle -> (Socket -> IO ()) -> IO ProcessID
+forkWorker Worker{..} out cb = do
+  fd <- handleToFd out
   setStoppedChildFlag True
   installHandler processStatusChanged Ignore Nothing
   soc <- mkSock workerSocket
   forkProcess $ do
+    -- unless (fd == (Fd 1)) $ closeFd (Fd 1)
+    dupTo fd (Fd 1)
     setStoppedChildFlag False
     installHandler processStatusChanged Default Nothing
     setLimits workerLimits
@@ -118,7 +123,7 @@ startIOWorker :: String              -- ^ Name
               -> FilePath            -- ^ UNIX socket
               -> (Handle -> IO ())   -- ^ Callback
               -> IO (Worker IOWorker, RestartWorker IO IOWorker)
-startIOWorker name sock callb = startWorker name sock defSet preFork handle
+startIOWorker name sock callb = startWorker name sock stdout defSet preFork handle
   where handle () soc = forever $ do
           (hndl, _, _) <- accept soc
           callb hndl
@@ -132,10 +137,11 @@ startIOWorker name sock callb = startWorker name sock defSet preFork handle
 startEvalWorker :: String                   -- ^ Name of the worker
                 -> EvalSettings             -- ^ Evaluation settings that will be used
                 -> IO (Worker EvalWorker, RestartWorker IO EvalWorker)
-startEvalWorker name eset = startWorker name sock set pre callback
+startEvalWorker name eset = startWorker name sock out set pre callback
   where sock = tmpDirPath eset </> (name ++ ".sock")
         set  = limitSet eset
         uid  = processUid set
+        out  = outHandle eset
         pre  = flip run' eset $ do
           addPkgDbs (pkgDatabases eset)
           dfs <- getSessionDynFlags
