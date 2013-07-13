@@ -19,7 +19,7 @@ import           Prelude hiding (span)
 
 import           Control.Monad (liftM)
 import           Control.Exception (SomeException)  
-import           Data.Char
+import           Data.Default
 import           Data.Word
 import           Data.Int
 import           Data.Monoid
@@ -34,7 +34,6 @@ import qualified Diagrams.Prelude              as D
 import           GHC.Generics
 import           Text.Blaze.Html.Renderer.Text
 import qualified Text.Blaze.Html5              as B
-import           Text.Blaze.Svg.Renderer.Utf8
 
 
 
@@ -124,14 +123,13 @@ class Display a where
     display :: a -> DisplayResult
     default display :: (Generic a, GDisplay (Rep a)) => a -> DisplayResult
     display = gdisplay . from
-
+    
 displayEmpty :: DisplayResult
 displayEmpty = DisplayResult []
 
 renderMyDiagramToSvg :: Double -> D.QDiagram D.SVG D.R2 Any -> B.Html
 renderMyDiagramToSvg size = D.renderDia D.SVG (D.SVGOptions (D.Dims size size))
 
-  
 instance Display DisplayResult where
   display d = d
 

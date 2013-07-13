@@ -44,7 +44,7 @@ import Database.Persist.Sqlite as P
 import Display hiding (text,html)
 import DisplayPersist
 import Util (controlSock, runWithSql, getDR, intToKey,
-             keyToInt, hash, getPastesDir)
+             keyToInt, hash, getPastesDir, renderDR)
 import Eval
 import Eval.EvalError  
 import Eval.EvalSettings
@@ -94,13 +94,13 @@ formWithCode code =
         H.input ! type_ "Submit" ! class_ "btn" ! value "Eval"
 
 
-renderPaste :: Paste -> ActionM ()
-renderPaste Paste{..} = html . renderHtml . mainPage "Paste" $ do
+renderPaste :: Int -> Paste -> ActionM ()
+renderPaste sz Paste{..} = html . renderHtml . mainPage "Paste" $ do
   formWithCode pasteContent
   H.div ! class_ "span5" $
     H.div ! HA.id "sheet" $ 
-      H.pre $
-        foldMap (H.preEscapedToHtml . Display.result) (getDR pasteResult)
+--      H.pre $
+        foldMap (renderDR sz) (getDR pasteResult)
 
 
 -- | * Database access and logic
@@ -205,7 +205,7 @@ main = do
   scotty 3000 $ do
     middleware logStdoutDev
     middleware $ staticPolicy (addBase "../common/static")
-    S.get "/get/:id" $ maybeT page404 renderPaste getPaste
+    S.get "/get/:id" $ maybeT page404 (renderPaste 500) getPaste
     S.get "/" listPastes
     S.post "/new" $ eitherT (uncurry errPage) redirPaste (measureTime newPaste)
 
