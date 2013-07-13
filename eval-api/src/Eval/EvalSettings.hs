@@ -64,7 +64,7 @@ data EvalSettings = EvalSettings
       -- | A handle where the output will be redirected to
       -- (to be precise, an action that would run in the worker
       -- environemnt and would return a handle)
-    , outHandle    :: IO Handle
+    , outHandle    :: Maybe (IO Handle)
       -- | Security restrictions
     , limitSet     :: LimitSettings
       -- | File that has to be preloaded
@@ -115,7 +115,7 @@ defaultSettings = EvalSettings
     , libDirPath   = Just libdir
     , pkgDatabases = []
     , verbLevel    = 1
-    , outHandle    = return stdout
+    , outHandle    = Nothing -- return stdout
     , limitSet     = def
     , preloadFile  = "Preload.hs"
     }

@@ -69,11 +69,12 @@ run' m set = runGhc (libDirPath set) (runEvalM m set)
 initGhc :: IORef [EvalError] -> Int -> Ghc ()
 initGhc ref vb = do
   dfs <- getSessionDynFlags
-  setSessionDynFlags $ dfs { hscTarget = HscInterpreted
-                           , ghcLink = LinkInMemory
-                           , log_action = logHandler ref
-                           , verbosity  = vb
-                           }
+  let dfs2 = dfs  { hscTarget = HscInterpreted
+                  , ghcLink = LinkInMemory
+                  , log_action = logHandler ref
+                  , verbosity  = vb
+                  }
+  setSessionDynFlags dfs2
   return ()
 
 

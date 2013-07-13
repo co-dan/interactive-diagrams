@@ -18,6 +18,7 @@ module Display where
 import           Prelude hiding (span)
 
 import           Control.Monad (liftM)
+import           Control.Exception (SomeException)  
 import           Data.Char
 import           Data.Word
 import           Data.Int
@@ -38,7 +39,7 @@ import           Text.Blaze.Svg.Renderer.Utf8
 
 
 
-data ClientType = Html | Svg | Text
+data ClientType = Html | Svg | Text | RuntimeErr
                 deriving (Eq, Show, Enum, Read, Generic)
 
 instance Serialize ClientType                         
@@ -128,12 +129,17 @@ displayEmpty :: DisplayResult
 displayEmpty = DisplayResult []
 
 renderMyDiagramToSvg :: Double -> D.QDiagram D.SVG D.R2 Any -> B.Html
-renderMyDiagramToSvg size dia = -- renderSvg $ 
-   D.renderDia D.SVG (D.SVGOptions (D.Dims size size)) dia
+renderMyDiagramToSvg size = D.renderDia D.SVG (D.SVGOptions (D.Dims size size))
 
+  
 instance Display DisplayResult where
   display d = d
 
+instance Display SomeException where
+  display e = DisplayResult [
+    DR RuntimeErr (TL.pack . ("Uncaught runtime error: " ++) . show $ e)
+    ]
+  
 instance (a ~ D.SVG, b ~ D.R2, c ~ Any) => Display (D.QDiagram a b c) where
   display     = svg . renderMyDiagramToSvg 150
   displayList = displayListOf (svg . renderMyDiagramToSvg 75)

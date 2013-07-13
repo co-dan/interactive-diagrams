@@ -30,7 +30,7 @@ module Eval.Worker
 import Prelude hiding (putStr, mapM_)
 
 import Control.Applicative ((<$>))  
-import Control.Monad (forever, unless)
+import Control.Monad (forever, unless, void)
 import Control.Monad.IO.Class (liftIO, MonadIO)
 import Data.Default
 import Data.Typeable ()
@@ -79,7 +79,7 @@ mkDefaultWorker name sock set = Worker
 startWorker :: (WorkerData w, MonadIO (WMonad w))
             => String         --  ^ Name
             -> FilePath       --  ^ Socket
-            -> IO Handle         --  ^ Where to redirect stdout, stderr
+            -> Maybe (IO Handle)         --  ^ Where to redirect stdout, stderr
             -> LimitSettings  --  ^ Restrictions
             -> WMonad w (WData w) --  ^ Pre-forking action
             -> (WData w -> Socket -> IO ()) -- ^ Socket callback
@@ -100,7 +100,7 @@ startWorker name sock out set pre cb = do
   w' <- restarter w
   return (w', restarter)
 
-forkWorker :: Worker a -> IO Handle -> (Socket -> IO ()) -> IO ProcessID
+forkWorker :: Worker a -> Maybe (IO Handle) -> (Socket -> IO ()) -> IO ProcessID
 forkWorker Worker{..} out cb = do
   setStoppedChildFlag True
   installHandler processStatusChanged Ignore Nothing
@@ -109,8 +109,11 @@ forkWorker Worker{..} out cb = do
     setStoppedChildFlag False
     installHandler processStatusChanged Default Nothing
     setLimits workerLimits
-    fd <- handleToFd =<< out
-    dupTo fd (Fd 1)
+    case out of
+      Nothing -> return ()
+      Just x  -> do
+        fd <- handleToFd =<< x
+        void $ dupTo fd (Fd 1)
     cb soc
     return ()
 
@@ -128,7 +131,7 @@ startIOWorker name sock callb = startWorker name sock out defSet preFork handle
           (hndl, _, _) <- accept soc
           callb hndl
         defSet = def { secontext = Nothing }
-        out    = return stdout
+        out    = Nothing 
         preFork =  putStrLn ("Starting worker " ++ show name)
                 >> return ()
         
@@ -150,7 +153,13 @@ startEvalWorker name eset = startWorker name sock out set pre callback
                                    , ghcLink = LinkInMemory
 --                                   , verbosity = 3
                                    }
-          loadFile (preloadFile eset)
+          -- loadFile (preloadFile eset)
+          -- compileExpr "preload"
+          preloadMod <- guessTarget (preloadFile eset) Nothing
+          oldTrgs <- getTargets
+          setTargets [preloadMod]
+          load LoadAllTargets
+          setTargets oldTrgs
           getSession
         callback sess soc = forever $ do
           (hndl, _, _) <- accept soc

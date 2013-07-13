@@ -10,7 +10,9 @@ import Data.Serialize (Serialize)
 import Data.Typeable
 import GHC.Generics
 import System.FilePath.Posix ((</>))
-  
+
+import InteractiveEval hiding (compileExpr)
+
 import Display
 import Eval (traceM)
 import Eval.EvalM
@@ -31,7 +33,11 @@ instance Serialize EvalCmd
 evalCmdToEvalM :: EvalCmd -> EvalM DisplayResult
 evalCmdToEvalM (CompileFile fpath) = do
   loadFile fpath
-  compileExpr "(return . display =<< main) :: IO DisplayResult"
+  underIO <- isUnderIO "main"
+  if underIO
+    then compileExpr "(return . display =<< main) :: IO DisplayResult"
+    else compileExpr "(display (main)) :: DisplayResult"
+    
 evalCmdToEvalM (EvalString s) = compileExpr s
 evalCmdToEvalM (EvalFile n txt) = do
   EvalSettings{..} <- ask
