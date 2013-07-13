@@ -75,8 +75,8 @@ newWorkerAct settings i = do
 main :: IO ()
 main = do
   hSetBuffering stdin NoBuffering
-  let devnull = openFile "/dev/null" WriteMode
-  let set = settings { outHandle = devnull }
+--  let devnull = openFile "/dev/null" WriteMode
+  let set = settings -- { outHandle = devnull }
   pool <- mkPool (newWorkerAct set) 1
   currentWorkers <- newMVar []
   soc <- mkSock sockFile

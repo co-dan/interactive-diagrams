@@ -34,7 +34,6 @@ import Eval.EvalError
 import Eval.EvalM 
 import Display
 
-foreign import ccall "&rts_stop_on_exception"    exceptionFlag :: Ptr CInt
 
 -- | Loads the file into the evaluator
 loadFile :: FilePath -> EvalM ()
@@ -68,22 +67,20 @@ compileExpr :: String -> EvalM DisplayResult
 compileExpr expr = do
   -- ty <- exprType expr -- throws exception if doesn't typecheck
   -- output ty
-  
-  (val :: DisplayResult) <- withSession $ \sess -> do
-    Just (vars, hval, fix_env) <- liftIO $ hscStmt sess expr
-    updateFixityEnv fix_env
-    hvals <- liftIO ((Left <$> hval)
-                     `catch` allExceptions)
-  
-    underIO <- isUnderIO expr
-    case (vars,hvals) of
-      ([_], Left [hv]) -> if underIO
-                          then liftIO . unsafeCoerce $ hv
-                          else return . unsafeCoerce $ hv
-      (_, Right exn)   -> return (display exn)
-      _                -> panic "compileExpr"
+
+  sess <- getSession
+  Just (vars, hval, fix_env) <- liftIO $ hscStmt sess expr -- ("let __cmCompileExpr="++expr)
+  updateFixityEnv fix_env
+  hvals <- liftIO ((Left <$> hval)
+                   `catch` allExceptions)
+  case (vars,hvals) of
+    ([_], Left [hv]) -> return . unsafeCoerce $ hv
+  --     if underIO
+  --     then liftIO . unsafeCoerce $ hv
+  --     else return . unsafeCoerce $ hv
+    ([_], Right exn) -> return (display exn)
+    _                -> panic "compileExpr"
                             
-  return val
   
 -- | Update fixity environment in the current interactive context.
 updateFixityEnv :: GhcMonad m => FixityEnv -> m ()
