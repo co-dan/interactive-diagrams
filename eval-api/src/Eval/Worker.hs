@@ -155,10 +155,8 @@ startEvalWorker name eset = startWorker name sock out set pre callback
                                    }
           -- loadFile (preloadFile eset)
           -- compileExpr "preload"
-          preloadMod <- guessTarget (preloadFile eset) Nothing
           oldTrgs <- getTargets
-          setTargets [preloadMod]
-          load LoadAllTargets
+          loadFile (preloadFile eset)
           setTargets oldTrgs
           getSession
         callback sess soc = forever $ do
