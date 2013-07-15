@@ -78,9 +78,11 @@ mainPage title content = H.docTypeHtml $ do
           H.h1 (H.toHtml title)
       H.div ! class_ "row-fluid" 
         $ content
-      H.div ! class_ "row-fluid" $
+      H.div ! class_ "row-fluid" $ do
         H.a ! HA.href "https://github.com/co-dan/interactive-diagrams/releases/tag/first-demo" 
  	  $ H.toHtml ("More info" :: Text)
+	H.br
+	H.toHtml ("Join us at #diagrams @ irc.freenode.net" :: Text)  
     
 
 formWithCode :: Text -> Html
