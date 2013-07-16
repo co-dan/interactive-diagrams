@@ -24,8 +24,12 @@ import Data.Text.Lazy (pack, Text)
 import qualified Data.Text.Lazy as T
 import qualified Data.Text.Lazy.IO as T
 
-  
+import Text.Hastache
+import Text.Hastache.Context
+import qualified Data.ByteString.Lazy as BL
+import qualified Data.ByteString as BS
 import Web.Scotty as S
+import Web.Scotty.Hastache
 import Network.Wai.Middleware.RequestLogger
 import Network.Wai.Middleware.Static
 import Network.HTTP.Types
@@ -56,7 +60,15 @@ import Eval.Worker.Protocol
 import Eval.Worker.Types
 import Eval.Worker.Internal
 
-
+defaultTemplateRead :: FilePath -> IO (Maybe BS.ByteString)
+defaultTemplateRead = muTemplateRead (defaultConfig :: MuConfig IO) 
+  
+hastacheConf :: MonadIO m => MuConfig m
+hastacheConf = defaultConfig
+   { muTemplateFileDir = Just "../common/templates/"
+   , muTemplateFileExt = Just ".html"
+   }
+   
 -- | * Rendering and views
 
 mainPage :: String -> Html -> Html
@@ -115,14 +127,15 @@ listPastes :: ActionM ()
 listPastes = do
   pastes <- liftIO $ runWithSql $ 
     selectList [] [LimitTo 20, Desc PasteId]
-  html . renderHtml . mainPage "Paste" $ do
-    formWithCode ""
-    H.div ! class_ "span5" $ 
-      forM_ pastes $ \(Entity k' Paste{..}) -> do
-        let k = keyToInt k'
-        H.a ! href (H.toValue ("/get/" ++ show k)) $
-          H.toHtml $ "Paste id " ++ show k
-        H.br
+  let cntx "result" = MuBool False
+      cntx "title"  = MuVariable ("Paste" :: Text)
+      cntx "pastes" = MuList $
+                      map (\(Entity k _) ->
+                            (mkStrContext $ \("k") ->
+                              MuVariable . show . keyToInt $ k))
+                      pastes
+      cntx _        = MuNothing
+  hastache hastacheConf "../common/templates/main.html" (mkStrContext cntx)
 
 
 errPage :: Text -> (Text, [EvalError]) -> ActionM ()

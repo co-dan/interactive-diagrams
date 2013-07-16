@@ -64,3 +64,6 @@ renderDR _ (DR Text r) = H.pre $ H.toHtml r
 renderDR _ (DR RuntimeErr r) = H.div ! HA.class_ "alert alert-error" $
                                  H.toHtml r
                                
+
+entityKey :: Entity t -> Key t
+entityKey (Entity k' _) = k'
