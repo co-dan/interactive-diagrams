@@ -15,6 +15,8 @@ import Data.Time.Clock
 
 import Database.Persist.Sqlite as P
 
+import Data.Text as T
+
 import Control.Monad.Logger
 import Control.Monad.Trans.Resource
 import Control.Applicative
@@ -24,7 +26,7 @@ import Text.Blaze.Html5.Attributes (type_, class_, href, rel, action, method,
                                     name, value, cols, rows)
 import qualified Text.Blaze.Html5 as H
 import qualified Text.Blaze.Html5.Attributes as HA
-
+import Text.Blaze.Html.Renderer.Utf8
 
 import Display
 
@@ -55,14 +57,12 @@ currentTime = getCurrentTime >>= return . floor . toRational . utctDayTime
 getPastesDir :: FilePath
 getPastesDir = "/tmp"
 
-renderDR :: Int -> DR -> H.Html
-renderDR _ (DR Html r) = H.preEscapedToHtml r
-renderDR s (DR Svg  r) = H.preEscapedToHtml r
-                         ! HA.width (H.toValue s)
-                         ! HA.height (H.toValue s)
-renderDR _ (DR Text r) = H.pre $ H.toHtml r
-renderDR _ (DR RuntimeErr r) = H.div ! HA.class_ "alert alert-error" $
-                                 H.toHtml r
+renderDR :: DR -> H.Html
+renderDR (DR Html r) = H.preEscapedToHtml r
+renderDR (DR Svg  r) = H.preEscapedToHtml r
+renderDR (DR Text r) = H.pre $ H.toHtml r
+renderDR (DR RuntimeErr r) = H.div ! HA.class_ "alert alert-error" $
+                             H.toHtml r
                                
 
 entityKey :: Entity t -> Key t

@@ -25,12 +25,25 @@
    </div>
    <div class="span5">
       <div id="sheet">
+        {{msg}} <br /> <br />
+        {{#errors}}
+        <div id="error">
+          <div class="alert {{severity}}">
+            <button type="button" class="close"
+            data-dismiss="alert">&times;</button>
+            <strong>{{caption}}</strong><br/>
+            {{content}}
+          </div>
+        </div>
+        {{/errors}}
         {{#result}}
         <pre>
-          {{.}}
+          {{result}}
         </pre>
         {{/result}}
-        {{>pastelisting}}
+        {{^result}}
+         {{>pastelisting}}
+        {{/result}}
       </div>
     </div>   
   </div>

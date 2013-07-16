@@ -46,11 +46,11 @@ limSettings = def {
      rlimits = Just def {
         totalMemoryLimit = ResourceLimits memlim memlim
         }
-     , secontext  = Just "idia_restricted_t"
-     , cgroupPath = Just $ cgroups </> "idiaworkers"
+     --, secontext  = Just "idia_restricted_t"
+     --, cgroupPath = Just $ cgroups </> "idiaworkers"
      }
-  where memlim = ResourceLimit $ 104857600 * 2
-                                 --- 100mb * 2
+  where memlim = ResourceLimit $ 104857600 * 4
+                                 --- 100mb * 4
 
 settings :: EvalSettings
 settings = def
