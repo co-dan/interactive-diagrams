@@ -30,6 +30,7 @@ executable scotty-pastebin
                        persistent-sqlite >=1.2,
                        persistent-template >=1.2,
                        scotty,
+                       scotty-hastache,
                        network,
                        http-types ==0.8.*,
                        blaze-html,

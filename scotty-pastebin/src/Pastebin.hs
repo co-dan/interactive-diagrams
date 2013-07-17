@@ -31,6 +31,7 @@ import Text.Hastache.Context
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString as BS
 import Web.Scotty as S
+import Web.Scotty.Types
 import Web.Scotty.Hastache
 import Network.Wai.Middleware.RequestLogger
 import Network.Wai.Middleware.Static
@@ -47,7 +48,7 @@ import Database.Persist.TH as P
 import Database.Persist.Sqlite as P
 
   
-import Display hiding (text,html)
+import Display (display)
 import Paste    
 import Util (controlSock, runWithSql, getDR, intToKey,
              keyToInt, hash, getPastesDir, renderDR)
@@ -86,43 +87,39 @@ mkErrMsg EvalError{..} = ErrMsg
           SevFatal -> ("alert-error", "Error")
           _ -> ("alert-info", "Info")
 
-errPage :: Text -> (Text, [EvalError]) -> ActionM ()
+errPage :: Text -> (Text, [EvalError]) -> ActionH ()
 errPage code (msg, errors) = do
   let errmsgs = map (mkGenericContext . mkErrMsg) errors
-      cntx :: String -> MuType IO -- ActionM
-      cntx "title"  = MuVariable ("Error :(" :: Text)
-      cntx "msg"    = MuVariable $ msg 
-      cntx "errors" = MuList errmsgs                      
-      cntx _        = MuNothing
-  hastache hastacheConf "../common/templates/main.html" (mkStrContext cntx)
+  setH "title"  $ MuVariable ("Error :(" :: Text)     
+  setH "msg"    $ MuVariable msg 
+  setH "errors" $ MuList errmsgs                      
+  hastache "main.html"
 
 
-renderPaste :: Paste -> ActionM ()
+renderPaste :: Paste -> ActionH ()
 renderPaste Paste{..} = do
-  let cntx "code"   = MuVariable pasteContent
-      cntx "title"  = MuVariable ("Paste" :: Text)
-      cntx "result" = MuVariable $ renderHtml $
-                      foldMap renderDR (getDR pasteResult)
-      cntx _        = MuNothing
-  hastache hastacheConf "../common/templates/main.html" (mkStrContext cntx)
+  setH "code"   $ MuVariable pasteContent
+  setH "title"  $ MuVariable ("Paste" :: Text)
+  setH "result" $ MuVariable $ renderHtml $
+    foldMap renderDR (getDR pasteResult)
+  hastache "main.html"
 
 
-renderPasteList :: [Entity Paste] -> ActionM ()
+renderPasteList :: [Entity Paste] -> ActionH ()
 renderPasteList pastes = do
-  let cntx "result" = MuBool False
-      cntx "title"  = MuVariable ("Paste" :: Text)
-      cntx "pastes" = MuList $
+  setH "result" $ MuBool False
+  setH "title"  $ MuVariable ("Paste" :: Text)
+  setH "pastes" $ MuList $
                       map (\(Entity k _) ->
                             (mkStrContext $ \("k") ->
                               MuVariable . show . keyToInt $ k))
                       pastes
-      cntx _        = MuNothing
-  hastache hastacheConf "../common/templates/main.html" (mkStrContext cntx)
+  hastache "main.html"
 
 -- | * Database access and logic
 
 
-getPaste :: MaybeT ActionM Paste
+--getPaste :: MaybeT (ActionT m) Paste
 getPaste = do 
   -- pid <- hoistMaybe . readMaybe =<< lift (param "id")
   pid <- lift $ param "id"
@@ -131,14 +128,14 @@ getPaste = do
 
 
 -- | ** Selects 20 recent pastes
-listPastes :: ActionM ()
+listPastes :: ActionH ()
 listPastes = do
   pastes <- liftIO $ runWithSql $ 
     selectList [] [LimitTo 20, Desc PasteId]
   renderPasteList pastes
 
   
-newPaste :: EitherT (Text, (Text, [EvalError])) ActionM Int
+-- newPaste :: EitherT (Text, (Text, [EvalError])) ActionM Int
 newPaste = do
   code <- lift (param "code")
   when (T.null code) $ throwT (code, ("Empty input", []))
@@ -146,8 +143,8 @@ newPaste = do
          `catchT` \e -> throwT (code, e)
   return (keyToInt pid)
 
-compilePaste :: Text
-             -> EitherT (Text, [EvalError]) ActionM (Key Paste)
+-- compilePaste :: Text
+--              -> EitherT (Text, [EvalError]) ActionM (Key Paste)
 compilePaste code = do
   fname <- liftIO $ hash code
   -- let fpath = getPastesDir </> show fname ++ ".hs"
@@ -167,10 +164,10 @@ compilePaste code = do
     Right r -> liftIO . runWithSql $ insert $
                Paste code (display r)
   
-redirPaste :: Int -> ActionM ()
+redirPaste :: Monad m => Int -> ActionT m ()
 redirPaste i = redirect $ pack ("/get/" ++ show i)
 
-page404 :: ActionM ()
+page404 :: Monad m => ActionT m ()
 page404 = do
   status status404
   text "Not found"
@@ -187,8 +184,8 @@ measureTime act = do
 main :: IO ()
 main = do
   runWithSql (runMigration migrateAll)
-  -- (queue, _) <- prepareEvalQueue (def {tmpDirPath = getPastesDir, rlimits = Just def})
-  scotty 3000 $ do
+  scottyH 3000 $ do
+    setTemplatesDir "../common/templates/"
     middleware logStdoutDev
     middleware $ staticPolicy (addBase "../common/static")
     S.get "/get/:id" $ maybeT page404 renderPaste getPaste
