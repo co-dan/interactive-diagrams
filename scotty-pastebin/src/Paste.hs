@@ -3,7 +3,7 @@
 {-# LANGUAGE EmptyDataDecls, FlexibleContexts, RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables, TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances, DeriveDataTypeable #-}
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveGeneric, RankNTypes #-}
 module Paste where
 
 import Data.Aeson
@@ -16,13 +16,13 @@ import GHC.Generics
   
 import Display
 import DisplayPersist
-
+  
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistUpperCase|
 Paste
-    content Text
-    result DisplayResult
+    content     Text
+    result      DisplayResult
+    containsImg Bool
     deriving Show
-    deriving Typeable
     deriving Generic
 |]
 

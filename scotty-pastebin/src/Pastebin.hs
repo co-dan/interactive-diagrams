@@ -16,8 +16,9 @@ import System.IO (hClose, Handle)
 
 import Data.Typeable
 import Data.Data
-import Data.Aeson()
+import Data.Aeson ()
 import Data.Default
+import Data.Maybe (isJust)
 import Data.EitherR (throwT, catchT)
 import Control.Error.Util (hoistMaybe, maybeT)
 import System.FilePath.Posix ((</>))
@@ -51,7 +52,7 @@ import Database.Persist.Sqlite as P
 import Display (display)
 import Paste    
 import Util (controlSock, runWithSql, getDR, intToKey,
-             keyToInt, hash, getPastesDir, renderDR)
+             keyToInt, hash, getPastesDir, renderDR, hasImage)
 import Eval
 import Eval.EvalError  
 import Eval.EvalSettings
@@ -93,7 +94,7 @@ errPage code (msg, errors) = do
   setH "title"  $ MuVariable ("Error :(" :: Text)     
   setH "msg"    $ MuVariable msg 
   setH "errors" $ MuList errmsgs                      
-  hastache "main.html"
+  hastache "main"
 
 
 renderPaste :: Paste -> ActionH ()
@@ -102,7 +103,7 @@ renderPaste Paste{..} = do
   setH "title"  $ MuVariable ("Paste" :: Text)
   setH "result" $ MuVariable $ renderHtml $
     foldMap renderDR (getDR pasteResult)
-  hastache "main.html"
+  hastache "main"
 
 
 renderPasteList :: [Entity Paste] -> ActionH ()
@@ -114,7 +115,7 @@ renderPasteList pastes = do
                             (mkStrContext $ \("k") ->
                               MuVariable . show . keyToInt $ k))
                       pastes
-  hastache "main.html"
+  hastache "main"
 
 -- | * Database access and logic
 
@@ -126,15 +127,22 @@ getPaste = do
   paste <- liftIO $ runWithSql $ P.get (intToKey pid)
   hoistMaybe paste
 
+-- | ** Select 20 recent images
+listImages :: ActionH ()
+listImages = do
+  pastes <- liftIO $ runWithSql $
+    selectList [PasteContainsImg ==. True] [LimitTo 20, Desc PasteId]
+  renderPasteList pastes
 
--- | ** Selects 20 recent pastes
+  
+-- | ** Select 20 recent pastes
 listPastes :: ActionH ()
 listPastes = do
   pastes <- liftIO $ runWithSql $ 
     selectList [] [LimitTo 20, Desc PasteId]
   renderPasteList pastes
 
-  
+
 -- newPaste :: EitherT (Text, (Text, [EvalError])) ActionM Int
 newPaste = do
   code <- lift (param "code")
@@ -161,8 +169,11 @@ compilePaste code = do
   -- liftIO $ hClose hndl
   case res of
     Left err -> throwT (pack err, errors)
-    Right r -> liftIO . runWithSql $ insert $
-               Paste code (display r)
+    Right r -> do
+      let dr = display r
+      let containsImage = isJust (hasImage dr)
+      liftIO . runWithSql $ insert $
+               Paste code (display r) containsImage
   
 redirPaste :: Monad m => Int -> ActionT m ()
 redirPaste i = redirect $ pack ("/get/" ++ show i)
@@ -185,11 +196,11 @@ main :: IO ()
 main = do
   runWithSql (runMigration migrateAll)
   scottyH 3000 $ do
-    setTemplatesDir "../common/templates/"
+    -- setTemplatesDir "../common/templates/"
+    setHastacheConfig hastacheConf
     middleware logStdoutDev
     middleware $ staticPolicy (addBase "../common/static")
     S.get "/get/:id" $ maybeT page404 renderPaste getPaste
     S.get "/json/:id" $ maybeT page404 json getPaste
     S.get "/" listPastes
     S.post "/new" $ eitherT (uncurry errPage) redirPaste (measureTime newPaste)
-

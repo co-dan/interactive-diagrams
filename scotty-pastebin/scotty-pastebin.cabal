@@ -35,6 +35,7 @@ executable scotty-pastebin
                        http-types ==0.8.*,
                        blaze-html,
                        blaze-markup,
+                       blaze-svg,
                        wai-extra,
                        wai-middleware-static,
                        data-default ==0.5.*,

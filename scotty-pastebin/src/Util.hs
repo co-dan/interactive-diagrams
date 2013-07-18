@@ -7,7 +7,8 @@ module Util (
   keyToInt,
   hash,
   getPastesDir,
-  renderDR
+  renderDR,
+  hasImage
   ) where
 
 import qualified Data.Hashable as H
@@ -15,12 +16,14 @@ import Data.Time.Clock
 
 import Database.Persist.Sqlite as P
 
-import Data.Text as T
-
+import qualified Data.Text as T
+import qualified Data.Text.Lazy as TL
+import Data.List
 import Control.Monad.Logger
 import Control.Monad.Trans.Resource
 import Control.Applicative
 import Control.Monad
+import Text.Blaze.Svg (Svg)
 import Text.Blaze.Html5 ((!))
 import Text.Blaze.Html5.Attributes (type_, class_, href, rel, action, method,
                                     name, value, cols, rows)
@@ -67,3 +70,8 @@ renderDR (DR RuntimeErr r) = H.div ! HA.class_ "alert alert-error" $
 
 entityKey :: Entity t -> Key t
 entityKey (Entity k' _) = k'
+
+hasImage :: DisplayResult -> Maybe TL.Text
+hasImage (DisplayResult drs) =
+  result <$> find ((==Display.Svg) . clientType) drs
+
