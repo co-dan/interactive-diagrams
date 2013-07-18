@@ -4,6 +4,7 @@
 {-# LANGUAGE ScopedTypeVariables, DeriveDataTypeable #-}
 module Main where
 
+import Control.Applicative ((<$>))
 import Control.Monad (forM_, when)
 import Control.Monad.Trans (lift, liftIO)
 import Control.Monad.IO.Class (MonadIO(..))
@@ -18,7 +19,7 @@ import Data.Typeable
 import Data.Data
 import Data.Aeson ()
 import Data.Default
-import Data.Maybe (isJust)
+import Data.Maybe (isJust, fromJust)
 import Data.EitherR (throwT, catchT)
 import Control.Error.Util (hoistMaybe, maybeT)
 import System.FilePath.Posix ((</>))
@@ -49,7 +50,7 @@ import Database.Persist.TH as P
 import Database.Persist.Sqlite as P
 
   
-import Display (display)
+import Display (display, result)
 import Paste    
 import Util (controlSock, runWithSql, getDR, intToKey,
              keyToInt, hash, getPastesDir, renderDR, hasImage)
@@ -117,8 +118,22 @@ renderPasteList pastes = do
                       pastes
   hastache "main"
 
--- | * Database access and logic
 
+data GalleryItem = GalleryItem { k :: Int, image :: T.Text }
+                 deriving (Data, Typeable)
+
+mkItem (k, p) = GalleryItem { k = k
+                            , image = fromJust . hasImage
+                                      . pasteResult $ p }
+                
+renderGallery :: [(Int, Paste)] -> ActionH ()
+renderGallery ps = do
+  let pastes = map (mkGenericContext . mkItem) ps
+  setH "pastes" $ MuList pastes
+  hastache "gallery"
+  
+                   
+-- | * Database access and logic
 
 --getPaste :: MaybeT (ActionT m) Paste
 getPaste = do 
@@ -128,13 +143,13 @@ getPaste = do
   hoistMaybe paste
 
 -- | ** Select 20 recent images
-listImages :: ActionH ()
+listImages :: ActionH [(Int, Paste)]
 listImages = do
   pastes <- liftIO $ runWithSql $
     selectList [PasteContainsImg ==. True] [LimitTo 20, Desc PasteId]
-  renderPasteList pastes
-
-  
+  return (map getP pastes)
+  where getP (Entity k p) = (keyToInt k, p)
+        
 -- | ** Select 20 recent pastes
 listPastes :: ActionH ()
 listPastes = do
@@ -203,4 +218,5 @@ main = do
     S.get "/get/:id" $ maybeT page404 renderPaste getPaste
     S.get "/json/:id" $ maybeT page404 json getPaste
     S.get "/" listPastes
+    S.get "/gallery" (listImages >>= renderGallery)
     S.post "/new" $ eitherT (uncurry errPage) redirPaste (measureTime newPaste)
