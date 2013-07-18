@@ -29,15 +29,18 @@ module Eval.Worker
 
 import Prelude hiding (putStr, mapM_)
 
-import Control.Applicative ((<$>))  
+import Control.Applicative ((<$>), (<*>))  
 import Control.Monad (forever, unless, void)
 import Control.Monad.IO.Class (liftIO, MonadIO)
 import Data.Default
 import Data.Typeable ()
 import Data.Foldable (mapM_)
 import Network (accept, Socket)
+import Network.Socket (close)
+import System.Directory
 import System.FilePath.Posix ((</>))
 import System.IO (Handle, stdout)
+import System.Mem.Weak (addFinalizer)
 import System.Posix.Process (forkProcess, getProcessID)
 import System.Posix.Signals (Handler(..), installHandler, setStoppedChildFlag, processStatusChanged)
 import System.Posix.Types (ProcessID, Fd(..))
@@ -103,10 +106,11 @@ startWorker name sock out set pre cb = do
   return (w', restarter)
 
 forkWorker :: Worker a -> Maybe (IO Handle) -> (Socket -> IO ()) -> IO ProcessID
-forkWorker Worker{..} out cb = do
+forkWorker (w@Worker{..}) out cb = do
   setStoppedChildFlag True
   installHandler processStatusChanged Ignore Nothing
   soc <- mkSock workerSocket
+  addFinalizer w (close soc)
   forkProcess $ do
     setStoppedChildFlag False
     installHandler processStatusChanged Default Nothing

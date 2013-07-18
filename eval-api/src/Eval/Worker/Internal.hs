@@ -7,11 +7,14 @@ module Eval.Worker.Internal
          connectToWorker, mkSock,
          -- * Specific for certain types of Workers
          sendEvalRequest, performEvalRequest, runToHandle,
-         sendEvalRequestNoRestart
+         sendEvalRequestNoRestart,
+         -- * Useful util functions
+         removeLinkIfExists, removeFileIfExists
        ) where
 
 import Control.Applicative ((<$>))
 import Control.Concurrent.Async (race)
+import Control.Exception (catch, throwIO)
 import Control.Monad (when)
 import Control.Monad.Reader (ask)
 import Control.Monad.IO.Class (liftIO)
@@ -19,8 +22,9 @@ import Data.IORef (newIORef, readIORef)
 import Data.Maybe (fromJust)
 import Data.Serialize (Serialize)
 import Network (listenOn, connectTo, PortID(..), Socket)
-import System.Directory (doesFileExist)
+import System.Directory (doesFileExist, removeFile)
 import System.IO (Handle, hClose)
+import System.IO.Error (isDoesNotExistError)
 import System.Posix.Files (removeLink)
 
 import GHC
@@ -37,11 +41,23 @@ import Eval.Worker.Types
   
 connectToWorker :: Worker a -> IO Handle
 connectToWorker Worker{..} = connectTo "localhost" (UnixSocket workerSocket)
-  
+
+removeLinkIfExists :: FilePath -> IO ()
+removeLinkIfExists f = removeLink f `catch` handleE
+  where handleE e
+            | isDoesNotExistError e = return ()
+            | otherwise             = throwIO e                                      
+
+removeFileIfExists :: FilePath -> IO ()
+removeFileIfExists f = removeFile f `catch` handleE
+  where handleE e
+            | isDoesNotExistError e = return ()
+            | otherwise             = throwIO e                                      
+
+    
 mkSock :: FilePath -> IO Socket
 mkSock sf = do
-  exists <- doesFileExist sf
-  when exists $ removeLink sf
+  removeLinkIfExists sf  
   listenOn (UnixSocket sf)
 
 -----------------------------------------------------------------------  
