@@ -2,6 +2,7 @@
 {-# LANGUAGE TypeFamilies, GeneralizedNewtypeDeriving, GADTs #-}
 {-# LANGUAGE EmptyDataDecls, FlexibleContexts, RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables, DeriveDataTypeable #-}
+{-# LANGUAGE BangPatterns #-}
 module Main where
 
 import Control.Applicative ((<$>))
@@ -165,7 +166,7 @@ listPastes = do
 -- newPaste :: EitherT (Text, (Text, [EvalError])) ActionM Int
 newPaste = do
   title' <- T.unpack <$> lift (param "title")
-  let title = if (null title) then "(undefined)" else title'
+  let title = if (null title') then "(undefined)" else title'
   code <- lift (param "code")
   usern' <- lift (param "author")
   let author = if (T.null usern') then "Anonymous" else usern'
@@ -183,19 +184,19 @@ compilePaste title code author = do
   hndl <- liftIO $ connectTo "localhost" (UnixSocket controlSock)
   liftIO $ sendData hndl RequestWorker
   (worker :: Worker EvalWorker) <- liftIO $ getData hndl
-  -- liftIO $ hClose hndl
+  liftIO $ hClose hndl
   ((res, errors), status) <- liftIO $ sendEvalRequestNoRestart worker $
                              EvalFile (show fname ++ ".hs") code
                              -- CompileFile fpath
   hndl <- liftIO $ connectTo "localhost" (UnixSocket controlSock)
   liftIO $ sendData hndl (ReturnWorker status worker)
-  -- liftIO $ hClose hndl
+  liftIO $ hClose hndl
   case res of
     Left err -> throwT (pack err, errors)
-    Right r -> do
+    Right !r -> do
       let dr = display r
       let containsImage = isJust (hasImage dr)
-      liftIO . runWithSql $ insert $
+      liftIO . runWithSql . insert $
                Paste title code (display r) containsImage author
   
 redirPaste :: Monad m => Int -> ActionT m ()
