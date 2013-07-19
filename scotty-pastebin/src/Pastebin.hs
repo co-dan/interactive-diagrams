@@ -102,6 +102,8 @@ renderPaste :: Paste -> ActionH ()
 renderPaste Paste{..} = do
   setH "code"   $ MuVariable pasteContent
   setH "title"  $ MuVariable ("Paste" :: Text)
+  setH "author" $ MuVariable pasteAuthor
+  setH "ptitle" $ MuVariable pasteTitle
   setH "result" $ MuVariable $ renderHtml $
     foldMap renderDR (getDR pasteResult)
   hastache "main"
@@ -162,15 +164,19 @@ listPastes = do
 
 -- newPaste :: EitherT (Text, (Text, [EvalError])) ActionM Int
 newPaste = do
+  title' <- T.unpack <$> lift (param "title")
+  let title = if (null title) then "(undefined)" else title'
   code <- lift (param "code")
+  usern' <- lift (param "author")
+  let author = if (T.null usern') then "Anonymous" else usern'
   when (T.null code) $ throwT (code, ("Empty input", []))
-  pid <- compilePaste code
+  pid <- compilePaste title code author 
          `catchT` \e -> throwT (code, e)
   return (keyToInt pid)
 
 -- compilePaste :: Text
 --              -> EitherT (Text, [EvalError]) ActionM (Key Paste)
-compilePaste code = do
+compilePaste title code author = do
   fname <- liftIO $ hash code
   -- let fpath = getPastesDir </> show fname ++ ".hs"
   -- liftIO $ T.writeFile fpath code
@@ -190,7 +196,7 @@ compilePaste code = do
       let dr = display r
       let containsImage = isJust (hasImage dr)
       liftIO . runWithSql $ insert $
-               Paste code (display r) containsImage
+               Paste title code (display r) containsImage author
   
 redirPaste :: Monad m => Int -> ActionT m ()
 redirPaste i = redirect $ pack ("/get/" ++ show i)

@@ -19,9 +19,11 @@ import DisplayPersist
   
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistUpperCase|
 Paste
+    title       String  default="(untitled)"
     content     Text
     result      DisplayResult
     containsImg Bool
+    author      Text   default="Anonymous"
     deriving Show
     deriving Generic
 |]
