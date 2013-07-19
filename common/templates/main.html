@@ -1,32 +1,25 @@
 {{>header}}
   <div class="row-fluid">
-   {{!<div class="span7" style="padding-right:20px; border-right: 1px solid #ccc;">}}
-    <div id="form">
-      <form action="/new" method="POST" class="form-horizontal">
-        <div class="control-group">
-          <label class="control-label"><i class="icon-user"></i>&nbsp;Author&nbsp;</label>
-          <input type="text" name="author" id="author"
-  style="font-size:13pt;height:30px;" placeholder="{{author}}" />
-          {{#result}}
-          <!--<span class="help-block" id="author">Pasted by {{author}}</span>-->
-          {{/result}}
+    {{#result}}
+    <div class="tabbable">
+      <ul class="nav nav-tabs">
+        <li class="active"><a href="#view" data-toggle="tab">View</a></li>
+        <li><a href="#edit" data-toggle="tab">Edit</a></li>
+      </ul>
+    {{/result}}  
+      <div class="tab-content">
+        <div class="tab-pane {{#result}}active{{/result}}" id="view">
+           {{>inputview}}
         </div>
-        <div class="control-group">
-          <label class="control-label"><i
-  class="icon-pencil"></i>&nbsp;Title&nbsp;</label>
-          <input type="text" name="title" id="title"
-  style="font-size:13pt;height:30px;" placeholder="{{ptitle}}" />
-          {{#result}}
-          <!--<span class="help-block" id="author">{{ptitle}}</span>-->
-          {{/result}}
+        <div class="tab-pane {{^result}}active{{/result}}" id="edit">
+           {{>inputform}}
         </div>
-        <div class="control-group">
-          <textarea rows="20" name="code" class="row-fluid">{{code}}</textarea>
-          <input type="submit" class="btn btn-primary" value="Paste!"
-  />
-        </div>
-      </form>
+      </div>
+    {{#result}}
+    {{! Closing .tabbable}}
     </div>
+    {{/result}}
+   {{!<div class="span7" style="padding-right:20px; border-right: 1px solid #ccc;">}}
    {{!</div>}} 
   </div>
   <hr />

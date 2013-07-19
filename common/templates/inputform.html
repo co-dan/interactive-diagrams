@@ -1,0 +1,26 @@
+    <div id="form">
+      <form action="/new" method="POST" class="form-horizontal">
+        <div class="control-group">
+          <label class="control-label"><i class="icon-user"></i>&nbsp;Author&nbsp;</label>
+          <input class="input-large" type="text" name="author" id="author"
+  style="font-size:13pt;height:32px;" value="{{author}}" />
+          {{#result}}
+          <!--<span class="help-block" id="author">Pasted by {{author}}</span>-->
+          {{/result}}
+        </div>
+        <div class="control-group">
+          <label class="control-label"><i
+  class="icon-pencil"></i>&nbsp;Title&nbsp;</label>
+          <input class="input-xlarge" type="text" name="title" id="title"
+  style="font-size:13pt;height:32px;" value="{{ptitle}}" />
+          {{#result}}
+          <!--<span class="help-block" id="author">{{ptitle}}</span>-->
+          {{/result}}
+        </div>
+        <div class="control-group">
+          <textarea rows="20" name="code" class="row-fluid">{{code}}</textarea>
+          <input type="submit" class="btn btn-primary" value="Paste!"
+  />
+        </div>
+      </form>
+    </div>

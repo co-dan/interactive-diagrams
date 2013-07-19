@@ -90,12 +90,15 @@ mkErrMsg EvalError{..} = ErrMsg
           SevFatal -> ("alert-error", "Error")
           _ -> ("alert-info", "Info")
 
-errPage :: Text -> (Text, [EvalError]) -> ActionH ()
-errPage code (msg, errors) = do
+errPage :: (String, Text, Text, (Text, [EvalError])) -> ActionH ()
+errPage (ptitle, author, code, (msg, errors)) = do
   let errmsgs = map (mkGenericContext . mkErrMsg) errors
   setH "title"  $ MuVariable ("Error :(" :: Text)     
   setH "msg"    $ MuVariable msg 
-  setH "errors" $ MuList errmsgs                      
+  setH "errors" $ MuList errmsgs
+  setH "ptitle" $ MuVariable ptitle
+  setH "author" $ MuVariable author
+  setH "code"   $ MuVariable code
   hastache "main"
 
 
@@ -163,16 +166,16 @@ listPastes = do
   renderPasteList pastes
 
 
--- newPaste :: EitherT (Text, (Text, [EvalError])) ActionM Int
+newPaste :: EitherT (String, Text, Text, (Text, [EvalError])) ActionH Int
 newPaste = do
   title' <- T.unpack <$> lift (param "title")
   let title = if (null title') then "(undefined)" else title'
   code <- lift (param "code")
   usern' <- lift (param "author")
   let author = if (T.null usern') then "Anonymous" else usern'
-  when (T.null code) $ throwT (code, ("Empty input", []))
+  when (T.null code) $ throwT (title, author, code, ("Empty input", []))
   pid <- compilePaste title code author 
-         `catchT` \e -> throwT (code, e)
+         `catchT` \e -> throwT (title, author, code, e)
   return (keyToInt pid)
 
 -- compilePaste :: Text
@@ -228,4 +231,4 @@ main = do
     S.get "/json/:id" $ maybeT page404 json getPaste
     S.get "/" listPastes
     S.get "/gallery" (listImages >>= renderGallery)
-    S.post "/new" $ eitherT (uncurry errPage) redirPaste (measureTime newPaste)
+    S.post "/new" $ eitherT errPage redirPaste (measureTime newPaste)
