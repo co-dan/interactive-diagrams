@@ -1,23 +1,17 @@
-<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
-<html> <head>
-<title>Hskll pstbn :: {{title}}</title>
-<link rel="stylesheet" type="text/css" href="/css/bootstrap.min.css" />
-<script src="http://code.jquery.com/jquery-2.0.2.min.js"></script>
-<script src="/js/bootstrap.min.js"></script>
-</head>
-<body>
-<a href="https://github.com/co-dan/interactive-diagrams"><img style="position: absolute; top: 0; right: 0; border: 0;" src="https://s3.amazonaws.com/github/ribbons/forkme_right_gray_6d6d6d.png" alt="Fork me on GitHub"></a>
-<div class="container-fluid">
-  <div class="row-fluid">
-    <div class="span10">
-      <h1>{{title}}</h1>
-    </div>
+{{>header}}
+
+<div class="row-fluid">
+  <ul class="thumbnails">
+  {{#images}}
+  <li>  
+  <div class="thumbnail">
+    <a href="/get/{{k}}">{{image}}</a>
   </div>
-  <div class="row-fluid">
-    {{#pastes}}
-      <a href="/get/{{k}}">{{image}}</a>
-    {{/pastes}}
-  </div>
+  </li>
+  {{/images}}
+  </ul>
 </div>
-</body>
-</html>
+
+{{>footer}}
+
+

@@ -129,7 +129,8 @@ mkItem (k, p) = GalleryItem { k = k
 renderGallery :: [(Int, Paste)] -> ActionH ()
 renderGallery ps = do
   let pastes = map (mkGenericContext . mkItem) ps
-  setH "pastes" $ MuList pastes
+  setH "title"  $ MuVariable ("Gallery" :: T.Text)
+  setH "images" $ MuList pastes
   hastache "gallery"
   
                    
