@@ -147,7 +147,8 @@ getPaste = do
 listImages :: ActionH [(Int, Paste)]
 listImages = do
   pastes <- liftIO $ runWithSql $
-    selectList [PasteContainsImg ==. True] [LimitTo 20, Desc PasteId]
+    rawSql "SELECT ?? FROM \"Paste\" WHERE (\"containsImg\"=?) ORDER BY RANDOM() LIMIT 20" [toPersistValue True]
+  --  selectList [PasteContainsImg ==. True] [LimitTo 20, Desc PasteId]
   return (map getP pastes)
   where getP (Entity k p) = (keyToInt k, p)
         
