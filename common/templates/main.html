@@ -1,6 +1,6 @@
 {{>header}}
   <div class="row-fluid">
-   <div class="span7" style="padding-right:20px; border-right: 1px solid #ccc;">
+   {{!<div class="span7" style="padding-right:20px; border-right: 1px solid #ccc;">}}
     <div id="form">
       <form action="/new" method="POST">
         <p>Please input your code:</p>
@@ -8,8 +8,10 @@
         <input type="submit" class="btn" value="Paste!" />
       </form>
     </div>
-   </div>
-   <div class="span5">
+   {{!</div>}} 
+  </div>
+  <div class="row-fluid">
+    <div class="span10">
       <div id="sheet">
         {{msg}} <br /> <br />
         {{#errors}}
@@ -31,6 +33,6 @@
          {{>pastelisting}}
         {{/result}}
       </div>
-    </div>   
+    </div>  
   </div>
 {{>footer}}

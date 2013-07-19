@@ -136,7 +136,7 @@ renderGallery ps = do
                    
 -- | * Database access and logic
 
---getPaste :: MaybeT (ActionT m) Paste
+getPaste :: MaybeT (ActionT HState) Paste
 getPaste = do 
   -- pid <- hoistMaybe . readMaybe =<< lift (param "id")
   pid <- lift $ param "id"
