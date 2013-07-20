@@ -120,9 +120,13 @@ renderPasteList pastes = do
   setH "result" $ MuBool False
   setH "title"  $ MuVariable ("Paste" :: Text)
   setH "pastes" $ MuList $
-                      map (\(Entity k _) ->
-                            (mkStrContext $ \("k") ->
-                              MuVariable . show . keyToInt $ k))
+                      map (\(Entity k pst) ->
+                            (mkStrContext $ \cnt ->
+                              case cnt of
+                                "k"       -> MuVariable . show . keyToInt $ k
+                                "ptitle"  -> MuVariable $ pasteTitle pst
+                                "pauthor" -> MuVariable $ pasteAuthor pst
+                            ))
                       pastes
   hastache "main"
 
