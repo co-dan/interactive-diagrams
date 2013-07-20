@@ -8,7 +8,8 @@ module Util (
   hash,
   getPastesDir,
   renderDR,
-  hasImage
+  hasImage,
+  renderCode
   ) where
 
 import qualified Data.Hashable as H
@@ -30,6 +31,9 @@ import Text.Blaze.Html5.Attributes (type_, class_, href, rel, action, method,
 import qualified Text.Blaze.Html5 as H
 import qualified Text.Blaze.Html5.Attributes as HA
 import Text.Blaze.Html.Renderer.Utf8
+
+import Language.Haskell.HsColour
+import Language.Haskell.HsColour.Colourise
 
 import Display
 
@@ -75,3 +79,6 @@ hasImage :: DisplayResult -> Maybe TL.Text
 hasImage (DisplayResult drs) =
   result <$> find ((==Display.Svg) . clientType) drs
 
+
+renderCode :: TL.Text -> TL.Text
+renderCode = TL.pack . hscolour CSS defaultColourPrefs False True "Paste" False . TL.unpack

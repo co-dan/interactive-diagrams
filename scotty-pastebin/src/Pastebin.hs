@@ -54,7 +54,8 @@ import Database.Persist.Sqlite as P
 import Display (display, result)
 import Paste    
 import Util (controlSock, runWithSql, getDR, intToKey,
-             keyToInt, hash, getPastesDir, renderDR, hasImage)
+             keyToInt, hash, getPastesDir, renderDR,
+             hasImage, renderCode)
 import Eval
 import Eval.EvalError  
 import Eval.EvalSettings
@@ -104,11 +105,12 @@ errPage (ptitle, author, code, (msg, errors)) = do
 
 renderPaste :: Paste -> ActionH ()
 renderPaste Paste{..} = do
-  setH "code"   $ MuVariable pasteContent
-  setH "title"  $ MuVariable ("Paste" :: Text)
-  setH "author" $ MuVariable pasteAuthor
-  setH "ptitle" $ MuVariable pasteTitle
-  setH "result" $ MuVariable $ renderHtml $
+  setH "code"     $ MuVariable pasteContent
+  setH "codeView" $ MuVariable (renderCode pasteContent)
+  setH "title"    $ MuVariable ("Paste" :: Text)
+  setH "author"   $ MuVariable pasteAuthor
+  setH "ptitle"   $ MuVariable pasteTitle
+  setH "result"   $  MuVariable $ renderHtml $
     foldMap renderDR (getDR pasteResult)
   hastache "main"
 

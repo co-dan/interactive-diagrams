@@ -32,6 +32,7 @@ executable scotty-pastebin
                        scotty,
                        scotty-hastache,
                        network,
+                       hscolour,
                        http-types ==0.8.*,
                        blaze-html,
                        blaze-markup,
