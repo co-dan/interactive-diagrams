@@ -55,7 +55,7 @@ import Display (display, result)
 import Paste    
 import Util (controlSock, runWithSql, getDR, intToKey,
              keyToInt, hash, getPastesDir, renderDR,
-             hasImage, renderCode)
+             hasImage, renderCode, paramEscaped)
 import Eval
 import Eval.EvalError  
 import Eval.EvalSettings
@@ -146,7 +146,6 @@ renderGallery ps = do
 
 getPaste :: MaybeT (ActionT HState) Paste
 getPaste = do 
-  -- pid <- hoistMaybe . readMaybe =<< lift (param "id")
   pid <- lift $ param "id"
   paste <- liftIO $ runWithSql $ P.get (intToKey pid)
   hoistMaybe paste
@@ -170,10 +169,10 @@ listPastes = do
 
 newPaste :: EitherT (String, Text, Text, (Text, [EvalError])) ActionH Int
 newPaste = do
-  title' <- T.unpack <$> lift (param "title")
+  title' <- T.unpack <$> lift (paramEscaped "title")
   let title = if (null title') then "(undefined)" else title'
   code <- lift (param "code")
-  usern' <- lift (param "author")
+  usern' <- lift (paramEscaped "author")
   let author = if (T.null usern') then "Anonymous" else usern'
   when (T.null code) $ throwT (title, author, code, ("Empty input", []))
   pid <- compilePaste title code author 

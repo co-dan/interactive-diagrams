@@ -2,6 +2,7 @@
 module Util (
   controlSock,
   runWithSql,
+  paramEscaped,
   getDR,
   intToKey,
   keyToInt,
@@ -35,6 +36,9 @@ import Text.Blaze.Html.Renderer.Utf8
 import Language.Haskell.HsColour
 import Language.Haskell.HsColour.Colourise
 
+import Web.Scotty as S
+import Web.Scotty.Types
+
 import Display
 
 controlSock :: FilePath
@@ -58,6 +62,19 @@ keyToInt (Key (PersistInt64 i)) = fromIntegral (toInteger i)
 hash :: H.Hashable a => a -> IO Int
 hash a = H.hashWithSalt <$> currentTime <*> pure a
 
+paramEscaped :: (Monad m, Functor m) => TL.Text -> ActionT m TL.Text
+paramEscaped = (fmap . fmap) (TL.concatMap escape) S.param
+  where escape :: Char -> TL.Text
+        escape h
+          | h == '&' = "&amp;"
+          | h == '\\'= "&#92;" 
+          | h == '"' = "&quot;"
+          | h == '\''= "&#39;" 
+          | h == '<' = "&lt;" 
+          | h == '>' = "&gt;" 
+          | otherwise     = TL.singleton h
+
+         
 currentTime :: IO Int       
 currentTime = getCurrentTime >>= return . floor . toRational . utctDayTime
 
@@ -82,3 +99,5 @@ hasImage (DisplayResult drs) =
 
 renderCode :: TL.Text -> TL.Text
 renderCode = TL.pack . hscolour CSS defaultColourPrefs False True "Paste" False . TL.unpack
+
+             
