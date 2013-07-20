@@ -10,7 +10,7 @@ import Control.Monad (forM_, when)
 import Control.Monad.Trans (lift, liftIO)
 import Control.Monad.IO.Class (MonadIO(..))
 import Control.Monad.Trans.Either (EitherT(..), eitherT)
-import Data.Monoid ((<>), mempty)
+import Data.Monoid ((<>), mempty, mconcat)
 import Data.Foldable (foldMap)
 import Control.Monad.Trans.Maybe (MaybeT(..))
 import Network (listenOn, connectTo, accept, socketPort, PortID(..), Socket(..))
@@ -107,7 +107,8 @@ renderPaste :: Paste -> ActionH ()
 renderPaste Paste{..} = do
   setH "code"     $ MuVariable pasteContent
   setH "codeView" $ MuVariable (renderCode pasteContent)
-  setH "title"    $ MuVariable ("Paste" :: Text)
+  setH "title"    $ MuVariable $ mconcat ["Paste / ", T.pack pasteTitle,
+                                          " by ", pasteAuthor]
   setH "author"   $ MuVariable pasteAuthor
   setH "ptitle"   $ MuVariable pasteTitle
   setH "result"   $  MuVariable $ renderHtml $
