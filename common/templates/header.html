@@ -6,6 +6,9 @@
 />
 <link rel="stylesheet" type="text/css"
 href="http://code.haskell.org/~malcolm/hscolour/emacs.css" />
+<link rel="stylesheet" type="text/css" href="/css/codemirror.css" />
+<script src="/js/codemirror.js"></script>
+<script src="/js/haskell.js"></script>
 <script src="http://code.jquery.com/jquery-2.0.2.min.js"></script>
 <script src="/js/bootstrap.min.js"></script>
 <style type="text/css">
@@ -54,7 +57,21 @@ href="http://code.haskell.org/~malcolm/hscolour/emacs.css" />
         margin: 20px 0;
       }
 
+      /* codemirror editor */
+      .CodeMirror {
+        height: 450px;
+        font-size: 90%;
+        background-color: white;
+        border: solid 1px #ccc;
+        -webkit-border-radius: 4px;
+          -moz-border-radius: 4px;
+          border-radius: 4px;
+      }
+
 </style>
+<script language="javascript">
+  var cm;
+</script>
 </head>
 <body>
 <div id="wrap">
