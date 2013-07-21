@@ -1,55 +1,63 @@
 {-# LANGUAGE RecordWildCards, FlexibleContexts #-}
 -- | A non-stripped pooling abstraction that restarts workers
--- /Note: right now the module is not desgined for threaded applications/
--- Some got has been taken from 'Data.Bool' by bos
+-- Some got has been taken from 'Data.Pool' by bos
 module Eval.Worker.RestartingPool where
 
-import Control.Applicative ((<$>))
-import Control.Monad (when, join)
-import Control.Monad.IO.Class (liftIO, MonadIO)
-import Control.Monad.Trans.Control (MonadBaseControl, control)  
-import Control.Exception (onException, mask)
-import Data.Vector (Vector)
-import qualified Data.Vector as V
-import Data.Hashable (hash)
-import Control.Concurrent (forkIO, threadDelay)
+import Control.Applicative ((<$>), (<*>))
+import Control.Concurrent (forkIO, threadDelay, killThread)
 import Control.Concurrent.STM
-import Control.Concurrent.STM.TVar
+import Control.Exception (onException, mask)
+import Control.Monad (when, join, forever, forM)
+import Control.Monad.Trans.Control (MonadBaseControl, control)  
+import System.Mem.Weak (addFinalizer)
 
+import Eval (traceM)
 import Eval.Worker.Types
 
 data WorkersPool a = Pool
     { newWorker     :: Int -> IO (Worker a, RestartWorker IO a)
       -- ^ Action for creating a new worker
-      -- ^ Action for restarting a worker
     , maxWorkers    :: Int
       -- ^ Maximum number of initialized workers
-    , currentRes    :: TVar Int
-    , resources     :: TVar [(Worker a, RestartWorker IO a)]
+    , activeWorkers :: TVar Int
+      -- ^ Current number of active workers
+    , workers       :: TVar [(Worker a, RestartWorker IO a)]
+      -- ^ A list of Workers
+    , restartRate   :: Int
+      -- ^ How long we should wait before restarting the workers (in seconds)
     }
 
 data WorkerStatus = Idle | InUse
 
--- data PoolEntry a = PoolEntry
---     { worker        :: MVar (Worker a)
---     , workerStatus  :: MVar WorkerStatus
---     }
-
 mkPool :: (Int -> IO (Worker a, RestartWorker IO a))
        -> Int
+       -> Int
        -> IO (WorkersPool a)
-mkPool newW maxW = atomically $ do
-  res <- newTVar []
-  num <- newTVar (0 :: Int)
-  return $ Pool newW {-restartW-} maxW num res
+mkPool newW maxW restartRate = do
+  res <- atomically $ newTVar []
+  num <- atomically $ newTVar (0 :: Int)
+  reaperT <- forkIO $ reaper res restartRate
+  let p = Pool newW maxW num res restartRate
+  addFinalizer p (killThread reaperT)
+  return p
 
 
+reaper :: TVar [(Worker a, RestartWorker IO a)] -> Int -> IO ()
+reaper wrkrs t' = forever $ do
+  let t = t' * 1000000
+  threadDelay t
+  workers <- readTVarIO wrkrs
+  print $ length workers
+  workers' <- forM workers $ \(w, rw) -> (,) <$> rw w <*> return rw
+  atomically $ writeTVar wrkrs workers'
+    
+  
 takeWorker :: WorkersPool a -> IO (Worker a, RestartWorker IO a)
 takeWorker Pool{..} = do
-  res <- readTVarIO resources
+  res <- readTVarIO workers
   case res of
     ((w@Worker{..}, restartW):xs) -> do
-      atomically $ writeTVar resources xs
+      atomically $ writeTVar workers xs
       workerDead <- not <$> workerAlive w
       wrk <- if workerDead
              then do
@@ -57,23 +65,23 @@ takeWorker Pool{..} = do
              else return w
       return (wrk, restartW)
     [] -> join . atomically $ do
-      activeRes <- readTVar currentRes
+      activeRes <- readTVar activeWorkers
       when (activeRes >= maxWorkers) retry
-      modifyTVar' currentRes (+1)
+      modifyTVar' activeWorkers (+1)
       return $ newWorker (activeRes+1)
-        `onException` atomically (modifyTVar' currentRes (subtract 1))
+        `onException` atomically (modifyTVar' activeWorkers (subtract 1))
 
 
 
 putWorker :: WorkersPool a -> (Worker a, RestartWorker IO a) -> IO ()
 putWorker Pool{..} w = atomically $ 
-  modifyTVar' resources (w:)
+  modifyTVar' workers (w:)
   
 
 destroyWorker :: WorkersPool a -> Worker a -> IO ()
 destroyWorker Pool{..} w = do
   _ <- killWorker w
-  atomically $ modifyTVar' currentRes (subtract 1)
+  atomically $ modifyTVar' activeWorkers (subtract 1)
 
 
 withWorker :: (MonadBaseControl IO m)

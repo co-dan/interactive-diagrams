@@ -1,7 +1,7 @@
 {-# LANGUAGE DeriveDataTypeable, RankNTypes, ImpredicativeTypes #-}
 {-# LANGUAGE TypeFamilies, StandaloneDeriving, RecordWildCards #-}
 {-# LANGUAGE FlexibleContexts, EmptyDataDecls, ScopedTypeVariables #-}
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, BangPatterns #-}
 {-|
   Worker can be in one of three states
 
@@ -86,7 +86,7 @@ startWorker :: (WorkerData w, MonadIO (WMonad w))
             -> WMonad w (Worker w, RestartWorker (WMonad w) w) 
 startWorker name sock out set pre cb = do 
   let w = mkDefaultWorker name sock set
-  let restarter w = do
+  let restarter !w = do
         w' <- liftIO $ killWorker w
         oldId <- liftIO $ getEffectiveUserID
         liftIO $ mapM_ setEffectiveUserID (processUid set)
@@ -96,7 +96,9 @@ startWorker name sock out set pre cb = do
         pid <- liftIO $ forkWorker w' out (cb dat)
         liftIO $ setEffectiveUserID oldId
         liftIO $ setCGroup set pid
-        return $ w' { workerPid = Just pid }
+        let w'' = w' { workerPid = Just pid }
+        return w''
+        w'' `seq` return w''
   w' <- restarter w
   return (w', restarter)
 

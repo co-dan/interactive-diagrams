@@ -77,7 +77,7 @@ main = do
   hSetBuffering stdin NoBuffering
 --  let devnull = openFile "/dev/null" WriteMode
   let set = settings -- { outHandle = devnull }
-  pool <- mkPool (newWorkerAct set) 1
+  pool <- mkPool (newWorkerAct set) 1 (60*5)
   currentWorkers <- newMVar []
   soc <- mkSock sockFile
   userID <$> getUserEntryForName username      
