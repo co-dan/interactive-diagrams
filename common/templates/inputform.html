@@ -1,8 +1,9 @@
     <div id="form">
       <form action="/new" method="POST" class="form-horizontal">
         <div class="control-group">
-          <label class="control-label"><i class="icon-user"></i>&nbsp;Author&nbsp;</label>
-          <input class="input-xlarge" type="text" name="author" id="author"
+          <label class="control-label"><i class="icon-user"></i>&nbsp;</label>
+          <input class="input-xlarge" type="text" name="author"
+          id="author" placeholder="Author"
   style="font-size:13pt;height:32px;" value="{{author}}" />
           {{#result}}
           <!--<span class="help-block" id="author">Pasted by {{author}}</span>-->
@@ -10,8 +11,8 @@
         </div>
         <div class="control-group">
           <label class="control-label"><i
-  class="icon-pencil"></i>&nbsp;Title&nbsp;</label>
-          <input class="input-xlarge" type="text" name="title" id="title"
+  class="icon-pencil"></i>&nbsp;</label>
+          <input class="input-xlarge" type="text" name="title" id="title" placeholder="Title"
   style="font-size:13pt;height:32px;" value="{{ptitle}}" />
           {{#result}}
           <!--<span class="help-block" id="author">{{ptitle}}</span>-->

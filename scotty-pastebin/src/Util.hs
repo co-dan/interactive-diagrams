@@ -84,7 +84,7 @@ getPastesDir = "/tmp"
 renderDR :: DR -> H.Html
 renderDR (DR Html r) = H.preEscapedToHtml r
 renderDR (DR Svg  r) = H.preEscapedToHtml r
-renderDR (DR Text r) = H.pre $ H.toHtml r
+renderDR (DR Text r) = H.toHtml r
 renderDR (DR RuntimeErr r) = H.div ! HA.class_ "alert alert-error" $
                              H.toHtml r
                                
