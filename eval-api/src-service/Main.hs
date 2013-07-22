@@ -46,16 +46,15 @@ limSettings = def {
      rlimits = Just def {
         totalMemoryLimit = ResourceLimits memlim memlim
         }
-     --, secontext  = Just "idia_restricted_t"
-     --, cgroupPath = Just $ cgroups </> "idiaworkers"
+     , secontext  = Just "idia_restricted_t"
+     , cgroupPath = Just $ cgroups </> "idiaworkers"
      }
-  where memlim = ResourceLimit $ 104857600 * 4
-                                 --- 100mb * 4
-
+  where memlim = ResourceLimit $ 104857600 * 6
+                                 --- 100mb * 6
 settings :: EvalSettings
 settings = def
   { limitSet = limSettings
-  , pkgDatabases = ["/home/vagrant/.ghc/x86_64-linux-7.7.20130628/package.conf.d"]
+  , pkgDatabases = ["/home/vagrant/.ghc/x86_64-linux-7.7.20130711/package.conf.d"]
   }
 
 
@@ -75,8 +74,8 @@ newWorkerAct settings i = do
 main :: IO ()
 main = do
   hSetBuffering stdin NoBuffering
---  let devnull = openFile "/dev/null" WriteMode
-  let set = settings -- { outHandle = devnull }
+  let devnull = openFile "/dev/null" WriteMode
+  let set = settings { outHandle = Just devnull }
   pool <- mkPool (newWorkerAct set) 1 (60*5)
   currentWorkers <- newMVar []
   soc <- mkSock sockFile

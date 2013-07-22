@@ -139,8 +139,8 @@ instance Display SomeException where
     ]
   
 instance (a ~ D.SVG, b ~ D.R2, c ~ Any) => Display (D.QDiagram a b c) where
-  display     = svg . renderMyDiagramToSvg 150
-  displayList = displayListOf (svg . renderMyDiagramToSvg 75)
+  display     = svg . renderMyDiagramToSvg 400
+  displayList = displayListOf (svg . renderMyDiagramToSvg 200)
 
 instance Display TL.Text where
   display d = displayChar '"' <> text d <> displayChar '"'

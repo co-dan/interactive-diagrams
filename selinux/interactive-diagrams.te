@@ -263,7 +263,7 @@ allow idia_restricted_t tmp_t:sock_file write;
 allow idia_restricted_t idia_service_t:unix_stream_socket { read write ioctl accept };
 allow idia_restricted_t tmp_t:dir { search getattr };
 allow idia_restricted_t tmp_t:file { getattr open read ioctl };
-# allow idia_restricted_t tmp_t:dir { write remove_name add_name };
+allow idia_restricted_t tmp_t:dir { write remove_name add_name };
 allow idia_restricted_t tmp_t:file { write create unlink execute };
 
 ##################################################
