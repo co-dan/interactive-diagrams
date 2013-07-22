@@ -47,7 +47,6 @@ reaper wrkrs t' = forever $ do
   let t = t' * 1000000
   threadDelay t
   workers <- readTVarIO wrkrs
-  print $ length workers
   workers' <- forM workers $ \(w, rw) -> (,) <$> rw w <*> return rw
   atomically $ writeTVar wrkrs workers'
     
