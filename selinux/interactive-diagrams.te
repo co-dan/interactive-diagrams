@@ -147,7 +147,7 @@ allow idia_service_t tmp_t:file { write getattr read create open ioctl };
 allow idia_service_t self:unix_stream_socket { sendto connectto };
 allow idia_service_t tmp_t:dir { write getattr create add_name remove_name search };
 allow idia_service_t tmp_t:sock_file { write create unlink getattr };
-allow idia_service_t tmp_t:dir { write remove_name add_name };
+allow idia_service_t tmp_t:dir { read rmdir write remove_name add_name };
 allow idia_service_t tmp_t:file { write create unlink execute };
 
 
@@ -264,7 +264,7 @@ allow idia_restricted_t idia_service_t:unix_stream_socket { read write ioctl acc
 allow idia_restricted_t tmp_t:dir { search getattr };
 allow idia_restricted_t tmp_t:file { getattr open read ioctl };
 # allow idia_restricted_t tmp_t:dir { write remove_name add_name };
-# allow idia_restricted_t tmp_t:file { write create unlink execute };
+allow idia_restricted_t tmp_t:file { write create unlink execute };
 
 ##################################################
 
