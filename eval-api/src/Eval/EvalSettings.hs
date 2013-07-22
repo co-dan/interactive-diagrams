@@ -169,14 +169,14 @@ stackSizeLimitHard = ResourceLimitUnknown
 -- We allow a few files to be opened, such as package.conf, because they are necessary. This
 -- doesn't seem to be security problem because it'll be opened at the module
 -- stage, before code ever evaluates. I hope.
-openFilesLimitSoft = openFilesLimitHard
-openFilesLimitHard = ResourceLimit 7
+openFilesLimitSoft = ResourceLimit 20
+openFilesLimitHard = ResourceLimit 50
 -- TODO: It would be nice to set these to zero, but right now Hint gets around the
 -- insecurity of the GHC API by writing stuff out to a file in /tmp, so we need
 -- to allow our compiled binary to do file I/O... :( But at least we can still limit
 -- how much we write out!
 fileSizeLimitSoft = fileSizeLimitHard
-fileSizeLimitHard = ResourceLimit 10800
+fileSizeLimitHard = ResourceLimitUnknown
 dataSizeLimitSoft = dataSizeLimitHard
 dataSizeLimitHard = ResourceLimit $ 104857600 * 5 -- 100 * 5 mb
 -- These should not be identical, to give the XCPU handler time to trigger

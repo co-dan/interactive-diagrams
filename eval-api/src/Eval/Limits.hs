@@ -81,8 +81,8 @@ setRLimits RLimits{..} = mapM_ (uncurry setResourceLimit) lims
   where lims = [ (ResourceCoreFileSize, coreFileSizeLimit)
                , (ResourceCPUTime, cpuTimeLimit)
                , (ResourceDataSize, dataSizeLimit)
-               -- , (ResourceFileSize, fileSizeLimit)
-               -- , (ResourceOpenFiles, openFilesLimit)
+               , (ResourceFileSize, fileSizeLimit)
+               , (ResourceOpenFiles, openFilesLimit)
                -- , (ResourceStackSize, stackSizeLimit)
                , (ResourceTotalMemory, totalMemoryLimit) ]
 
