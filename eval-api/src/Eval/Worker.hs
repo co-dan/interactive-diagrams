@@ -29,7 +29,8 @@ module Eval.Worker
 
 import Prelude hiding (putStr, mapM_)
 
-import Control.Applicative ((<$>), (<*>))  
+import Control.Applicative ((<$>), (<*>))
+import Control.Exception (catch, throwIO)
 import Control.Monad (forever, unless, void)
 import Control.Monad.IO.Class (liftIO, MonadIO)
 import Data.Default
@@ -40,6 +41,7 @@ import Network.Socket (close)
 import System.Directory
 import System.FilePath.Posix ((</>))
 import System.IO (Handle, stdout)
+import System.IO.Error (isPermissionError, isAlreadyExistsError)
 import System.Mem.Weak (addFinalizer)
 import System.Posix.Process (forkProcess, getProcessID)
 import System.Posix.Signals (Handler(..), installHandler, setStoppedChildFlag, processStatusChanged)
@@ -60,6 +62,7 @@ import Eval.Worker.EvalCmd
 import Eval.Worker.Protocol
 import Eval.Worker.Internal
 import Eval.Worker.Types
+import SignalHandlers
 
 -- | Create an uninitialized worker
 mkDefaultWorker :: String -> FilePath -> LimitSettings -> Worker a
@@ -152,7 +155,18 @@ startEvalWorker name eset = startWorker name sock out set pre callback
         set  = limitSet eset
         uid  = processUid set
         out  = outHandle eset
+        cleanup = do
+            let dir = (++) <$> chrootPath set <*> return (tmpDirPath eset)
+            case dir of
+                Nothing -> return ()
+                Just path -> do
+                    removeDirectoryRecursive path `catch` ignore
+                    createDirectory path `catch` ignore
+        ignore e = if isPermissionError e || isAlreadyExistsError e
+                   then return ()
+                   else throwIO e
         pre  = flip run' eset $ do
+          liftIO cleanup
           addPkgDbs (pkgDatabases eset)
           dfs <- getSessionDynFlags
           setSessionDynFlags $ dfs { hscTarget = HscInterpreted
@@ -164,6 +178,7 @@ startEvalWorker name eset = startWorker name sock out set pre callback
           oldTrgs <- getTargets
           loadFile (preloadFile eset)
           setTargets oldTrgs
+          liftIO restoreHandlers
           getSession
         callback sess soc = forever $ do
           (hndl, _, _) <- accept soc
