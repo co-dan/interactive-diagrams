@@ -1,22 +1,31 @@
-{-# LANGUAGE OverloadedStrings, TemplateHaskell, QuasiQuotes #-}
-{-# LANGUAGE TypeFamilies, GeneralizedNewtypeDeriving, GADTs #-}
-{-# LANGUAGE EmptyDataDecls, FlexibleContexts, RecordWildCards #-}
-{-# LANGUAGE ScopedTypeVariables, TypeSynonymInstances #-}
-{-# LANGUAGE FlexibleInstances, DeriveDataTypeable #-}
-{-# LANGUAGE DeriveGeneric, RankNTypes #-}
+{-# LANGUAGE DeriveDataTypeable         #-}
+{-# LANGUAGE DeriveGeneric              #-}
+{-# LANGUAGE EmptyDataDecls             #-}
+{-# LANGUAGE FlexibleContexts           #-}
+{-# LANGUAGE FlexibleInstances          #-}
+{-# LANGUAGE GADTs                      #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE QuasiQuotes                #-}
+{-# LANGUAGE RankNTypes                 #-}
+{-# LANGUAGE RecordWildCards            #-}
+{-# LANGUAGE ScopedTypeVariables        #-}
+{-# LANGUAGE TemplateHaskell            #-}
+{-# LANGUAGE TypeFamilies               #-}
+{-# LANGUAGE TypeSynonymInstances       #-}
 module Paste where
 
 import Data.Aeson
+import Data.Text.Lazy          (Text, pack)
 import Data.Typeable
-import Data.Text.Lazy (pack, Text)
-import Database.Persist as P
-import Database.Persist.TH as P
+import Database.Persist        as P
 import Database.Persist.Sqlite as P
+import Database.Persist.TH     as P
 import GHC.Generics
-  
+
 import Display
 import DisplayPersist
-  
+
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistUpperCase|
 Paste
     title       String  default="(untitled)"
@@ -37,4 +46,4 @@ instance ToJSON DR where
 
 instance ToJSON DisplayResult
 
-instance ToJSON Paste         
+instance ToJSON Paste
