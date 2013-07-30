@@ -10,6 +10,7 @@
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE TypeFamilies               #-}
+{-# LANGUAGE TypeHoles                  #-}
 module Main where
 
 import           Control.Applicative                  ((<$>))
@@ -19,15 +20,14 @@ import           Control.Monad.Trans                  (lift)
 import           Control.Monad.Trans.Either           (EitherT (..), eitherT)
 import           Control.Monad.Trans.Maybe            (MaybeT (..))
 import           Data.Foldable                        (foldMap)
-import           Data.Monoid                          (mconcat, (<>))
+import           Data.Monoid                          (mconcat)
 import           Network                              (PortID (..), connectTo)
 import           System.IO                            (hClose)
 
 import           Control.Error.Util                   (hoistMaybe, maybeT)
 import           Data.Aeson                           ()
-import           Data.Data
 import           Data.EitherR                         (catchT, throwT)
-import           Data.Maybe                           (fromJust, isJust)
+import           Data.Maybe                           (isJust)
 import           Data.Text.Lazy                       (Text, pack)
 import qualified Data.Text.Lazy                       as T
 import           Data.Time.Clock                      (diffUTCTime,
@@ -45,22 +45,18 @@ import           Web.Scotty.Types
 import           Database.Persist                     as P
 import           Database.Persist.Sqlite              as P
 import           Text.Blaze.Html.Renderer.Text
-import qualified Text.Blaze.Html5                     as H
 
-
+import           Config
 import           Display                              (display)
 import           Eval.EvalError
 import           Eval.Worker.EvalCmd
 import           Eval.Worker.Internal
 import           Eval.Worker.Protocol
 import           Eval.Worker.Types
-import           Paste
-import           Util                                 (controlSock, getDR,
-                                                       hasImage,
-                                                       hash, intToKey, keyToInt,
-                                                       paramEscaped, renderCode,
-                                                       renderDR, runWithSql)
-
+import           Pastebin.ErrorMessage
+import           Pastebin.Gallery
+import           Pastebin.Paste
+import           Pastebin.Util
 
 hastacheConf :: MonadIO m => MuConfig m
 hastacheConf = defaultConfig
@@ -70,21 +66,6 @@ hastacheConf = defaultConfig
    }
 
 -- | * Rendering and views
-
-data ErrMsg = ErrMsg { content :: Text, caption :: String, severity :: String }
-            deriving (Typeable, Data)
-
-mkErrMsg :: EvalError -> ErrMsg
-mkErrMsg EvalError{..} = ErrMsg
-   { content  = renderHtml $
-                foldMap ((<> H.br) . H.toHtml . T.pack) (lines errMsg)
-   , caption  = caption
-   , severity = style }
-  where (style, caption) = case severity of
-          SevError -> ("alert-error", "Error")
-          SevWarning -> ("alert-block", "Warning")
-          SevFatal -> ("alert-error", "Error")
-          _ -> ("alert-info", "Info")
 
 errPage :: (String, Text, Text, (Text, [EvalError])) -> ActionH ()
 errPage (ptitle, author, code, (msg, errors)) = do
@@ -128,14 +109,6 @@ renderPasteList pastes = do
     hastache "main"
 
 
-data GalleryItem = GalleryItem { k :: Int, image :: T.Text }
-                 deriving (Data, Typeable)
-
-mkItem :: (Int, PasteGeneric backend) -> GalleryItem
-mkItem (k, p) = GalleryItem { k = k
-                            , image = fromJust . hasImage
-                                      . pasteResult $ p }
-
 renderGallery :: [(Int, Paste)] -> ActionH ()
 renderGallery ps = do
     let pastes = map (mkGenericContext . mkItem) ps
@@ -155,9 +128,7 @@ getPaste = do
 -- | ** Select 20 recent images
 listImages :: ActionH [(Int, Paste)]
 listImages = do
-    pastes <- liftIO $ runWithSql $
-              rawSql "SELECT ?? FROM \"Paste\" WHERE (\"containsImg\"=?) ORDER BY RANDOM() LIMIT 20" [toPersistValue True]
-    --  selectList [PasteContainsImg ==. True] [LimitTo 20, Desc PasteId]
+    pastes <- liftIO $ runWithSql gallerySql
     return (map getP pastes)
   where
     getP (Entity k p) = (keyToInt k, p)

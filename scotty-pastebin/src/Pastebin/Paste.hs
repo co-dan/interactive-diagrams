@@ -13,7 +13,7 @@
 {-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE TypeSynonymInstances       #-}
-module Paste where
+module Pastebin.Paste where
 
 import Data.Aeson
 import Data.Text.Lazy          (Text)
@@ -21,7 +21,7 @@ import Database.Persist.TH     as P
 import GHC.Generics
 
 import Display
-import DisplayPersist ()
+import Pastebin.DisplayPersist ()
 
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistUpperCase|
 Paste

@@ -1,24 +1,22 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes       #-}
 {-# LANGUAGE TemplateHaskell   #-}
-module Util
+module Pastebin.Util
     (
-      controlSock
-    , getDR
-    , getPastesDir
+      -- * Convertation & queries
+      getDR
     , hasImage
-    , hash
+    , paramEscaped
     , intToKey
     , keyToInt
-    , paramEscaped
+      -- * Hashing
+    , hash
+      -- * Rendering
     , renderCode
     , renderDR
-    , runWithSql
     ) where
 
 import           Control.Applicative
-import           Control.Monad.Logger
-import           Control.Monad.Trans.Resource
 import qualified Data.Hashable                       as H
 import           Data.List
 import qualified Data.Text.Lazy                      as TL
@@ -35,14 +33,11 @@ import           Web.Scotty.Types
 
 import           Display
 
-controlSock :: FilePath
-controlSock = "/idia/run/sock/control.sock"
+-- * Convertation & quering
 
-runWithSql :: SqlPersistT (LoggingT (ResourceT IO)) a -> IO a
-runWithSql = runResourceT
-           . runStdoutLoggingT
-           . withSqliteConn "./pastes.db"
-           . runSqlConn
+hasImage :: DisplayResult -> Maybe TL.Text
+hasImage (DisplayResult drs) =
+    result <$> find ((==Display.Svg) . clientType) drs
 
 getDR :: DisplayResult -> [DR]
 getDR (DisplayResult drs) = drs
@@ -52,10 +47,7 @@ intToKey = Key . PersistInt64 . fromIntegral
 
 keyToInt :: Key a -> Int
 keyToInt (Key (PersistInt64 i)) = fromIntegral (toInteger i)
-keyToInt (Key _)                = error "Unknown key format"                                  
-
-hash :: H.Hashable a => a -> IO Int
-hash a = H.hashWithSalt <$> currentTime <*> pure a
+keyToInt (Key _)                = error "Unknown key format"
 
 paramEscaped :: (Monad m, Functor m) => TL.Text -> ActionT m TL.Text
 paramEscaped = (fmap . fmap) (TL.concatMap escape) S.param
@@ -70,11 +62,15 @@ paramEscaped = (fmap . fmap) (TL.concatMap escape) S.param
           | otherwise     = TL.singleton h
 
 
+-- * Hashing
+
 currentTime :: IO Int
 currentTime = getCurrentTime >>= return . floor . toRational . utctDayTime
 
-getPastesDir :: FilePath
-getPastesDir = "/tmp"
+hash :: H.Hashable a => a -> IO Int
+hash a = H.hashWithSalt <$> currentTime <*> pure a
+
+-- * Rendering
 
 renderDR :: DR -> H.Html
 renderDR (DR Html r) = H.preEscapedToHtml r
@@ -82,11 +78,6 @@ renderDR (DR Svg  r) = H.preEscapedToHtml r
 renderDR (DR Text r) = H.toHtml r
 renderDR (DR RuntimeErr r) = H.div ! HA.class_ "alert alert-error" $
                                  H.toHtml r
-
-hasImage :: DisplayResult -> Maybe TL.Text
-hasImage (DisplayResult drs) =
-    result <$> find ((==Display.Svg) . clientType) drs
-
 
 renderCode :: TL.Text -> TL.Text
 renderCode = TL.pack . hscolour CSS defaultColourPrefs False True "Paste" False . TL.unpack
