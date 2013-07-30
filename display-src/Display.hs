@@ -1,60 +1,73 @@
 {- Original file from GHCLive project,
-copyright (c) 2012, Shae Erisson & contributors 
+copyright (c) 2012, Shae Erisson & contributors
           (c) 2013, Dan Frumin, Luite Stegeman -}
-{-# LANGUAGE DeriveDataTypeable   #-}
-{-# LANGUAGE FlexibleInstances    #-}
-{-# LANGUAGE FlexibleContexts     #-}
-{-# LANGUAGE TemplateHaskell      #-}
-{-# LANGUAGE TypeSynonymInstances #-}
-{-# LANGUAGE TypeFamilies         #-}
-{-# LANGUAGE TypeOperators        #-}
-{-# LANGUAGE DefaultSignatures    #-}
+{-# LANGUAGE DefaultSignatures          #-}
+{-# LANGUAGE DeriveDataTypeable         #-}
+{-# LANGUAGE DeriveGeneric              #-}
+{-# LANGUAGE FlexibleContexts           #-}
+{-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE DeriveGeneric        #-}
-{-# LANGUAGE StandaloneDeriving   #-}
+{-# LANGUAGE StandaloneDeriving         #-}
+{-# LANGUAGE TemplateHaskell            #-}
+{-# LANGUAGE TypeFamilies               #-}
+{-# LANGUAGE TypeOperators              #-}
+{-# LANGUAGE TypeSynonymInstances       #-}
 
-module Display where
+module Display
+    (
+      -- * Main datatypes
+      DisplayResult(..)
+    , ClientType(..)
+    , DR(..)
+      -- * Helper functions
+    , html
+    , text
+    , svg
+    , displayString
+    , displayChar
+      -- * Other functions
+    , displaying
+    , displayEmpty
+    ) where
 
-import           Prelude hiding (span)
+import           Prelude                       hiding (span)
 
-import           Control.Monad (liftM)
-import           Control.Exception (SomeException)  
-import           Data.Default
-import           Data.Word
+import           Control.Exception             (SomeException)
+import           Control.Monad                 (liftM)
 import           Data.Int
 import           Data.Monoid
+import           Data.Serialize
 import qualified Data.Text                     as T
 import qualified Data.Text.Encoding            as T
 import qualified Data.Text.Lazy                as TL
 import qualified Data.Text.Lazy.Encoding       as TL
 import           Data.Typeable
-import           Data.Serialize  
+import           Data.Word
 import qualified Diagrams.Backend.SVG          as D
 import qualified Diagrams.Prelude              as D
 import           GHC.Generics
 import           Text.Blaze.Html.Renderer.Text
 import qualified Text.Blaze.Html5              as B
 
-
-
-
+-- * Main datatype
+    
 data ClientType = Html | Svg | Text | RuntimeErr
                 deriving (Eq, Show, Enum, Read, Generic)
-
-instance Serialize ClientType                         
 
 newtype DisplayResult = DisplayResult [DR]
                       deriving (Eq, Monoid, Typeable,
                                 Show, Read, Generic)
-                               
-instance Serialize DisplayResult
-
 data DR = DR {
       clientType :: ClientType, -- "SVG" "IMG" etc, changes how the browser-side javascript handles this result.
-      result :: TL.Text            -- actual result data
+      result     :: TL.Text            -- actual result data
       } deriving (Eq, Show, Typeable, Read, Generic)
 
+                 
+instance Serialize ClientType
+instance Serialize DisplayResult
+instance Serialize DR
 
+-- Warning: orphans
 instance Serialize TL.Text where
   put = put . TL.encodeUtf8
   get = liftM TL.decodeUtf8 get
@@ -62,8 +75,7 @@ instance Serialize TL.Text where
 instance Serialize T.Text where
   put = put . T.encodeUtf8
   get = liftM T.decodeUtf8 get
-  
-instance Serialize DR
+
 
 text :: TL.Text -> DisplayResult
 text x = DisplayResult [ DR Text x ]
@@ -123,7 +135,7 @@ class Display a where
     display :: a -> DisplayResult
     default display :: (Generic a, GDisplay (Rep a)) => a -> DisplayResult
     display = gdisplay . from
-    
+
 displayEmpty :: DisplayResult
 displayEmpty = DisplayResult []
 
@@ -137,7 +149,7 @@ instance Display SomeException where
   display e = DisplayResult [
     DR RuntimeErr (TL.pack . ("Uncaught runtime error: " ++) . show $ e)
     ]
-  
+
 instance (a ~ D.SVG, b ~ D.R2, c ~ Any) => Display (D.QDiagram a b c) where
   display     = svg . renderMyDiagramToSvg 400
   displayList = displayListOf (svg . renderMyDiagramToSvg 200)
