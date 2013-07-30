@@ -16,15 +16,12 @@
 module Paste where
 
 import Data.Aeson
-import Data.Text.Lazy          (Text, pack)
-import Data.Typeable
-import Database.Persist        as P
-import Database.Persist.Sqlite as P
+import Data.Text.Lazy          (Text)
 import Database.Persist.TH     as P
 import GHC.Generics
 
 import Display
-import DisplayPersist
+import DisplayPersist ()
 
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistUpperCase|
 Paste

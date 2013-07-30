@@ -13,34 +13,26 @@
 module Main where
 
 import           Control.Applicative                  ((<$>))
-import           Control.Monad                        (forM_, when)
+import           Control.Monad                        (when)
 import           Control.Monad.IO.Class               (MonadIO (..))
-import           Control.Monad.Trans                  (lift, liftIO)
+import           Control.Monad.Trans                  (lift)
 import           Control.Monad.Trans.Either           (EitherT (..), eitherT)
 import           Control.Monad.Trans.Maybe            (MaybeT (..))
 import           Data.Foldable                        (foldMap)
-import           Data.Monoid                          (mconcat, mempty, (<>))
-import           Network                              (PortID (..), Socket (..),
-                                                       accept, connectTo,
-                                                       listenOn, socketPort)
-import           System.IO                            (Handle, hClose)
+import           Data.Monoid                          (mconcat, (<>))
+import           Network                              (PortID (..), connectTo)
+import           System.IO                            (hClose)
 
 import           Control.Error.Util                   (hoistMaybe, maybeT)
 import           Data.Aeson                           ()
 import           Data.Data
-import           Data.Default
 import           Data.EitherR                         (catchT, throwT)
 import           Data.Maybe                           (fromJust, isJust)
 import           Data.Text.Lazy                       (Text, pack)
 import qualified Data.Text.Lazy                       as T
-import qualified Data.Text.Lazy.IO                    as T
 import           Data.Time.Clock                      (diffUTCTime,
                                                        getCurrentTime)
-import           Data.Typeable
-import           System.FilePath.Posix                ((</>))
 
-import qualified Data.ByteString                      as BS
-import qualified Data.ByteString.Lazy                 as BL
 import           Network.HTTP.Types
 import           Network.Wai.Middleware.RequestLogger
 import           Network.Wai.Middleware.Static
@@ -52,29 +44,19 @@ import           Web.Scotty.Types
 
 import           Database.Persist                     as P
 import           Database.Persist.Sqlite              as P
-import           Database.Persist.TH                  as P
 import           Text.Blaze.Html.Renderer.Text
-import           Text.Blaze.Html5                     (Html, (!))
 import qualified Text.Blaze.Html5                     as H
-import           Text.Blaze.Html5.Attributes          (action, class_, cols,
-                                                       href, method, name, rel,
-                                                       rows, type_, value)
-import qualified Text.Blaze.Html5.Attributes          as HA
 
 
-import           Display                              (display, result)
-import           Eval
+import           Display                              (display)
 import           Eval.EvalError
-import           Eval.EvalM
-import           Eval.EvalSettings
-import           Eval.Helpers
 import           Eval.Worker.EvalCmd
 import           Eval.Worker.Internal
 import           Eval.Worker.Protocol
 import           Eval.Worker.Types
 import           Paste
 import           Util                                 (controlSock, getDR,
-                                                       getPastesDir, hasImage,
+                                                       hasImage,
                                                        hash, intToKey, keyToInt,
                                                        paramEscaped, renderCode,
                                                        renderDR, runWithSql)
@@ -140,6 +122,7 @@ renderPasteList pastes = do
                                 "k"       -> MuVariable . show . keyToInt $ k
                                 "ptitle"  -> MuVariable $ pasteTitle pst
                                 "pauthor" -> MuVariable $ pasteAuthor pst
+                                _         -> MuNothing
                             ))
                       pastes
     hastache "main"
@@ -148,6 +131,7 @@ renderPasteList pastes = do
 data GalleryItem = GalleryItem { k :: Int, image :: T.Text }
                  deriving (Data, Typeable)
 
+mkItem :: (Int, PasteGeneric backend) -> GalleryItem
 mkItem (k, p) = GalleryItem { k = k
                             , image = fromJust . hasImage
                                       . pasteResult $ p }
@@ -198,22 +182,23 @@ newPaste = do
            `catchT` \e -> throwT (title, author, code, e)
     return (keyToInt pid)
 
--- compilePaste :: Text
---              -> EitherT (Text, [EvalError]) ActionM (Key Paste)
+compilePaste :: MonadIO m
+             => String -> Text -> Text
+             -> EitherT (Text, [EvalError]) m (Key (PasteGeneric SqlBackend))
 compilePaste title code author = do
     fname <- liftIO $ hash code
     -- let fpath = getPastesDir </> show fname ++ ".hs"
     -- liftIO $ T.writeFile fpath code
     hndl <- liftIO $ connectTo "localhost" (UnixSocket controlSock)
-    liftIO $ sendData hndl RequestWorker
+    _ <- liftIO $ sendData hndl RequestWorker
     (worker :: Worker EvalWorker) <- liftIO $ getData hndl
     liftIO $ hClose hndl
-    ((res, errors), status) <- liftIO $ sendEvalRequestNoRestart worker $
-                               EvalFile (show fname ++ ".hs") code
+    ((res, errors), wstatus) <- liftIO $ sendEvalRequestNoRestart worker $
+                                EvalFile (show fname ++ ".hs") code
                              -- CompileFile fpath
-    hndl <- liftIO $ connectTo "localhost" (UnixSocket controlSock)
-    liftIO $ sendData hndl (ReturnWorker status worker)
-    liftIO $ hClose hndl
+    hndl2 <- liftIO $ connectTo "localhost" (UnixSocket controlSock)
+    _ <- liftIO $ sendData hndl2 (ReturnWorker wstatus worker)
+    liftIO $ hClose hndl2
     case res of
         Left err -> throwT (pack err, errors)
         Right !r -> do
