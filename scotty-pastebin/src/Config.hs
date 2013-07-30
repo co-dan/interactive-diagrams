@@ -16,3 +16,6 @@ runWithSql = runResourceT
 
 getPastesDir :: FilePath
 getPastesDir = "/tmp"
+
+getTemplatesDir :: FilePath
+getTemplatesDir = "../common/templates/"

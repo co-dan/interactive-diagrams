@@ -60,7 +60,7 @@ import           Pastebin.Util
 
 hastacheConf :: MonadIO m => MuConfig m
 hastacheConf = defaultConfig
-   { muTemplateFileDir = Just "../common/templates/"
+   { muTemplateFileDir = Just getTemplatesDir
    , muTemplateFileExt = Just ".html"
    , muEscapeFunc      = emptyEscape
    }

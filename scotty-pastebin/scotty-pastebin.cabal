@@ -26,7 +26,8 @@ executable scotty-pastebin
                        persistent >=1.2,
                        persistent-sqlite >=1.2,
                        persistent-template >=1.2,
-                       scotty,
+                       scotty ==0.4.6.1, 
+                       -- need the scotty-transformer version
                        scotty-hastache,
                        network,
                        hscolour,
@@ -38,7 +39,6 @@ executable scotty-pastebin
                        wai-middleware-static,
                        data-default ==0.5.*,
                        display,
---                       diagrams,
                        monad-logger >=0.2,
                        resourcet,
                        cereal ==0.3.*,
