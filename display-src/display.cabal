@@ -12,7 +12,7 @@ cabal-version:       >=1.8
 
 
 library
-  exposed-modules:     Display
+  exposed-modules:     Diagrams.Interactive.Display
   ghc-options:         -O2 -threaded -Wall -Werror -fno-warn-orphans
   build-depends:       base >=4.6,
                        blaze-html ==0.6.*,  
