@@ -131,7 +131,6 @@ instance Serialize CPid
 instance Serialize (Worker a)
 
 data IOWorker
-data EvalWorker
 
 class WorkerData w where
     -- | Data that saves after restarts
@@ -142,11 +141,6 @@ class WorkerData w where
 instance WorkerData IOWorker where
     type WData IOWorker = ()
     type WMonad IOWorker = IO
-
-instance WorkerData EvalWorker where
-    type WData EvalWorker = HscEnv
-    type WMonad EvalWorker = IO
-
 
 -- | Check whether the worker is initialized
 initialized :: Worker a -> Bool
