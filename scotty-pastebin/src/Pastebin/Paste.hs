@@ -20,7 +20,7 @@ import Data.Text.Lazy          (Text)
 import Database.Persist.TH     as P
 import GHC.Generics
 
-import Display
+import Diagrams.Interactive.Display
 import Pastebin.DisplayPersist ()
 
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistUpperCase|

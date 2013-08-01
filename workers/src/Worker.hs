@@ -1,39 +1,45 @@
-{-# LANGUAGE BangPatterns, FlexibleContexts, MultiParamTypeClasses #-}
+{-# LANGUAGE BangPatterns          #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 module Worker
     (
       module Worker.Types
     , module Worker.Pool
+    , module Worker.Protocol
     , mkDefaultWorker
     , startWorker
     , startIOWorker
     ) where
 
-import Worker.Types
-import Worker.Pool
 import Worker.Internal
 import Worker.Internal.Limits
+import Worker.Pool
+import Worker.Protocol
+import Worker.Types
 
-import Prelude hiding (mapM_)
+import Prelude                hiding (mapM_)
 
-import Control.Applicative ((<$>), (<*>))
-import Control.Exception (catch, throwIO)
-import Control.Monad (forever, unless, void)
-import Control.Monad.IO.Class (liftIO, MonadIO)
+import Control.Applicative    ((<$>), (<*>))
+import Control.Exception      (catch, throwIO)
+import Control.Monad          (forever, unless, void)
+import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.Default
-import Data.Typeable ()
-import Data.Foldable (mapM_)
-import Network (accept, Socket)
-import Network.Socket (close)
+import Data.Foldable          (mapM_)
+import Data.Typeable          ()
+import Network                (Socket, accept)
+import Network.Socket         (close)
 import System.Directory
-import System.FilePath.Posix ((</>))
-import System.IO (Handle, stdout)
-import System.IO.Error (isPermissionError, isAlreadyExistsError)
-import System.Mem.Weak (addFinalizer)
-import System.Posix.Process (forkProcess, getProcessID)
-import System.Posix.Signals (Handler(..), installHandler, setStoppedChildFlag, processStatusChanged)
-import System.Posix.Types (ProcessID, Fd(..))
-import System.Posix.IO (handleToFd, dupTo, closeFd)
-import System.Posix.User (getRealUserID, setEffectiveUserID, getEffectiveUserID)
+import System.FilePath.Posix  ((</>))
+import System.IO              (Handle, stdout)
+import System.IO.Error        (isAlreadyExistsError, isPermissionError)
+import System.Mem.Weak        (addFinalizer)
+import System.Posix.IO        (closeFd, dupTo, handleToFd)
+import System.Posix.Process   (forkProcess, getProcessID)
+import System.Posix.Signals   (Handler (..), installHandler,
+                               processStatusChanged, setStoppedChildFlag)
+import System.Posix.Types     (Fd (..), ProcessID)
+import System.Posix.User      (getEffectiveUserID, getRealUserID,
+                               setEffectiveUserID)
 
 
 -- | Create an uninitialized worker
@@ -61,8 +67,8 @@ startWorker :: (WorkerData w, MonadIO (WMonad w))
             -> LimitSettings  --  ^ Restrictions
             -> WMonad w (WData w) --  ^ Pre-forking action
             -> (WData w -> Socket -> IO ()) -- ^ Socket callback
-            -> WMonad w (Worker w, RestartWorker (WMonad w) w) 
-startWorker name sock out set pre cb = do 
+            -> WMonad w (Worker w, RestartWorker (WMonad w) w)
+startWorker name sock out set pre cb = do
     let w = mkDefaultWorker name sock set
     let restarter !w = do
             w' <- liftIO $ killWorker w
@@ -82,9 +88,9 @@ startWorker name sock out set pre cb = do
 
 -- | Start a worker of type 'IOWorker'
 -- The callback function is called every time a connectino is established
--- 
+--
 -- >>> startIOWorker "test" "/tmp/test.sock" $ \h -> hPutStrLn h "hello, world"
---   
+--
 startIOWorker :: String              -- ^ Name
               -> FilePath            -- ^ UNIX socket
               -> (Handle -> IO ())   -- ^ Callback
@@ -94,7 +100,7 @@ startIOWorker name sock callb = startWorker name sock out defSet preFork handle
           (hndl, _, _) <- accept soc
           callb hndl
         defSet = def { secontext = Nothing }
-        out    = Nothing 
+        out    = Nothing
         preFork =  putStrLn ("Starting worker " ++ show name)
                 >> return ()
-    
+

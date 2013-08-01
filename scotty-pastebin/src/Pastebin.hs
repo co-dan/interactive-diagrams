@@ -47,12 +47,9 @@ import           Database.Persist.Sqlite              as P
 import           Text.Blaze.Html.Renderer.Text
 
 import           Config
-import           Display                              (display)
+import           Diagrams.Interactive.Display         (display)
+import           Eval
 import           Eval.EvalError
-import           Eval.Worker.EvalCmd
-import           Eval.Worker.Internal
-import           Eval.Worker.Protocol
-import           Eval.Worker.Types
 import           Pastebin.ErrorMessage
 import           Pastebin.Gallery
 import           Pastebin.Paste

@@ -31,7 +31,7 @@ import qualified Text.Blaze.Html5.Attributes         as HA
 import           Web.Scotty                          as S
 import           Web.Scotty.Types
 
-import           Display
+import           Diagrams.Interactive.Display        as Display
 
 -- * Convertation & quering
 

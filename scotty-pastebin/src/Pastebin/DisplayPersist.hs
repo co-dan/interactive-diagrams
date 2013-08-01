@@ -12,6 +12,6 @@ module Pastebin.DisplayPersist where
 
 import Database.Persist.TH
 
-import Display
+import Diagrams.Interactive.Display
 
 derivePersistField "DisplayResult"

@@ -14,12 +14,9 @@ module Eval.EvalWorker where
 import           Control.Applicative          ((<$>), (<*>))
 import           Control.Concurrent           (threadDelay)
 import           Control.Concurrent.Async     (race)
-import Network (accept)    
-import Control.Monad (forever)
-import System.Directory (createDirectory, removeDirectoryRecursive)
+import           Control.Exception            (catch, throwIO)
+import           Control.Monad                (forever)
 import           Control.Monad.IO.Class       (liftIO)
-import Control.Exception (catch, throwIO)
-import System.IO.Error (isAlreadyExistsError, isPermissionError)
 import           Control.Monad.Reader         (ask)
 import           Data.IORef                   (newIORef, readIORef)
 import           Data.Maybe                   (fromJust)
@@ -28,23 +25,27 @@ import           Data.Text.Lazy               (Text)
 import qualified Data.Text.Lazy.IO            as T
 import           Data.Typeable
 import           GHC.Generics
+import           Network                      (accept)
+import           System.Directory             (createDirectory,
+                                               removeDirectoryRecursive)
 import           System.FilePath.Posix        ((</>))
 import           System.IO                    (Handle, hClose)
+import           System.IO.Error              (isAlreadyExistsError,
+                                               isPermissionError)
 import           System.Posix.Signals         (killProcess, signalProcess)
 import           System.Posix.Types           (ProcessID)
 
 
 import           Diagrams.Interactive.Display
-import SignalHandlers
 import           Eval.EvalError
 import           Eval.EvalM
 import           Eval.EvalSettings
 import           Eval.Handlers
 import           Eval.Helpers
 import           GHC                          hiding (compileExpr)
+import           SignalHandlers
 import           Worker
 import           Worker.Internal
-import           Worker.Protocol
 
 -- | Evaluation result together with a list of errors/warnings
 type EvalResultWithErrors = (EvalResult, [EvalError])
@@ -99,7 +100,7 @@ startEvalWorker name eset = startWorker name sock out set pre callback
             return r
 
 
--- | Read data from a handle and convert it to 'EvalM' action        
+-- | Read data from a handle and convert it to 'EvalM' action
 evalWorkerAction :: Handle -> IO (EvalM DisplayResult)
 evalWorkerAction hndl = do
   (cmd :: EvalCmd) <- getData hndl
@@ -113,7 +114,7 @@ sendCompileFileRequest :: (Worker EvalWorker, RestartWorker IO EvalWorker)
                        -> IO (EvalResultWithErrors, Worker EvalWorker)
 sendCompileFileRequest w fpath = sendEvalRequest w (CompileFile fpath)
 
-  
+
 -- | Send the 'Worker' a request to compile an expression
 sendEvalStringRequest :: (Worker EvalWorker, RestartWorker IO EvalWorker)
                       -> String
