@@ -3,31 +3,32 @@
 module Main where
 
 import Control.Applicative ((<$>))
-import Control.Concurrent (threadDelay, forkIO)
+import Control.Concurrent (forkIO)
 import Control.Concurrent.MVar  
-import Control.Monad (when, unless, void, forever, liftM)
-import Data.ByteString (hGetContents)
+import Control.Monad (unless, void, forever)
 import Data.Default
-import Data.Serialize (encode, decode, Serialize)
-import Data.Typeable (Typeable)
-import Network (listenOn, connectTo, accept, socketPort, PortID(..), Socket(..))
-import Network.Socket (close)
-import System.Directory (doesFileExist, doesDirectoryExist, createDirectory)
+import Network (accept, Socket)
+import System.Directory (doesDirectoryExist, createDirectory)
 import System.FilePath.Posix ((</>))
-import System.IO (Handle, IOMode(..), openFile, hClose, stdin, stdout, hSetBuffering, BufferMode(..), hGetLine, hPutStrLn)
-import System.Posix.Files (removeLink, setOwnerAndGroup)
+import System.IO (IOMode(..), openFile, hClose, stdin, hSetBuffering, BufferMode(..))
+import System.Posix.Files (setOwnerAndGroup)
 import System.Posix.User (getUserEntryForName, UserEntry(..))
 import System.Posix.Types (UserID)
 
-import Eval (traceM)
-import Eval.Worker
+import Worker.Pool (WorkersPool)    
+import qualified Worker.Pool as W
+import Worker.Types    
+import Worker.Protocol
+import Worker.Internal
+import Eval.EvalWorker
 import Eval.EvalSettings
-import Eval.Worker.Types
-import Eval.Worker.RestartingPool
-import Eval.Worker.Protocol
-import Eval.Worker.Internal
-import Eval.Worker.EvalCmd
 import SignalHandlers
+import Debug.Trace 
+
+-- -- | Debug function  
+-- traceM :: Monad m => String -> m ()
+-- traceM s = trace s $ return ()
+
 
 sockFile :: FilePath
 sockFile = "/idia/run/sock/control.sock"
@@ -61,22 +62,23 @@ settings = def
 setOwner :: FilePath -> UserID -> IO ()
 setOwner fp u = setOwnerAndGroup fp u (-1)
 
-newWorkerAct settings i = do
+newWorkerAct :: Show a => EvalSettings -> a -> IO (Worker EvalWorker, RestartWorker IO EvalWorker)
+newWorkerAct wsettings i = do
   let wname = "EvalWorker" ++ show i
       wdir  = workersDir </> ("worker" ++ show i)
   uid <- userID <$> getUserEntryForName username      
   doesDirectoryExist wdir >>= \e -> unless e $
     createDirectory wdir
-  startEvalWorker wname (settings { limitSet = limSettings  {
-                                      chrootPath = Just wdir,
-                                      processUid = Just uid }})
+  startEvalWorker wname (wsettings { limitSet = limSettings  {
+                                          chrootPath = Just wdir,
+                                          processUid = Just uid }})
 
 main :: IO ()
 main = do
   hSetBuffering stdin NoBuffering
   let devnull = openFile "/dev/null" WriteMode
   let set = settings { outHandle = Just devnull }
-  pool <- mkPool (newWorkerAct set) 1 (60*5)
+  pool <- W.mkPool (newWorkerAct set) 1 (60*5)
   currentWorkers <- newMVar []
   soc <- mkSock sockFile
   userID <$> getUserEntryForName username      
@@ -94,9 +96,9 @@ loop soc pool currentWorkers = forever $ do
   cmd <- getData hndl
   case cmd of
     RequestWorker -> void $ forkIO $ do
-      (w, rw) <- takeWorker pool
+      (w, rw) <- W.takeWorker pool
       traceM $ "Sending " ++ show w
-      sendData hndl w
+      _ <- sendData hndl w
       modifyMVar_ currentWorkers (return . ((w,rw):))
       hClose hndl
     ReturnWorker st wrk -> do
@@ -112,7 +114,7 @@ loop soc pool currentWorkers = forever $ do
             OK -> return (wrk, rw)
             Timeout -> restartIfDead rw wrk
             Unknown -> restartIfDead rw wrk
-      putWorker pool (wrk',rw)
+      W.putWorker pool (wrk',rw)
     _     -> error "Unimplemented"
 
 restartIfDead :: RestartWorker IO a -> Worker a

@@ -10,13 +10,14 @@ import Data.Default
 import System.Console.Readline
 import Data.Time.Clock (getCurrentTime, diffUTCTime)
 
+import Diagrams.Interactive.Display
+import Worker
 import Eval
-import Display
+import Eval.EvalWorker
 import Eval.EvalM
 import Eval.EvalSettings
 import Eval.Helpers  
 import Eval.EvalError
-import Eval.Worker
 
 settings :: EvalSettings
 settings = def {

@@ -26,20 +26,15 @@ extra-source-files:  examples/*.hs
 
 library
   hs-source-dirs:      src
+  ghc-options:         -Wall -Werror -fno-warn-orphans
   exposed-modules:     Eval,
-                       Eval.EvalError,
+                       Eval.EvalWorker,
                        Eval.EvalM,
                        Eval.EvalSettings,
                        Eval.Helpers,
-                       Eval.Limits,
-                       Eval.Worker,
-                       Eval.Worker.EvalCmd,
-                       Eval.Worker.Internal,
-                       Eval.Worker.Protocol,
-                       Eval.Worker.RestartingPool,
-                       Eval.Worker.Types,
+                       Eval.Handlers,
+                       Eval.EvalError,
                        SignalHandlers
-  ghc-options:         -Wall  
   build-depends:       base >=4.6 && <5,
                        transformers ==0.3.*,
                        mtl ==2.1.*,
@@ -55,6 +50,7 @@ library
                        vector ==0.10.*,
                        hashable, 
                        text,
+                       workers,
                        stm,
                        monad-control,
                        network ==2.4.*,
@@ -65,13 +61,14 @@ library
 executable eval-service  
   hs-source-dirs:      src-service
   main-is:             Main.hs
-  ghc-options:         -O2 -Wall
+  ghc-options:         -O2 -Wall -Werror
   build-depends:       base,
                        transformers,
                        network ==2.4.*,
                        data-default,
                        cereal,
                        time,
+                       workers,
                        text,
                        unix,
                        filepath,
@@ -89,6 +86,7 @@ executable evali
                        readline,
                        data-default,
                        time,
+                       workers,
                        text,
                        eval-api,
                        display

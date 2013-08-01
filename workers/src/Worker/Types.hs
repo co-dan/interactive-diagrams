@@ -5,6 +5,17 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving  #-}
 {-# LANGUAGE TypeFamilies        #-}
+{-|
+  Worker can be in one of three states
+
+    [Uninitialized] Uninitialized worker is a worker that has a name,
+    a socket, possibly 'WData' but has not been forker
+
+    [Initialized] Initialized worker has an associated forker process.
+
+    [Active] A worker is active if it's initialized and it's being used
+    a client. Active/inactive workers are managed by a 'WorkersPool'.
+-}
 module Worker.Types where
 
 import Control.Exception     (Exception, IOException, handle)
