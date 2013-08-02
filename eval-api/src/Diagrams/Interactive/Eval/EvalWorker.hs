@@ -165,7 +165,7 @@ runToHandle :: (Serialize a, Show a)
 runToHandle act hndl = do
     ref <- liftIO $ newIORef []
     set <- ask
-    liftEvalM $ initGhc ref (verbLevel set)
+    liftGhc $ initGhc ref (verbLevel set)
     dr :: Either String a <- handleException act
     errors :: [EvalError] <- liftIO $ readIORef ref
     _ <- liftIO $ sendData hndl (dr, errors)

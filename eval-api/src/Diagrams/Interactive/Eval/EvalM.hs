@@ -9,7 +9,7 @@ module Diagrams.Interactive.Eval.EvalM
       -- * Functions
     , run
     , run'
-    , liftEvalM
+    , liftGhc
     ) where
 
 import           Control.Applicative          ((<$>))
@@ -40,7 +40,7 @@ newtype EvalM a = EvalM { unEvalM :: ReaderT EvalSettings Ghc a }
 run :: EvalM a -> EvalSettings -> IO (Either String a)
 run m set = do
     ref <- newIORef []
-    r <- handleException $ run' (liftEvalM (initGhc ref (verbLevel set)) >> m) set
+    r <- handleException $ run' (liftGhc (initGhc ref (verbLevel set)) >> m) set
     logMsg <- unlines . map show <$> readIORef ref
     case r of
         Left s -> return $ Left $ s ++ "\n" ++ logMsg
@@ -51,8 +51,8 @@ run' :: EvalM a -> EvalSettings -> IO a
 run' m set = runGhc (libDirPath set) (runEvalM m set)
 
 -- | Lift Ghc action to the EvalM monad
-liftEvalM :: Ghc a -> EvalM a
-liftEvalM = EvalM . lift
+liftGhc :: Ghc a -> EvalM a
+liftGhc = EvalM . lift
 
 
 runEvalM :: EvalM a -> EvalSettings -> Ghc a
@@ -73,7 +73,7 @@ instance ExceptionMonad EvalM where
         EvalM $ ReaderT $ \r ->
           gmask $ \ghc_restore -> do
               let eval_restore act =
-                      liftEvalM $ ghc_restore (runEvalM act r)
+                      liftGhc $ ghc_restore (runEvalM act r)
               runEvalM (callb eval_restore) r
 
 #if __GLASGOW_HASKELL__ < 707
@@ -82,11 +82,11 @@ instance MonadUtils.MonadIO EvalM where
 #endif
 
 instance HasDynFlags EvalM where
-    getDynFlags = liftEvalM getDynFlags
+    getDynFlags = liftGhc getDynFlags
 
 instance Functor EvalM where
     fmap = liftM
 
 instance GhcMonad EvalM where
-    getSession = liftEvalM getSession
-    setSession = liftEvalM . setSession
+    getSession = liftGhc getSession
+    setSession = liftGhc . setSession
