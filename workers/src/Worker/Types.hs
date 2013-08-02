@@ -16,12 +16,28 @@
     [Active] A worker is active if it's initialized and it's being used
     a client. Active/inactive workers are managed by a 'WorkersPool'.
 -}
-module Worker.Types where
+module Worker.Types
+    (
+      -- * Limit settings
+      LimitSettings(..)
+    , RLimits(..)
+    , defaultLimits
+      -- * Workers
+    , Worker(..)
+    , RestartWorker
+    , WorkerData(..)
+    , IOWorker
+      -- * Other types
+    , ProtocolException(..)
+      -- * Helper functions
+    , initialized
+    , workerAlive
+    , processAlive
+    ) where
 
 import Control.Exception     (Exception, IOException, handle)
-import Control.Monad         (when)
 import Data.Default
-import Data.Maybe            (fromJust, isJust)
+import Data.Maybe            (isJust)
 import Data.Serialize        (Serialize)
 import Data.Typeable
 import GHC.Generics
@@ -29,7 +45,6 @@ import System.Linux.SELinux  (SecurityContext)
 import System.Posix.Process  (getProcessStatus)
 import System.Posix.Resource (Resource (..), ResourceLimit (..),
                               ResourceLimits (..))
-import System.Posix.Signals  (killProcess, signalProcess)
 import System.Posix.Types    (CUid (..), UserID)
 import System.Posix.Types    (CPid (..), ProcessID)
 
@@ -53,6 +68,8 @@ instance Serialize ResourceLimit
 instance Serialize ResourceLimits
 instance Serialize RLimits
 
+-- | Datastructure that holds the information about restrictions and
+--   limitations for the worker process
 data LimitSettings = LimitSettings
     { -- | Maximum time for which the code is allowed to run
       -- (in seconds)
@@ -85,6 +102,7 @@ deriving instance Generic CUid
 instance Serialize CUid
 instance Serialize LimitSettings
 
+-- | Default 'LimitSettings'
 defaultLimits :: LimitSettings
 defaultLimits = LimitSettings
     { timeout    = 3
@@ -139,13 +157,25 @@ deriving instance Generic CPid
 instance Serialize CPid
 instance Serialize (Worker a)
 
-data IOWorker
-
+-- | Types of data attached to a worker.
+-- This might be a configuration file, a size of the packet, session data, etc.
 class WorkerData w where
     -- | Data that saves after restarts
     type WData w :: *
     -- | Monad in which the worker runs
     type WMonad w :: * -> *
+
+{- | A simple type of worker that executes IO actions
+
+The definition of the 'WorkerData' instance for IOWorker looks like this:
+
+@
+  instance WorkerData IOWorker where
+      type WData IOWorker = ()
+      type WMonad IOWorker = IO
+@
+-}
+data IOWorker
 
 instance WorkerData IOWorker where
     type WData IOWorker = ()
@@ -174,26 +204,12 @@ processAlive pid = handle (\(_ :: IOException) -> return False) $ do
     _ <- getProcessStatus False False pid
     return True
 
+-- | Checks whether the worker is alive
 workerAlive :: Worker a -> IO Bool
 workerAlive w = do
     case (workerPid w) of
         Nothing  -> return False
         Just pid -> processAlive pid
-
--- | Kills a worker, take an initialized worker,
--- returns non-initialized one.
-killWorker :: Worker a -> IO (Worker a)
-killWorker w@Worker{..} = do
-    when (initialized w) $ do
-        alive <- processAlive (fromJust workerPid)
-        when alive $ do
-            signalProcess killProcess (fromJust workerPid)
-            tc <- getProcessStatus False False (fromJust workerPid)
-            case tc of
-                Just _  -> return ()
-                Nothing -> signalProcess killProcess (fromJust workerPid)
-    return (w { workerPid = Nothing })
-
 
 
 --- This snippet is taken from the mueval package

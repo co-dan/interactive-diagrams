@@ -1,5 +1,6 @@
 {-# LANGUAGE ForeignFunctionInterface #-}
 {-# LANGUAGE RecordWildCards          #-}
+-- | The implementation of security restrictions
 module Worker.Internal.Limits
     (
       -- * Apply restrictions

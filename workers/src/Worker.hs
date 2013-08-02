@@ -1,6 +1,7 @@
 {-# LANGUAGE BangPatterns          #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+-- | Main entry point
 module Worker
     (
       module Worker.Types
@@ -8,6 +9,7 @@ module Worker
     , module Worker.Protocol
     , mkDefaultWorker
     , startWorker
+    , killWorker
     , startIOWorker
     ) where
 
@@ -25,7 +27,7 @@ import System.Posix.User      (getEffectiveUserID, setEffectiveUserID)
 import Worker.Internal
 import Worker.Internal.Limits
 import Worker.Pool
-import Worker.Protocol
+import Worker.Protocol    
 import Worker.Types
 
 -- | Create an uninitialized worker

@@ -3,7 +3,18 @@
 {-# LANGUAGE RecordWildCards       #-}
 -- | A non-stripped pooling abstraction that restarts workers
 -- Some got has been taken from 'Data.Pool' by bos
-module Worker.Pool where
+module Worker.Pool
+    (
+      -- * Workers Pool
+      WorkersPool
+    , mkPool
+      -- * High-level operations on the pool
+    , withWorker
+      -- * Low-level operations on the pool
+    , takeWorker
+    , putWorker
+    , destroyWorker
+    ) where
 
 import Control.Applicative         ((<$>), (<*>))
 import Control.Concurrent          (forkIO, killThread, threadDelay)
@@ -14,7 +25,9 @@ import Control.Monad.Trans.Control (MonadBaseControl, control)
 import System.Mem.Weak             (addFinalizer)
 
 import Worker.Types
+import Worker.Internal
 
+-- | A simple pool for workers. Workers are restarted from time to time
 data WorkersPool a = Pool
     { newWorker     :: Int -> IO (Worker a, RestartWorker IO a)
       -- ^ Action for creating a new worker
@@ -28,11 +41,14 @@ data WorkersPool a = Pool
       -- ^ How long we should wait before restarting the workers (in seconds)
     }
 
-data WorkerStatus = Idle | InUse
 
+-- | Create a new workers pool    
 mkPool :: (Int -> IO (Worker a, RestartWorker IO a))
+       -- ^ An action that creates a new worker. Takes a unique number as an argument
        -> Int
+       -- ^ Maximum number of workers in the pool   
        -> Int
+       -- ^ Restart rate (in seconds)
        -> IO (WorkersPool a)
 mkPool newW maxW restartRate = do
     res <- atomically $ newTVar []
@@ -52,6 +68,9 @@ reaper wrkrs t' = forever $ do
     atomically $ writeTVar wrkrs workers'
 
 
+-- | Take worker from the pool.
+-- The caller is responsible for putting the worker back into the pool
+-- or destroying it with 'destroyWorker'   
 takeWorker :: WorkersPool a -> IO (Worker a, RestartWorker IO a)
 takeWorker Pool{..} = do
     res <- readTVarIO workers
@@ -71,17 +90,19 @@ takeWorker Pool{..} = do
             return $ newWorker (activeRes+1)
                 `onException` atomically (modifyTVar' activeWorkers (subtract 1))
 
+-- | Put the worker back in pool    
 putWorker :: WorkersPool a -> (Worker a, RestartWorker IO a) -> IO ()
 putWorker Pool{..} w = atomically $
     modifyTVar' workers (w:)
 
-
+-- | Destroy a worker. Frees up space in the pool
 destroyWorker :: WorkersPool a -> Worker a -> IO ()
 destroyWorker Pool{..} w = do
     _ <- killWorker w
     atomically $ modifyTVar' activeWorkers (subtract 1)
 
 
+-- | Like 'takeWorker' + 'putWorker' but takes care of the exception handling for you    
 withWorker :: (MonadBaseControl IO m)
            => WorkersPool a
            -> ((Worker a, RestartWorker IO a) -> m b)
