@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveGeneric      #-}
 {-# LANGUAGE FlexibleInstances  #-}
 {-# LANGUAGE StandaloneDeriving #-}
+-- | Evaluation settings
 module Diagrams.Interactive.Eval.EvalSettings
     (
       EvalSettings(..)
@@ -59,7 +60,19 @@ instance Show (IO Handle) where
 instance Eq (IO Handle) where
   _ == _ = False
 
-
+{- | Default value for 'EvalSettings'
+@
+defaultSettings = EvalSettings
+    { tmpDirPath   = "/tmp"
+    , libDirPath   = Just libdir
+    , pkgDatabases = []
+    , verbLevel    = 1
+    , outHandle    = Nothing -- return stdout
+    , limitSet     = def
+    , preloadFile  = "Preload.hs"
+    }
+@
+-}  
 defaultSettings :: EvalSettings
 defaultSettings = EvalSettings
     { tmpDirPath   = "/tmp"

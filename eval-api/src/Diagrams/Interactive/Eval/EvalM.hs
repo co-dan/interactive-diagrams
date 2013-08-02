@@ -1,7 +1,16 @@
 {-# LANGUAGE CPP                        #-}
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-module Diagrams.Interactive.Eval.EvalM where
+module Diagrams.Interactive.Eval.EvalM
+    (
+      -- * Types
+      EvalResult
+    , EvalM(..)
+      -- * Functions
+    , run
+    , run'
+    , liftEvalM
+    ) where
 
 import           Control.Applicative          ((<$>))
 import           Control.Monad                (liftM)
@@ -27,7 +36,7 @@ newtype EvalM a = EvalM { unEvalM :: ReaderT EvalSettings Ghc a }
             MonadReader EvalSettings,
             MonadIO)
 
--- | Runs an EvalM monad and returns either a result, or an error message
+-- | Runs an EvalM monad action and returns either a result, or an error message
 run :: EvalM a -> EvalSettings -> IO (Either String a)
 run m set = do
     ref <- newIORef []
@@ -37,18 +46,17 @@ run m set = do
         Left s -> return $ Left $ s ++ "\n" ++ logMsg
         _ -> return r
 
+-- | Runs an EvalM monad action
 run' :: EvalM a -> EvalSettings -> IO a
 run' m set = runGhc (libDirPath set) (runEvalM m set)
 
-
+-- | Lift Ghc action to the EvalM monad
 liftEvalM :: Ghc a -> EvalM a
 liftEvalM = EvalM . lift
 
 
 runEvalM :: EvalM a -> EvalSettings -> Ghc a
 runEvalM (EvalM act') = runReaderT act'
-
-
 
 #if __GLASGOW_HASKELL__ < 707
 instance MonadIO Ghc where

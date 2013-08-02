@@ -2,6 +2,7 @@
 {-# LANGUAGE DeriveGeneric      #-}
 {-# LANGUAGE RecordWildCards    #-}
 {-# LANGUAGE StandaloneDeriving #-}
+-- | Errors that may arise during the evaluation
 module Diagrams.Interactive.Eval.EvalError
     (
       Severity(..)
@@ -18,6 +19,7 @@ import Exception
 import GHC
 import GHC.Generics
 
+-- | The targets cannot be loaded    
 data LoadingException = LoadingException
                       deriving (Typeable)
 
@@ -26,6 +28,7 @@ instance Show LoadingException where
 
 instance Exception LoadingException
 
+-- | It's taking too long for the process to complete         
 data TooLong = TooLong
              deriving (Typeable)
 
@@ -48,11 +51,12 @@ srcPos sp = SrcPos
     , startCol = srcSpanStartCol sp
     , endLine = srcSpanEndLine sp
     , endCol = srcSpanEndCol sp }
-    
+
+-- | Evaluation error    
 data EvalError = EvalError
-    { severity :: Severity     -- ^ The severity of the error
-    , errMsg   :: String       -- ^ The error message
-    , srcSpan  :: SrcPos  -- ^ Position of the error in the source code
+    { severity :: Severity  -- ^ The severity of the error
+    , errMsg   :: String    -- ^ The error message
+    , srcSpan  :: SrcPos    -- ^ Position of the error in the source code
     } deriving (Generic, Eq)
                
 deriving instance Generic Severity
@@ -78,3 +82,4 @@ instance Show Severity where
     show SevError = "Error: "
     show SevFatal = "Fatal: "
     show _ = ""
+

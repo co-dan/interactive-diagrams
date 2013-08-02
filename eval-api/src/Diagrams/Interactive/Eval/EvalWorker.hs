@@ -9,7 +9,24 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving  #-}
 {-# LANGUAGE TypeFamilies        #-}
-module Diagrams.Interactive.Eval.EvalWorker where
+module Diagrams.Interactive.Eval.EvalWorker
+    (
+      -- * Eval worker
+      EvalWorker
+    , startEvalWorker
+      -- ** Communication
+    , sendEvalRequest
+    , sendEvalRequestNoRestart
+    , sendCompileFileRequest
+    , sendEvalStringRequest
+      -- * Eval Cmd
+    , EvalCmd(..)
+    , evalCmdToEvalM
+      -- * Other stuff
+    , EvalResultWithErrors
+    , WStatus(..)
+    , ServiceCmd(..)
+    ) where
 
 import           Control.Applicative                    ((<$>), (<*>))
 import           Control.Concurrent                     (threadDelay)
@@ -50,6 +67,16 @@ import           Worker.Internal
 -- | Evaluation result together with a list of errors/warnings
 type EvalResultWithErrors = (EvalResult, [EvalError])
 
+{- | A type of worker that evaluates code.
+Stores the GHC session for preloading
+
+@
+instance WorkerData EvalWorker where
+    type WData EvalWorker = 'HscEnv'
+    type WMonad EvalWorker = IO
+@
+
+-}
 data EvalWorker
 
 instance WorkerData EvalWorker where
@@ -171,7 +198,7 @@ sendEvalRequest (w, restart) cmd = do
                                  str, [])
     return (evres, w')
 
-
+-- | Just like 'sendEvalRequest' but does not restart the worker if the limits were hit
 sendEvalRequestNoRestart :: Worker EvalWorker
                          -> EvalCmd
                          -> IO (EvalResultWithErrors, WStatus)
@@ -202,16 +229,18 @@ performEvalRequest hndl cmd = do
 
 ------------------------------------------------------------
 
+-- | Datatype used for communicating with the 'EvalWorker'
 data EvalCmd = CompileFile FilePath
-               -- ^ Path to the file
+               -- ^ Compile a Haskell module. Takes the path to the file
              | EvalString  String
-               -- ^ Expression to evaluate
+               -- ^ Evaluate a string. Takes the expression to evaluate
              | EvalFile    String    Text
-               -- ^  Name of the file, contents
+               -- ^  Similar to 'CompileFile'. Takes the name of the file, contents
              deriving (Typeable, Generic)
 
 instance Serialize EvalCmd
 
+-- | Convert an 'EvalCmd' to 'EvalM' action that can be executed         
 evalCmdToEvalM :: EvalCmd -> EvalM DisplayResult
 evalCmdToEvalM (CompileFile fpath) = do
   loadFile fpath
@@ -219,7 +248,6 @@ evalCmdToEvalM (CompileFile fpath) = do
   if underIO
     then compileExpr "(return . display =<< main) :: IO DisplayResult"
     else compileExpr "(display (main)) :: DisplayResult"
-
 evalCmdToEvalM (EvalString s) = compileExpr s
 evalCmdToEvalM (EvalFile n txt) = do
   EvalSettings{..} <- ask
@@ -228,11 +256,13 @@ evalCmdToEvalM (EvalFile n txt) = do
   liftIO $ T.writeFile fpath txt
   evalCmdToEvalM (CompileFile fpath)
 
+-- | Worker status  
 data WStatus = OK | Timeout | Unknown
              deriving (Generic, Show)
 
 instance Serialize WStatus
 
+-- | Commands for the service app         
 data ServiceCmd = RequestWorker
                 | RequestWorkerMaybe
                 | ReturnWorker WStatus (Worker EvalWorker)
