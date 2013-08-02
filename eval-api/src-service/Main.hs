@@ -1,31 +1,38 @@
-{-# LANGUAGE DeriveDataTypeable, RankNTypes, ImpredicativeTypes #-}
-{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE ImpredicativeTypes #-}
+{-# LANGUAGE RankNTypes         #-}
+{-# LANGUAGE TupleSections      #-}
 module Main where
 
-import Control.Applicative ((<$>))
-import Control.Concurrent (forkIO)
-import Control.Concurrent.MVar  
-import Control.Monad (unless, void, forever)
-import Data.Default
-import Network (accept, Socket)
-import System.Directory (doesDirectoryExist, createDirectory)
-import System.FilePath.Posix ((</>))
-import System.IO (IOMode(..), openFile, hClose, stdin, hSetBuffering, BufferMode(..))
-import System.Posix.Files (setOwnerAndGroup)
-import System.Posix.User (getUserEntryForName, UserEntry(..))
-import System.Posix.Types (UserID)
+import           Control.Applicative                    ((<$>))
+import           Control.Concurrent                     (forkIO)
+import           Control.Concurrent.MVar
+import           Control.Monad                          (forever, unless, void)
+import           Data.Default
+import           Network                                (Socket, accept)
+import           System.Directory                       (createDirectory,
+                                                         doesDirectoryExist)
+import           System.FilePath.Posix                  ((</>))
+import           System.IO                              (BufferMode (..),
+                                                         IOMode (..), hClose,
+                                                         hSetBuffering,
+                                                         openFile, stdin)
+import           System.Posix.Files                     (setOwnerAndGroup)
+import           System.Posix.Types                     (UserID)
+import           System.Posix.User                      (UserEntry (..),
+                                                         getUserEntryForName)
 
-import Worker.Pool (WorkersPool)    
-import qualified Worker.Pool as W
-import Worker.Types    
-import Worker.Protocol
-import Worker.Internal
-import Eval.EvalWorker
-import Eval.EvalSettings
-import SignalHandlers
-import Debug.Trace 
+import           Debug.Trace
+import           Diagrams.Interactive.Eval.EvalSettings
+import           Diagrams.Interactive.Eval.EvalWorker
+import           SignalHandlers
+import           Worker.Internal
+import           Worker.Pool                            (WorkersPool)
+import qualified Worker.Pool                            as W
+import           Worker.Protocol
+import           Worker.Types
 
--- -- | Debug function  
+-- -- | Debug function
 -- traceM :: Monad m => String -> m ()
 -- traceM s = trace s $ return ()
 
@@ -66,7 +73,7 @@ newWorkerAct :: Show a => EvalSettings -> a -> IO (Worker EvalWorker, RestartWor
 newWorkerAct wsettings i = do
   let wname = "EvalWorker" ++ show i
       wdir  = workersDir </> ("worker" ++ show i)
-  uid <- userID <$> getUserEntryForName username      
+  uid <- userID <$> getUserEntryForName username
   doesDirectoryExist wdir >>= \e -> unless e $
     createDirectory wdir
   startEvalWorker wname (wsettings { limitSet = limSettings  {
@@ -81,8 +88,8 @@ main = do
   pool <- W.mkPool (newWorkerAct set) 1 (60*5)
   currentWorkers <- newMVar []
   soc <- mkSock sockFile
-  userID <$> getUserEntryForName username      
-   >>= setOwner sockFile 
+  userID <$> getUserEntryForName username
+   >>= setOwner sockFile
   loop soc pool currentWorkers
   return ()
 
@@ -91,7 +98,7 @@ loop :: Socket
      -> MVar [(Worker EvalWorker, RestartWorker IO EvalWorker)]
      -> IO ()
 loop soc pool currentWorkers = forever $ do
-  restoreHandlers 
+  restoreHandlers
   (hndl, _, _) <- accept soc
   cmd <- getData hndl
   case cmd of

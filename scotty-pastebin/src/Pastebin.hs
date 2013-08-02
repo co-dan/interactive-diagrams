@@ -48,8 +48,8 @@ import           Text.Blaze.Html.Renderer.Text
 
 import           Config
 import           Diagrams.Interactive.Display         (display)
-import           Eval
-import           Eval.EvalError
+import           Diagrams.Interactive.Eval
+import           Diagrams.Interactive.Eval.EvalError
 import           Pastebin.ErrorMessage
 import           Pastebin.Gallery
 import           Pastebin.Paste

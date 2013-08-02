@@ -1,23 +1,24 @@
 {-# LANGUAGE RankNTypes #-}
 module Main where
 
-import Control.Monad
-import Control.Monad.IO.Class
-import Data.List
-import qualified Data.Text.Lazy as TL
-import Control.Concurrent
-import Data.Default
-import System.Console.Readline
-import Data.Time.Clock (getCurrentTime, diffUTCTime)
+import           Control.Concurrent
+import           Control.Monad
+import           Control.Monad.IO.Class
+import           Data.Default
+import           Data.List
+import qualified Data.Text.Lazy                         as TL
+import           Data.Time.Clock                        (diffUTCTime,
+                                                         getCurrentTime)
+import           System.Console.Readline
 
-import Diagrams.Interactive.Display
-import Worker
-import Eval
-import Eval.EvalWorker
-import Eval.EvalM
-import Eval.EvalSettings
-import Eval.Helpers  
-import Eval.EvalError
+import           Diagrams.Interactive.Display
+import           Diagrams.Interactive.Eval
+import           Diagrams.Interactive.Eval.EvalError
+import           Diagrams.Interactive.Eval.EvalM
+import           Diagrams.Interactive.Eval.EvalSettings
+import           Diagrams.Interactive.Eval.EvalWorker
+import           Diagrams.Interactive.Eval.Helpers
+import           Worker
 
 settings :: EvalSettings
 settings = def {
@@ -61,15 +62,15 @@ evalLn :: String
        -> (Worker EvalWorker, RestartWorker IO EvalWorker)
        -> IO (EvalResultWithErrors, Worker EvalWorker)
 evalLn s wrk
-  | ":load" `isPrefixOf` s = 
+  | ":load" `isPrefixOf` s =
     let fname = dropWhile (==' ') $ drop 5 s
     in sendCompileFileRequest wrk fname
   | otherwise = let expr = ("(return $ display (" ++ s ++ ")) :: IO DisplayResult")
                 in sendEvalStringRequest wrk expr
 
 cleanUp :: Worker a -> IO ()
-cleanUp w = void $ killWorker w 
-                   
+cleanUp w = void $ killWorker w
+
 measureTime :: MonadIO m => m a -> m a
 measureTime act = do
   t0 <- liftIO getCurrentTime

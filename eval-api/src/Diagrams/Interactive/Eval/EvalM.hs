@@ -1,7 +1,7 @@
 {-# LANGUAGE CPP                        #-}
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-module Eval.EvalM where
+module Diagrams.Interactive.Eval.EvalM where
 
 import           Control.Applicative          ((<$>))
 import           Control.Monad                (liftM)
@@ -17,8 +17,8 @@ import qualified MonadUtils
 #endif
 
 import           Diagrams.Interactive.Display
-import           Eval.EvalSettings
-import           Eval.Handlers
+import           Diagrams.Interactive.Eval.EvalSettings
+import           Diagrams.Interactive.Eval.Handlers
 
 type EvalResult = Either String DisplayResult
 

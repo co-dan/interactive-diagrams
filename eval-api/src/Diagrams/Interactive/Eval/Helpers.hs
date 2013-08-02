@@ -4,7 +4,7 @@
 {-|
   Helper functions for the 'EvalM' and 'Ghc' monads
 -}
-module Eval.Helpers
+module Diagrams.Interactive.Eval.Helpers
     (
       -- * Compilation and interpretation (of computer programs)
       loadFile
@@ -35,8 +35,8 @@ import Packages                     hiding (display)
 import Type
 
 import Diagrams.Interactive.Display
-import Eval.EvalError
-import Eval.EvalM
+import Diagrams.Interactive.Eval.EvalError
+import Diagrams.Interactive.Eval.EvalM
 
 ------------------------------------------------------------
 -- Code queries

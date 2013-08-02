@@ -5,7 +5,7 @@ module Pastebin.ErrorMessage
     (
       ErrMsg(..)
     , mkErrMsg
-    , module Eval.EvalError
+    , module Diagrams.Interactive.Eval.EvalError
     ) where
 
 import           Data.Data
@@ -15,7 +15,7 @@ import           Data.Text.Lazy                (Text, pack)
 import           Text.Blaze.Html.Renderer.Text (renderHtml)
 import qualified Text.Blaze.Html5              as H
 
-import           Eval.EvalError
+import           Diagrams.Interactive.Eval.EvalError
 
 data ErrMsg = ErrMsg { content :: Text, caption :: String, style :: String }
             deriving (Typeable, Data)

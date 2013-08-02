@@ -4,7 +4,7 @@
 {-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 -- | Various handlers for the GHC API
-module Eval.Handlers
+module Diagrams.Interactive.Eval.Handlers
     (
       initGhc
     , handleException
@@ -20,7 +20,7 @@ import GHC
 import Outputable
 import Panic
 
-import Eval.EvalError
+import Diagrams.Interactive.Eval.EvalError
 import SignalHandlers
 
 -- | Inits the GHC API, sets the mode and the log handler

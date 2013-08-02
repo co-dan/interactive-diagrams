@@ -9,40 +9,40 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving  #-}
 {-# LANGUAGE TypeFamilies        #-}
-module Eval.EvalWorker where
+module Diagrams.Interactive.Eval.EvalWorker where
 
-import           Control.Applicative          ((<$>), (<*>))
-import           Control.Concurrent           (threadDelay)
-import           Control.Concurrent.Async     (race)
-import           Control.Exception            (catch, throwIO)
-import           Control.Monad                (forever)
-import           Control.Monad.IO.Class       (liftIO)
-import           Control.Monad.Reader         (ask)
-import           Data.IORef                   (newIORef, readIORef)
-import           Data.Maybe                   (fromJust)
-import           Data.Serialize               (Serialize)
-import           Data.Text.Lazy               (Text)
-import qualified Data.Text.Lazy.IO            as T
+import           Control.Applicative                    ((<$>), (<*>))
+import           Control.Concurrent                     (threadDelay)
+import           Control.Concurrent.Async               (race)
+import           Control.Exception                      (catch, throwIO)
+import           Control.Monad                          (forever)
+import           Control.Monad.IO.Class                 (liftIO)
+import           Control.Monad.Reader                   (ask)
+import           Data.IORef                             (newIORef, readIORef)
+import           Data.Maybe                             (fromJust)
+import           Data.Serialize                         (Serialize)
+import           Data.Text.Lazy                         (Text)
+import qualified Data.Text.Lazy.IO                      as T
 import           Data.Typeable
 import           GHC.Generics
-import           Network                      (accept)
-import           System.Directory             (createDirectory,
-                                               removeDirectoryRecursive)
-import           System.FilePath.Posix        ((</>))
-import           System.IO                    (Handle, hClose)
-import           System.IO.Error              (isAlreadyExistsError,
-                                               isPermissionError)
-import           System.Posix.Signals         (killProcess, signalProcess)
-import           System.Posix.Types           (ProcessID)
+import           Network                                (accept)
+import           System.Directory                       (createDirectory, removeDirectoryRecursive)
+import           System.FilePath.Posix                  ((</>))
+import           System.IO                              (Handle, hClose)
+import           System.IO.Error                        (isAlreadyExistsError,
+                                                         isPermissionError)
+import           System.Posix.Signals                   (killProcess,
+                                                         signalProcess)
+import           System.Posix.Types                     (ProcessID)
 
 
 import           Diagrams.Interactive.Display
-import           Eval.EvalError
-import           Eval.EvalM
-import           Eval.EvalSettings
-import           Eval.Handlers
-import           Eval.Helpers
-import           GHC                          hiding (compileExpr)
+import           Diagrams.Interactive.Eval.EvalError
+import           Diagrams.Interactive.Eval.EvalM
+import           Diagrams.Interactive.Eval.EvalSettings
+import           Diagrams.Interactive.Eval.Handlers
+import           Diagrams.Interactive.Eval.Helpers
+import           GHC                                    hiding (compileExpr)
 import           SignalHandlers
 import           Worker
 import           Worker.Internal

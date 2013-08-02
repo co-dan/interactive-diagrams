@@ -2,7 +2,7 @@
 {-# LANGUAGE DeriveGeneric      #-}
 {-# LANGUAGE RecordWildCards    #-}
 {-# LANGUAGE StandaloneDeriving #-}
-module Eval.EvalError
+module Diagrams.Interactive.Eval.EvalError
     (
       Severity(..)
     , SrcPos(..)

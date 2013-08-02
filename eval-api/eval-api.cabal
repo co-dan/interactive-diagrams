@@ -27,13 +27,13 @@ extra-source-files:  examples/*.hs
 library
   hs-source-dirs:      src
   ghc-options:         -Wall -Werror -fno-warn-orphans
-  exposed-modules:     Eval,
-                       Eval.EvalWorker,
-                       Eval.EvalM,
-                       Eval.EvalSettings,
-                       Eval.Helpers,
-                       Eval.Handlers,
-                       Eval.EvalError,
+  exposed-modules:     Diagrams.Interactive.Eval,
+                       Diagrams.Interactive.Eval.EvalWorker,
+                       Diagrams.Interactive.Eval.EvalM,
+                       Diagrams.Interactive.Eval.EvalSettings,
+                       Diagrams.Interactive.Eval.EvalError,
+                       Diagrams.Interactive.Eval.Helpers,
+                       Diagrams.Interactive.Eval.Handlers,
                        SignalHandlers
   build-depends:       base >=4.6 && <5,
                        transformers ==0.3.*,

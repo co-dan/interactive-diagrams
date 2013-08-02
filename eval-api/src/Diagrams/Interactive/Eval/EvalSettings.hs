@@ -1,7 +1,7 @@
 {-# LANGUAGE DeriveGeneric      #-}
 {-# LANGUAGE FlexibleInstances  #-}
 {-# LANGUAGE StandaloneDeriving #-}
-module Eval.EvalSettings
+module Diagrams.Interactive.Eval.EvalSettings
     (
       EvalSettings(..)
     , defaultSettings

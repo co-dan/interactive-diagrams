@@ -1,11 +1,11 @@
 {-# LANGUAGE ScopedTypeVariables, RankNTypes, DeriveDataTypeable #-}
 {-# LANGUAGE RecordWildCards, OverloadedStrings #-}
 -- | Main entry point of the library
-module Eval
+module Diagrams.Interactive.Eval
     (
-      module Eval.EvalWorker
+      module Diagrams.Interactive.Eval.EvalWorker
     , module Worker
     ) where  
 
-import Eval.EvalWorker
+import Diagrams.Interactive.Eval.EvalWorker
 import Worker
