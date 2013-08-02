@@ -122,7 +122,9 @@ addPkgDb fp = do
 
 -- | Add a list of package databases to the Ghc monad
 -- This should be equivalen to
+--    
 -- > addPkgDbs ls = mapM_ addPkgDb ls
+--    
 -- but it is actaully faster, because it does the package
 -- reintialization after adding all the databases
 #if __GLASGOW_HASKELL_ >= 707
