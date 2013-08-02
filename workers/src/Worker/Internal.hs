@@ -4,7 +4,7 @@
 -- useful work writing your own workers
 module Worker.Internal
     (
-      forkWorker  
+      forkWorker
       -- * Connection related
     , connectToWorker
     , mkSock
@@ -12,21 +12,22 @@ module Worker.Internal
     , removeFileIfExists
     ) where
 
-import Control.Monad (void)
-import Control.Exception        (catch, throwIO)
-import Network.Socket (close)
-import Network                  (PortID (..), Socket, connectTo, listenOn)
-import System.Directory         (removeFile)
-import System.IO                (Handle)
-import System.IO.Error          (isDoesNotExistError, isPermissionError)
-import System.Posix.Process (forkProcess, getProcessID)
-import System.Mem.Weak (addFinalizer)
-import System.Posix.Signals (Handler(..), installHandler, setStoppedChildFlag, processStatusChanged)
-import System.Posix.Types (ProcessID, Fd(..))
-import System.Posix.IO (handleToFd, dupTo, closeFd)
+import Control.Exception      (catch, throwIO)
+import Control.Monad          (void)
+import Network                (PortID (..), Socket, connectTo, listenOn)
+import Network.Socket         (close)
+import System.Directory       (removeFile)
+import System.IO              (Handle)
+import System.IO.Error        (isDoesNotExistError, isPermissionError)
+import System.Mem.Weak        (addFinalizer)
+import System.Posix.IO        (dupTo, handleToFd)
+import System.Posix.Process   (forkProcess)
+import System.Posix.Signals   (Handler (..), installHandler,
+                               processStatusChanged, setStoppedChildFlag)
+import System.Posix.Types     (Fd (..), ProcessID)
 
-import Worker.Types
 import Worker.Internal.Limits
+import Worker.Types
 
 connectToWorker :: Worker a -> IO Handle
 connectToWorker Worker{..} = connectTo "localhost" (UnixSocket workerSocket)
@@ -46,19 +47,19 @@ mkSock sf = do
 
 forkWorker :: Worker a -> Maybe (IO Handle) -> (Socket -> IO ()) -> IO ProcessID
 forkWorker (w@Worker{..}) out cb = do
-  setStoppedChildFlag True
-  installHandler processStatusChanged Ignore Nothing
-  soc <- mkSock workerSocket
-  addFinalizer w (close soc)
-  forkProcess $ do
-    setStoppedChildFlag False
-    installHandler processStatusChanged Default Nothing
-    setLimits workerLimits
-    case out of
-      Nothing -> return ()
-      Just x  -> do
-        fd <- handleToFd =<< x
-        void $ dupTo fd (Fd 1)
-    cb soc
-    return ()
-    
+    _ <- setStoppedChildFlag True
+    _ <- installHandler processStatusChanged Ignore Nothing
+    soc <- mkSock workerSocket
+    addFinalizer w (close soc)
+    forkProcess $ do
+        _ <- setStoppedChildFlag False
+        _ <- installHandler processStatusChanged Default Nothing
+        setLimits workerLimits
+        case out of
+            Nothing -> return ()
+            Just x  -> do
+                fd <- handleToFd =<< x
+                void $ dupTo fd (Fd 1)
+        cb soc
+
+

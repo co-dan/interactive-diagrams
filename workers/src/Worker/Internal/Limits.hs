@@ -1,6 +1,16 @@
 {-# LANGUAGE ForeignFunctionInterface #-}
 {-# LANGUAGE RecordWildCards          #-}
-module Worker.Internal.Limits where
+module Worker.Internal.Limits
+    (
+      -- * Apply restrictions
+      setLimits
+      -- * Individual limits
+    , setRLimits
+    , chroot
+    , changeUserID
+    , setCGroup
+    , setupSELinuxCntx
+    ) where
 
 import Prelude                hiding (mapM_)
 
@@ -25,38 +35,32 @@ import SignalHandlers
 import Worker.Types
 
 foreign import ccall unsafe "unistd.h chroot"
-  c_chroot :: CString -> IO CInt
+    c_chroot :: CString -> IO CInt
 
+-- | Set the chroot jail                 
 chroot :: FilePath -> IO ()
 chroot fp = do
-  eid <- getEffectiveUserID
-  setUserID (CUid 0)
-  withCString fp $ \c_fp -> do
-    throwErrnoIfMinus1 "chroot" (c_chroot c_fp)
-    changeWorkingDirectory "/"
-    return ()
-  setEffectiveUserID eid
+    eid <- getEffectiveUserID
+    setUserID (CUid 0)
+    withCString fp $ \c_fp -> do
+        _ <- throwErrnoIfMinus1 "chroot" (c_chroot c_fp)
+        changeWorkingDirectory "/"
+        return ()
+    setEffectiveUserID eid
 
+-- | Change the uid of the current process    
 changeUserID :: UserID -> IO ()
 changeUserID uid = do
-  setUserID (CUid 0) -- need to be root in order to setuid()
-  setUserID uid
+    setUserID (CUid 0) -- need to be root in order to setuid()
+    setUserID uid
 
 -- | Add a process to a cgroup
 setCGroup :: LimitSettings
           -> ProcessID      -- ^ The ID of a process to be added to the group
           -> IO ()
 setCGroup LimitSettings{..} pid =
-  mapM_ (\fp -> writeFile (fp </> "tasks") $ show pid) cgroupPath
+    mapM_ (\fp -> writeFile (fp </> "tasks") $ show pid) cgroupPath
 
-setLimits :: LimitSettings -> IO ()
-setLimits LimitSettings{..} = do
-  mapM_ setRLimits rlimits
-  mapM_ setupSELinuxCntx secontext
-  nice niceness
-  mapM_ chroot chrootPath
-  mapM_ changeUserID processUid
-  restoreHandlers
 
 -- | Set rlimits using setrlimit syscall
 setRLimits :: RLimits -> IO ()
@@ -80,9 +84,9 @@ setRLimits RLimits{..} = mapM_ (uncurry setResourceLimit) lims
 -- we only modify the type part
 setupSELinuxCntx :: SecurityContext -> IO ()
 setupSELinuxCntx ty = do
-  con <- splitBy (==':') <$> getCon
-  when (length con /= 4) $ error ("Bad context: " ++ mconcat con)
-  setCon $ mconcat $ intersperse ":" [con !! 0, con !! 1, ty, con !! 3]
+    con <- splitBy (==':') <$> getCon
+    when (length con /= 4) $ error ("Bad context: " ++ mconcat con)
+    setCon $ mconcat $ intersperse ":" [con !! 0, con !! 1, ty, con !! 3]
 
 splitBy :: (a -> Bool) -> [a] -> [[a]]
 splitBy _ []     = []
@@ -91,3 +95,12 @@ splitBy f (x:xs)
   | otherwise = s : splitBy f s'
   where (s, s') = break f (x:xs)
 
+-- | Apply the 'LimitSettings'        
+setLimits :: LimitSettings -> IO ()
+setLimits LimitSettings{..} = do
+    mapM_ setRLimits rlimits
+    mapM_ setupSELinuxCntx secontext
+    nice niceness
+    mapM_ chroot chrootPath
+    mapM_ changeUserID processUid
+    restoreHandlers

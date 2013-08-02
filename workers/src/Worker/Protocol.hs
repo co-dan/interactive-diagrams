@@ -31,21 +31,21 @@ getData h = getData' h
 
 sendData' :: Serialize a => Handle -> a -> IO ByteString
 sendData' hndl datum = do
-  let encoded = encode datum
-  let len     = (fromIntegral . BS.length $ encoded) :: Word32
-  hPut hndl (encode len)
-  hFlush hndl
-  hPut hndl encoded
-  hFlush hndl
-  return encoded
+    let encoded = encode datum
+    let len     = (fromIntegral . BS.length $ encoded) :: Word32
+    hPut hndl (encode len)
+    hFlush hndl
+    hPut hndl encoded
+    hFlush hndl
+    return encoded
 
 getData' :: Serialize a => Handle -> IO a
 getData' hndl = do
-  lenD :: DecodeResult Word32 <- decode <$> hGet hndl 4
-  let len = case lenD of
-        Right i -> fromIntegral i
-        Left str -> throw (ConversionException $ "length\n" ++ str)
-  res <- decode <$> hGet hndl len
-  case res of
-    Left str -> throw (ConversionException $ "Deserialization error:\n" ++ str)
-    Right x  -> return x
+    lenD :: DecodeResult Word32 <- decode <$> hGet hndl 4
+    let len = case lenD of
+            Right i -> fromIntegral i
+            Left str -> throw (ConversionException $ "length\n" ++ str)
+    res <- decode <$> hGet hndl len
+    case res of
+        Left str -> throw (ConversionException $ "Deserialization error:\n" ++ str)
+        Right x  -> return x

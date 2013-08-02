@@ -11,36 +11,22 @@ module Worker
     , startIOWorker
     ) where
 
-import Worker.Internal
-import Worker.Internal.Limits
-import Worker.Pool
-import Worker.Protocol
-import Worker.Types
-
 import Prelude                hiding (mapM_)
 
-import Control.Applicative    ((<$>), (<*>))
-import Control.Exception      (catch, throwIO)
-import Control.Monad          (forever, unless, void)
+import Control.Monad          (forever)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.Default
 import Data.Foldable          (mapM_)
 import Data.Typeable          ()
 import Network                (Socket, accept)
-import Network.Socket         (close)
-import System.Directory
-import System.FilePath.Posix  ((</>))
-import System.IO              (Handle, stdout)
-import System.IO.Error        (isAlreadyExistsError, isPermissionError)
-import System.Mem.Weak        (addFinalizer)
-import System.Posix.IO        (closeFd, dupTo, handleToFd)
-import System.Posix.Process   (forkProcess, getProcessID)
-import System.Posix.Signals   (Handler (..), installHandler,
-                               processStatusChanged, setStoppedChildFlag)
-import System.Posix.Types     (Fd (..), ProcessID)
-import System.Posix.User      (getEffectiveUserID, getRealUserID,
-                               setEffectiveUserID)
+import System.IO              (Handle)
+import System.Posix.User      (getEffectiveUserID, setEffectiveUserID)
 
+import Worker.Internal
+import Worker.Internal.Limits
+import Worker.Pool
+import Worker.Protocol
+import Worker.Types
 
 -- | Create an uninitialized worker
 mkDefaultWorker :: String -> FilePath -> LimitSettings -> Worker a
@@ -61,15 +47,15 @@ mkDefaultWorker name sock set = Worker
   the callback.
 -}
 startWorker :: (WorkerData w, MonadIO (WMonad w))
-            => String         --  ^ Name
-            -> FilePath       --  ^ Socket
-            -> Maybe (IO Handle)         --  ^ Where to redirect stdout, stderr
-            -> LimitSettings  --  ^ Restrictions
-            -> WMonad w (WData w) --  ^ Pre-forking action
-            -> (WData w -> Socket -> IO ()) -- ^ Socket callback
+            => String         -- ^ Name
+            -> FilePath       -- ^ Socket
+            -> Maybe (IO Handle)  -- ^ Where to redirect stdout, stderr
+            -> LimitSettings  -- ^ Restrictions
+            -> WMonad w (WData w)  -- ^ Pre-forking action
+            -> (WData w -> Socket -> IO ())  -- ^ Socket callback
             -> WMonad w (Worker w, RestartWorker (WMonad w) w)
 startWorker name sock out set pre cb = do
-    let w = mkDefaultWorker name sock set
+    let defW = mkDefaultWorker name sock set
     let restarter !w = do
             w' <- liftIO $ killWorker w
             oldId <- liftIO $ getEffectiveUserID
@@ -81,10 +67,10 @@ startWorker name sock out set pre cb = do
             liftIO $ setEffectiveUserID oldId
             liftIO $ setCGroup set pid
             let w'' = w' { workerPid = Just pid }
-            return w''
             w'' `seq` return w''
-    w' <- restarter w
+    w' <- restarter defW
     return (w', restarter)
+
 
 -- | Start a worker of type 'IOWorker'
 -- The callback function is called every time a connectino is established
@@ -97,8 +83,8 @@ startIOWorker :: String              -- ^ Name
               -> IO (Worker IOWorker, RestartWorker IO IOWorker)
 startIOWorker name sock callb = startWorker name sock out defSet preFork handle
   where handle () soc = forever $ do
-          (hndl, _, _) <- accept soc
-          callb hndl
+            (hndl, _, _) <- accept soc
+            callb hndl
         defSet = def { secontext = Nothing }
         out    = Nothing
         preFork =  putStrLn ("Starting worker " ++ show name)

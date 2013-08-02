@@ -33,8 +33,6 @@ import System.Posix.Signals  (killProcess, signalProcess)
 import System.Posix.Types    (CUid (..), UserID)
 import System.Posix.Types    (CPid (..), ProcessID)
 
-import GHC
-
 -- | Resource limits
 data RLimits = RLimits
     { coreFileSizeLimit :: ResourceLimits
@@ -99,10 +97,10 @@ defaultLimits = LimitSettings
     }
 
 instance Default LimitSettings where
-  def = defaultLimits
+    def = defaultLimits
 
 instance Default RLimits where
-  def = RLimits
+    def = RLimits
         { coreFileSizeLimit = mkLimits (coreSizeLimitSoft, coreSizeLimitHard)
         , cpuTimeLimit      = mkLimits (cpuTimeLimitSoft, cpuTimeLimitHard)
         , dataSizeLimit     = mkLimits (dataSizeLimitSoft, dataSizeLimitHard)
