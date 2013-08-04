@@ -35,9 +35,9 @@ import           Diagrams.Interactive.Display        as Display
 
 -- * Convertation & quering
 
-hasImage :: DisplayResult -> Maybe TL.Text
+hasImage :: DisplayResult -> Maybe DR
 hasImage (DisplayResult drs) =
-    result <$> find ((==Display.Svg) . clientType) drs
+    find ((==Display.Svg) . clientType) drs
 
 getDR :: DisplayResult -> [DR]
 getDR (DisplayResult drs) = drs

@@ -1,5 +1,5 @@
 module Preload (allExceptions, preload, unsafePerformIO, catch, SomeException) where
-import Display
+import Diagrams.Interactive.Display
 import Control.Concurrent
 import Control.Concurrent.Async
 import Control.Exception  

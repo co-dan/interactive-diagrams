@@ -47,7 +47,8 @@ import           Database.Persist.Sqlite              as P
 import           Text.Blaze.Html.Renderer.Text
 
 import           Config
-import           Diagrams.Interactive.Display         (display)
+import           Diagrams.Interactive.Display         (DisplayResult (..),
+                                                       display, result)
 import           Diagrams.Interactive.Eval
 import           Diagrams.Interactive.Eval.EvalError
 import           Pastebin.ErrorMessage
@@ -115,6 +116,14 @@ renderGallery ps = do
 
 
 -- | * Database access and logic
+
+getRaw :: MaybeT ActionH Text
+getRaw = do
+    -- pid <- lift $ param "id"
+    ind <- lift $ param "ind"
+    paste <- getPaste
+    let (DisplayResult res) = pasteResult paste
+    return . result $ res !! ind
 
 getPaste :: MaybeT (ActionT HState) Paste
 getPaste = do
@@ -202,6 +211,9 @@ main = do
         middleware $ staticPolicy (addBase "../common/static")
         S.get "/get/:id" $ maybeT page404 renderPaste getPaste
         S.get "/json/:id" $ maybeT page404 json getPaste
+        S.get "/raw/:id/:ind" $ maybeT page404 text getRaw
+        S.get "/raw/:id/:ind/pic.svg" $ maybeT page404 html getRaw
         S.get "/" listPastes
         S.get "/gallery" (listImages >>= renderGallery)
         S.post "/new" $ eitherT errPage redirPaste (measureTime newPaste)
+        
