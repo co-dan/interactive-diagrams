@@ -1,9 +1,10 @@
 #!/bin/sh
 killall -9 scotty-pastebin
 killall -9 eval-service
+# cabal install workers/ eval-api/ &&
 cd ./eval-api/ &&
 cabal build && 
-cabal install &&
+ cabal install . ../workers &&
 cp dist/build/evali/evali /idia/run/bin/evali &&
 cp dist/build/eval-service/eval-service /idia/run/bin/eval-service &&
 sudo restorecon /idia/run/bin/evali &&
