@@ -109,7 +109,7 @@ startEvalWorker name eset = startWorker name sock out set pre callback
           dfs <- getSessionDynFlags
           _ <- setSessionDynFlags $ dfs { hscTarget = HscInterpreted
                                         , ghcLink = LinkInMemory
-                                        -- , verbosity = 3
+                                        , verbosity = 3
                                         }
           -- loadFile (preloadFile eset)
           -- compileExpr "preload"

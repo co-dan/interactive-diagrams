@@ -1,6 +1,7 @@
 {-# LANGUAGE CPP                      #-}
 {-# LANGUAGE ForeignFunctionInterface #-}
 {-# LANGUAGE ScopedTypeVariables      #-}
+{-# LANGUAGE OverloadedStrings        #-}
 {-|
   Helper functions for the 'EvalM' and 'Ghc' monads
 -}
@@ -58,17 +59,19 @@ isUnderIO expr = do
 ------------------------------------------------------------
 -- Compilation and interpretation
 ------------------------------------------------------------
-                
+
+displayImport :: InteractiveImport
+displayImport = IIDecl . simpleImportDecl $ mkModuleName "Diagrams.Interactive.Display"
+
 -- | Loads the file into the evaluator
 loadFile :: FilePath -> EvalM ()
 loadFile file = do
-    setTargets =<< sequence [ guessTarget file Nothing
-                            , guessTarget "Helper.hs" Nothing]
+    setTargets =<< guessTarget file Nothing
     graph <- depanal [] False
     -- output graph
     loaded <- load LoadAllTargets
     when (failed loaded) $ throw LoadingException
-    setContext (map (IIModule . moduleName . ms_mod) graph)
+    setContext $ displayImport:(map (IIModule . moduleName . ms_mod) graph)
 
 -- | Compiles an expression to a @DisplayResult@
 compileExpr :: String -> EvalM DisplayResult
