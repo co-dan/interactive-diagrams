@@ -1,3 +1,3 @@
-module Helper (module Display) where
+module Helper (module Diagrams.Interactive.Display) where
 
-import Display
+import Diagrams.Interactive.Display
