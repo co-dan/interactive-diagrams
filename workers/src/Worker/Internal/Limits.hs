@@ -86,9 +86,10 @@ setRLimits RLimits{..} = mapM_ (uncurry setResourceLimit) lims
 setupSELinuxCntx :: SecurityContext -> IO ()
 setupSELinuxCntx ty = do
     con <- splitBy (==':') <$> getCon
-    when (length con /= 4) $ error ("Bad context: " ++ mconcat con)
+    when (length con < 4) $ error ("Bad context: " ++ mconcat (intersperse ":" con))
     setCon $ mconcat $ intersperse ":" [con !! 0, con !! 1, ty, con !! 3]
 
+-- | @splitBy (==x)@ is an inverse of @'intersperse' [x]@    
 splitBy :: (a -> Bool) -> [a] -> [[a]]
 splitBy _ []     = []
 splitBy f (x:xs)
