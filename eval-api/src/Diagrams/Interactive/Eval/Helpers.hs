@@ -66,7 +66,7 @@ displayImport = IIDecl . simpleImportDecl $ mkModuleName "Diagrams.Interactive.D
 -- | Loads the file into the evaluator
 loadFile :: FilePath -> EvalM ()
 loadFile file = do
-    setTargets =<< guessTarget file Nothing
+    setTargets =<< sequence [guessTarget file Nothing]
     graph <- depanal [] False
     -- output graph
     loaded <- load LoadAllTargets
