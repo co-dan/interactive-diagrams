@@ -80,14 +80,15 @@ startWorker name sock out set pre cb = do
 -- >>> startIOWorker "test" "/tmp/test.sock" $ \h -> hPutStrLn h "hello, world"
 --
 startIOWorker :: String              -- ^ Name
+              -> LimitSettings       -- ^ Restrictions
               -> FilePath            -- ^ UNIX socket
               -> (Handle -> IO ())   -- ^ Callback
               -> IO (Worker IOWorker, RestartWorker IO IOWorker)
-startIOWorker name sock callb = startWorker name sock out def preFork handle
+startIOWorker name set sock callb = startWorker name sock out set preFork handle
   where handle () soc = forever $ do
             (hndl, _, _) <- accept soc
             callb hndl
-        out    = Nothing
+        out     = Nothing
         preFork =  putStrLn ("Starting worker " ++ show name)
                 >> return ()
 
