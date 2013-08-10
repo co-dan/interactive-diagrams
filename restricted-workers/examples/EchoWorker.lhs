@@ -30,8 +30,8 @@ the worker itself together with the restarting function.
 
 Firstly, let's implement our callback:
 
-> echoHandle :: Handle -> IO ()
-> echoHandle h = do
+> echoHandler :: Handle -> IO ()
+> echoHandler h = do
 >     hSetBuffering h LineBuffering
 >     s <- BS.hGetLine h
 >     BS.putStr $ "Got: " <> s <> "\n"
@@ -57,7 +57,7 @@ and a main function:
 > main :: IO ()
 > main = do
 >     hSetBuffering stdin NoBuffering
->     loop =<< startIOWorker "Testworker" def "/tmp/1.sock" echoHandle
+>     loop =<< startIOWorker "Testworker" def "/tmp/1.sock" echoHandler
 >     return ()
 
 We can test it:

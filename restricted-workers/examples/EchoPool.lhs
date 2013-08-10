@@ -15,10 +15,10 @@ pool of EchoWokers. See also: 'EchoWorker.lhs'.
 > import System.Restricted.Worker
 > import System.Restricted.Worker.Pool
 
-This is just the 'echoHandle' function from 'EchoWorker.lhs':
+This is just the 'echoHandler' function from 'EchoWorker.lhs':
 
-> echoHandle :: Handle -> IO ()
-> echoHandle h = do
+> echoHandler :: Handle -> IO ()
+> echoHandler h = do
 >     hSetBuffering h LineBuffering
 >     s <- BS.hGetLine h
 >     BS.putStrLn $ "Got: " <> s
@@ -56,7 +56,7 @@ creats a new worker. This is callback that gets called with a unique
 worker id. No two live workers share the same id.
 
 > newWorkerAct :: Int -> IO (Worker IOWorker, RestartWorker IO IOWorker)
-> newWorkerAct uid = startIOWorker wname def wsock echoHandle
+> newWorkerAct uid = startIOWorker wname def wsock echoHandler
 >   where wname = "Worker" ++ show uid
 >         wsock = "/tmp/"  ++ show uid ++ ".sock"
 

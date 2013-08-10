@@ -1,4 +1,4 @@
-> {-# LANGUAGE OverloadedStrings, DeriveGeneric #-}
+> {-# LANGUAGE DeriveGeneric #-}
 > module Main where
 
 We already know how to define simple workers that communicate with the
@@ -6,7 +6,7 @@ client using text. But sometimes it's necessary to transfer more
 complex data to the worker. We provide a simple way of tackling this
 problem using the 'System.Restricted.Worker.Protocol' module.
 
-> import Control.Monad         (forM_, (<=<))
+> import Control.Monad         (forM_)
 > import Control.Concurrent    (threadDelay)
 > import Data.Default          (def)
 > import Data.Serialize        (Serialize)
