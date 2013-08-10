@@ -1,7 +1,7 @@
 > {-# LANGUAGE OverloadedStrings #-}
 > module Main where
 
-In this example we'll take a look how to use Worker.Pool to create a
+In this example we'll take a look how to use 'System.Restricted.Worker.Pool' to create a
 pool of EchoWokers. See also: 'EchoWorker.lhs'.
 
 > import Control.Concurrent (forkIO, threadDelay)
@@ -12,8 +12,8 @@ pool of EchoWokers. See also: 'EchoWorker.lhs'.
 > import System.IO          (Handle, stdin, hClose,
 >                            hSetBuffering, BufferMode(..))
 > 
-> import Worker
-> import Worker.Pool
+> import System.Restricted.Worker
+> import System.Restricted.Worker.Pool
 
 This is just the 'echoHandle' function from 'EchoWorker.lhs':
 
@@ -25,7 +25,7 @@ This is just the 'echoHandle' function from 'EchoWorker.lhs':
 >     BS.hPutStrLn h s
 >     hClose h
 
-Let's examine the type of 'Workers.Pool.mkPool':
+Let's examine the type of 'System.Restricted.Worker.Pool.mkPool':
 
 ```haskell
 mkPool :: (Int -> IO (Worker a, RestartWorker IO a))

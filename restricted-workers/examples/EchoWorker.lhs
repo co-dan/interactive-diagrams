@@ -7,14 +7,13 @@ us whatever we sent it.
 
 Let's start by importing some libraries
 
-> import           Control.Concurrent    (threadDelay)
-> import           Control.Monad         (when)
 > import qualified Data.ByteString       as BS
 > import           Data.Default          (def)
 > import           Data.Monoid           ((<>))
 > import           System.IO             (BufferMode (..), Handle, hClose,
->                                        hSetBuffering, stdin, stdout)
-> import           Worker
+>                                        hSetBuffering, stdin)
+>     
+> import           System.Restricted.Worker
 
 Let's take a look at 'startIOWorker' function:
 
