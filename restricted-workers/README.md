@@ -23,13 +23,16 @@ in some places can be improved.
 ## Examples
 
 The following examples will walk you through creating basic kinds of
-workers (IOWorker), handling a pool of workers and creating your own
-types of workers.
+workers (IOWorker), handling a pool of workers, communicating with
+workers using 'System.Restricted.Workers.Protocol' and creating your
+own types of workers.
 
 - [EchoWorker.lhs](examples/EchoWorker.lhs) - basic usage of
   `IOWorker`
 - [EchoPool.lhs](examples/EchoPool.lhs) - basic usage of
   `Workers.Pool`
+- [CommandEvalProtocol.lhs](examples/CommandEvalProtocol.lhs) -
+  rewriting our Echo worker to use the provided Protocol module
 
 # External configurations 
 
