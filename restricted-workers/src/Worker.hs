@@ -35,7 +35,7 @@ mkDefaultWorker :: String -> FilePath -> LimitSettings -> Worker a
 mkDefaultWorker name sock set = Worker
     { workerName    = name
     , workerSocket  = sock
-    , workerLimits  = set 
+    , workerLimits  = set -- def { secontext = Nothing }
     , workerPid     = Nothing
     }
 
@@ -88,7 +88,7 @@ startIOWorker name set sock callb = startWorker name sock out set preFork handle
   where handle () soc = forever $ do
             (hndl, _, _) <- accept soc
             callb hndl
-        out     = Nothing
+        out     =  Nothing
         preFork =  putStrLn ("Starting worker " ++ show name)
                 >> return ()
 

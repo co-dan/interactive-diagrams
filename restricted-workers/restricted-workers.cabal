@@ -6,9 +6,7 @@ description:         This library provides an abstract interface for running var
                      
                      The library provides Worker and RestartingPool abstractions for as well as configurable security and resource restrictions settings.
 
-                     Use '-fnoselinux' flag to compile the library without the selinux support.
-
-                     /Warning/: this library work only on unix-like systems
+                     /Warning/: this library requires SELinux to function
 
 homepage:            https://github.com/co-dan/interactive-diagrams/tree/master/restricted-workers/README.md
 license:             BSD3
@@ -20,10 +18,6 @@ category:            System, Concurrency, Data
 build-type:          Simple
 cabal-version:       >=1.10
 
-flag noselinux
-  Default:             False
-  Description:         Disable SELinux support
-
 library
   exposed-modules:     Worker,
                        Worker.Types,
@@ -32,7 +26,7 @@ library
                        Worker.Internal,
                        Worker.Internal.Limits
   other-modules:       SignalHandlers
-  ghc-options:         -Wall -fno-warn-orphans                                            
+  ghc-options:         -Wall -Werror -fno-warn-orphans                                            
   build-depends:       base >=4.5 && <4.8,
                        stm >=2.4 && <2.5,
                        monad-control >=0.3 && <0.4,
@@ -46,13 +40,7 @@ library
                        bytestring >= 0.10 && < 0.13,
                        filepath >= 1,
                        text >= 0.10,
-                       data-default >= 0.5
-
+                       data-default >= 0.5,
+                       selinux -any
   hs-source-dirs:      src
-
-  if !flag(noselinux) 
-    build-depends:      selinux -any
-  else
-    cpp-options:        "-DNO_SELINUX"
-
   default-language:    Haskell2010

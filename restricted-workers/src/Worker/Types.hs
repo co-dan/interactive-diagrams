@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP                 #-}
 {-# LANGUAGE DeriveDataTypeable  #-}
 {-# LANGUAGE DeriveGeneric       #-}
 {-# LANGUAGE EmptyDataDecls      #-}
@@ -42,9 +41,7 @@ import Data.Maybe            (isJust)
 import Data.Serialize        (Serialize)
 import Data.Typeable
 import GHC.Generics
-#if !NO_SELINUX
 import System.Linux.SELinux  (SecurityContext)
-#endif
 import System.Posix.Process  (getProcessStatus)
 import System.Posix.Resource (Resource (..), ResourceLimit (..),
                               ResourceLimits (..))
@@ -89,11 +86,9 @@ data LimitSettings = LimitSettings
     , chrootPath :: Maybe FilePath
       -- | The UID that will be set after the call to chroot.
     , processUid :: Maybe UserID
-#if !NO_SELINUX      
       -- | SELinux security context under which the worker
       -- process will be running.
     , secontext  :: Maybe SecurityContext
-#endif
       -- | A filepath to the 'tasks' file for the desired cgroup.
       --
       -- For example, if I have mounted the @cpu@ controller at
@@ -115,9 +110,7 @@ defaultLimits = LimitSettings
     , rlimits    = Nothing
     , chrootPath = Nothing
     , processUid = Nothing
-#if !NO_SELINUX                   
-    , secontext  = Nothing
-#endif
+    , secontext  = Nothing -- Just "idia_restricted_t"
     , cgroupPath = Nothing
     }
 

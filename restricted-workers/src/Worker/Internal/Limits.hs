@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP                      #-}
 {-# LANGUAGE ForeignFunctionInterface #-}
 {-# LANGUAGE RecordWildCards          #-}
 -- | The implementation of security restrictions
@@ -11,9 +10,7 @@ module Worker.Internal.Limits
     , chroot
     , changeUserID
     , setCGroup
-#if !NO_SELINUX      
     , setupSELinuxCntx
-#endif
     ) where
 
 import Prelude                hiding (mapM_)
@@ -26,9 +23,7 @@ import Data.Monoid            (mconcat)
 import Foreign.C
 import Foreign.C.Types
 import System.FilePath.Posix  ((</>))
-#if !NO_SELINUX    
 import System.Linux.SELinux   (SecurityContext, getCon, setCon)
-#endif    
 import System.Posix.Directory (changeWorkingDirectory)
 import System.Posix.Process   (nice)
 import System.Posix.Resource  (setResourceLimit)
@@ -79,7 +74,6 @@ setRLimits RLimits{..} = mapM_ (uncurry setResourceLimit) lims
                -- , (ResourceStackSize, stackSizeLimit)
                , (ResourceTotalMemory, totalMemoryLimit) ]
 
-#if !NO_SELINUX        
 -- | Set the security context.
 -- To be more precise, it only sets up the type.
 -- Example usage:
@@ -102,15 +96,12 @@ splitBy f (x:xs)
   | f x       = splitBy f xs
   | otherwise = s : splitBy f s'
   where (s, s') = break f (x:xs)
-#endif
-        
+
 -- | Apply the 'LimitSettings'        
 setLimits :: LimitSettings -> IO ()
 setLimits LimitSettings{..} = do
     mapM_ setRLimits rlimits
-#if !NO_SELINUX
     mapM_ setupSELinuxCntx secontext
-#endif    
     nice niceness
     mapM_ chroot chrootPath
     mapM_ changeUserID processUid
