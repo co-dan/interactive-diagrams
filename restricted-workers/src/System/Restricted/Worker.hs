@@ -5,7 +5,7 @@
 module System.Restricted.Worker
     (
       module System.Restricted.Worker.Types
-    , module System.Restricted.Worker.Pool
+--    , module System.Restricted.Worker.Pool
     , module System.Restricted.Worker.Protocol
     , mkDefaultWorker
     , startWorker
@@ -16,6 +16,7 @@ module System.Restricted.Worker
 import Prelude                           hiding (mapM_)
 
 import Control.Monad                     (forever)
+import Control.Monad.Base                (MonadBase (..))
 import Control.Monad.IO.Class            (MonadIO, liftIO)
 import Data.Foldable                     (mapM_)
 import Data.Typeable                     ()
@@ -27,7 +28,7 @@ import System.Posix.User                 (getEffectiveUserID,
 import System.Restricted.Limits
 import System.Restricted.Types
 import System.Restricted.Worker.Internal
-import System.Restricted.Worker.Pool
+-- import System.Restricted.Worker.Pool
 import System.Restricted.Worker.Protocol
 import System.Restricted.Worker.Types
 
@@ -49,14 +50,15 @@ mkDefaultWorker name sock set = Worker
   DB query, anything you want. The resuling 'WData' will be passed to
   the callback.
 -}
-startWorker :: (WorkerData w, MonadIO (WMonad w))
+startWorker :: (WorkerData w, MonadIO (WMonad w),
+                MonadBase (WMonad w) m)
             => String         -- ^ Name
             -> FilePath       -- ^ Socket
             -> Maybe (IO Handle)  -- ^ Where to redirect stdout, stderr
             -> LimitSettings  -- ^ Restrictions
             -> WMonad w (WData w)  -- ^ Pre-forking action
             -> (WData w -> Socket -> IO ())  -- ^ Socket callback
-            -> WMonad w (Worker w, RestartWorker (WMonad w) w)
+            -> WMonad w (Worker w, RestartWorker m w)
 startWorker name sock out set pre cb = do
     let defW = mkDefaultWorker name sock set
     let restarter !w = do
@@ -72,7 +74,7 @@ startWorker name sock out set pre cb = do
             let w'' = w' { workerPid = Just pid }
             w'' `seq` return w''
     w' <- restarter defW
-    return (w', restarter)
+    return (w', liftBase . restarter)
 
 
 -- | Start a worker of type 'IOWorker'

@@ -28,7 +28,7 @@ This is just the 'echoHandle' function from 'EchoWorker.lhs':
 Let's examine the type of 'System.Restricted.Worker.Pool.mkPool':
 
 ```haskell
-mkPool :: (Int -> IO (Worker a, RestartWorker IO a))
+mkPool :: (Int -> IO (Worker IOWorker, RestartWorker IO IOWorker))
        -- ^ An action that creates a new worker. Takes a unique number as an argument
        -> Int
        -- ^ Maximum number of workers in the pool   
