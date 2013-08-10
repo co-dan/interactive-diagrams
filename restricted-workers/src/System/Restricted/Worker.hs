@@ -1,16 +1,21 @@
 {-# LANGUAGE BangPatterns          #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
--- | Main entry point
+-- | Main entry point of the library
 module System.Restricted.Worker
     (
+      -- * Exposed modules  
       module System.Restricted.Worker.Types
---    , module System.Restricted.Worker.Pool
+    , module System.Restricted.Worker.Pool
     , module System.Restricted.Worker.Protocol
+      -- * Creating  workers
     , mkDefaultWorker
     , startWorker
-    , killWorker
     , startIOWorker
+      -- * Quering and killing workers
+    , killWorker
+    , workerAlive
+    , connectToWorker
     ) where
 
 import Prelude                           hiding (mapM_)
@@ -28,7 +33,7 @@ import System.Posix.User                 (getEffectiveUserID,
 import System.Restricted.Limits
 import System.Restricted.Types
 import System.Restricted.Worker.Internal
--- import System.Restricted.Worker.Pool
+import System.Restricted.Worker.Pool
 import System.Restricted.Worker.Protocol
 import System.Restricted.Worker.Types
 

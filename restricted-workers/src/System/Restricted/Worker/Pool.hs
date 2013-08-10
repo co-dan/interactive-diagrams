@@ -1,8 +1,7 @@
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE RecordWildCards       #-}
-{-# LANGUAGE ScopedTypeVariables   #-}
-{-# LANGUAGE TypeHoles #-}
+
 -- | A non-stripped pooling abstraction that restarts workers
 -- Some got has been taken from 'Data.Pool' by bos
 module System.Restricted.Worker.Pool
