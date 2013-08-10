@@ -19,12 +19,13 @@ build-type:          Simple
 cabal-version:       >=1.10
 
 library
-  exposed-modules:     Worker,
-                       Worker.Types,
-                       Worker.Pool,
-                       Worker.Protocol,
-                       Worker.Internal,
-                       Worker.Internal.Limits
+  exposed-modules:     System.Restricted.Worker,
+                       System.Restricted.Worker.Types,
+                       System.Restricted.Worker.Pool,
+                       System.Restricted.Worker.Protocol,
+                       System.Restricted.Worker.Internal,
+                       System.Restricted.Limits,
+                       System.Restricted.Types
   other-modules:       SignalHandlers
   ghc-options:         -Wall -Werror -fno-warn-orphans                                            
   build-depends:       base >=4.5 && <4.8,

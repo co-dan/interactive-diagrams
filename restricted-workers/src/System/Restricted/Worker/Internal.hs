@@ -2,42 +2,44 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 -- | Library exposing internal functions uses by 'Eval.Worker'
 -- useful work writing your own workers
-module Worker.Internal
+module System.Restricted.Worker.Internal
     (
       -- * Worker related
       forkWorker
     , killWorker
+    , workerAlive
       -- * Connection related
     , connectToWorker
     , mkSock
       -- * Useful util functions
     , removeFileIfExists
+    , processAlive
     ) where
 
-import Control.Exception      (catch, throwIO)
-import Control.Monad          (void, when)
-import Data.Maybe             (fromJust)
-import Network                (PortID (..), Socket, connectTo, listenOn)
-import Network.Socket         (close)
-import System.Directory       (removeFile)
-import System.IO              (Handle)
-import System.IO.Error        (isDoesNotExistError, isPermissionError)
-import System.Mem.Weak        (addFinalizer)
-import System.Posix.IO        (dupTo, handleToFd)
-import System.Posix.Process   (forkProcess, getProcessStatus)
-import System.Posix.Signals   (Handler (..), installHandler, killProcess,
-                               processStatusChanged, setStoppedChildFlag,
-                               signalProcess)
-import System.Posix.Types     (Fd (..), ProcessID)
+import Control.Exception              (IOException, catch, handle, throwIO)
+import Control.Monad                  (void, when)
+import Data.Maybe                     (fromJust)
+import Network                        (PortID (..), Socket, connectTo, listenOn)
+import Network.Socket                 (close)
+import System.Directory               (removeFile)
+import System.IO                      (Handle)
+import System.IO.Error                (isDoesNotExistError, isPermissionError)
+import System.Mem.Weak                (addFinalizer)
+import System.Posix.IO                (dupTo, handleToFd)
+import System.Posix.Process           (forkProcess, getProcessStatus)
+import System.Posix.Signals           (Handler (..), installHandler,
+                                       killProcess, processStatusChanged,
+                                       setStoppedChildFlag, signalProcess)
+import System.Posix.Types             (Fd (..), ProcessID)
 
-import Worker.Internal.Limits
-import Worker.Types
+import System.Restricted.Limits
+import System.Restricted.Worker.Types
 
--- | Connect to the worker's socket and return a handle    
+-- | Connect to the worker's socket and return a handle
 connectToWorker :: Worker a -> IO Handle
 connectToWorker Worker{..} = connectTo "localhost" (UnixSocket workerSocket)
 
--- | Remove a file if it exists. Should be thread-safe.                             
+-- | Remove a file if it exists. Should be thread-safe.
 removeFileIfExists :: FilePath -> IO ()
 removeFileIfExists f = removeFile f `catch` handleE
   where handleE e
@@ -88,4 +90,21 @@ killWorker w@Worker{..} = do
                 Just _  -> return ()
                 Nothing -> signalProcess killProcess (fromJust workerPid)
     return (w { workerPid = Nothing })
+
+
+-----------------------
+
+-- | Checks whether the process is alive
+-- /hacky/
+processAlive :: ProcessID -> IO Bool
+processAlive pid = handle (\(_ :: IOException) -> return False) $ do
+    _ <- getProcessStatus False False pid
+    return True
+
+-- | Checks whether the worker is alive
+workerAlive :: Worker a -> IO Bool
+workerAlive w = do
+    case (workerPid w) of
+        Nothing  -> return False
+        Just pid -> processAlive pid
 

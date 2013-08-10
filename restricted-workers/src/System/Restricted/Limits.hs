@@ -1,7 +1,7 @@
 {-# LANGUAGE ForeignFunctionInterface #-}
 {-# LANGUAGE RecordWildCards          #-}
 -- | The implementation of security restrictions
-module Worker.Internal.Limits
+module System.Restricted.Limits
     (
       -- * Apply restrictions
       setLimits
@@ -13,32 +13,32 @@ module Worker.Internal.Limits
     , setupSELinuxCntx
     ) where
 
-import Prelude                hiding (mapM_)
+import Prelude                 hiding (mapM_)
 
-import Control.Applicative    ((<$>))
-import Control.Monad          (when)
-import Data.Foldable          (mapM_)
-import Data.List              (intersperse)
-import Data.Monoid            (mconcat)
+import Control.Applicative     ((<$>))
+import Control.Monad           (when)
+import Data.Foldable           (mapM_)
+import Data.List               (intersperse)
+import Data.Monoid             (mconcat)
 import Foreign.C
 import Foreign.C.Types
-import System.FilePath.Posix  ((</>))
-import System.Linux.SELinux   (SecurityContext, getCon, setCon)
-import System.Posix.Directory (changeWorkingDirectory)
-import System.Posix.Process   (nice)
-import System.Posix.Resource  (setResourceLimit)
-import System.Posix.Resource  (Resource (..))
-import System.Posix.Types     (CUid (..), ProcessID, UserID)
-import System.Posix.User      (getEffectiveUserID, setEffectiveUserID,
-                               setUserID)
+import System.FilePath.Posix   ((</>))
+import System.Linux.SELinux    (SecurityContext, getCon, setCon)
+import System.Posix.Directory  (changeWorkingDirectory)
+import System.Posix.Process    (nice)
+import System.Posix.Resource   (setResourceLimit)
+import System.Posix.Resource   (Resource (..))
+import System.Posix.Types      (CUid (..), ProcessID, UserID)
+import System.Posix.User       (getEffectiveUserID, setEffectiveUserID,
+                                setUserID)
 
 import SignalHandlers
-import Worker.Types
+import System.Restricted.Types
 
 foreign import ccall unsafe "unistd.h chroot"
     c_chroot :: CString -> IO CInt
 
--- | Set the chroot jail                 
+-- | Set the chroot jail
 chroot :: FilePath -> IO ()
 chroot fp = do
     eid <- getEffectiveUserID
@@ -49,7 +49,7 @@ chroot fp = do
         return ()
     setEffectiveUserID eid
 
--- | Change the uid of the current process    
+-- | Change the uid of the current process
 changeUserID :: UserID -> IO ()
 changeUserID uid = do
     setUserID (CUid 0) -- need to be root in order to setuid()
@@ -89,7 +89,7 @@ setupSELinuxCntx ty = do
     when (length con < 4) $ error ("Bad context: " ++ mconcat (intersperse ":" con))
     setCon $ mconcat $ intersperse ":" [con !! 0, con !! 1, ty, con !! 3]
 
--- | @splitBy (==x)@ is an inverse of @'intersperse' [x]@    
+-- | @splitBy (==x)@ is an inverse of @'intersperse' [x]@
 splitBy :: (a -> Bool) -> [a] -> [[a]]
 splitBy _ []     = []
 splitBy f (x:xs)
@@ -97,7 +97,7 @@ splitBy f (x:xs)
   | otherwise = s : splitBy f s'
   where (s, s') = break f (x:xs)
 
--- | Apply the 'LimitSettings'        
+-- | Apply the 'LimitSettings'
 setLimits :: LimitSettings -> IO ()
 setLimits LimitSettings{..} = do
     mapM_ setRLimits rlimits

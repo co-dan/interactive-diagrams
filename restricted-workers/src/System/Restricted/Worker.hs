@@ -2,33 +2,34 @@
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 -- | Main entry point
-module Worker
+module System.Restricted.Worker
     (
-      module Worker.Types
-    , module Worker.Pool
-    , module Worker.Protocol
+      module System.Restricted.Worker.Types
+    , module System.Restricted.Worker.Pool
+    , module System.Restricted.Worker.Protocol
     , mkDefaultWorker
     , startWorker
     , killWorker
     , startIOWorker
     ) where
 
-import Prelude                hiding (mapM_)
+import Prelude                           hiding (mapM_)
 
-import Control.Monad          (forever)
-import Control.Monad.IO.Class (MonadIO, liftIO)
-import Data.Default
-import Data.Foldable          (mapM_)
-import Data.Typeable          ()
-import Network                (Socket, accept)
-import System.IO              (Handle)
-import System.Posix.User      (getEffectiveUserID, setEffectiveUserID)
+import Control.Monad                     (forever)
+import Control.Monad.IO.Class            (MonadIO, liftIO)
+import Data.Foldable                     (mapM_)
+import Data.Typeable                     ()
+import Network                           (Socket, accept)
+import System.IO                         (Handle)
+import System.Posix.User                 (getEffectiveUserID,
+                                          setEffectiveUserID)
 
-import Worker.Internal
-import Worker.Internal.Limits
-import Worker.Pool
-import Worker.Protocol    
-import Worker.Types
+import System.Restricted.Limits
+import System.Restricted.Types
+import System.Restricted.Worker.Internal
+import System.Restricted.Worker.Pool
+import System.Restricted.Worker.Protocol
+import System.Restricted.Worker.Types
 
 -- | Create an uninitialized worker
 mkDefaultWorker :: String -> FilePath -> LimitSettings -> Worker a

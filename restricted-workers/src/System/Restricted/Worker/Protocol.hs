@@ -1,17 +1,22 @@
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 -- | A simple protocol for sending serializable data over handles
-module Worker.Protocol (sendData, getData, DecodeResult) where
+module System.Restricted.Worker.Protocol
+    (
+      sendData
+    , getData
+    , DecodeResult
+    ) where
 
-import           Control.Applicative ((<$>))
-import           Control.Exception   (IOException, catch, throw)
-import           Data.ByteString     (ByteString, hGet, hPut)
-import qualified Data.ByteString     as BS
-import           Data.Serialize      (Serialize, decode, encode)
-import           Data.Word           (Word32)
-import           GHC.IO.Handle       (Handle, hFlush)
+import           Control.Applicative            ((<$>))
+import           Control.Exception              (IOException, catch, throw)
+import           Data.ByteString                (ByteString, hGet, hPut)
+import qualified Data.ByteString                as BS
+import           Data.Serialize                 (Serialize, decode, encode)
+import           Data.Word                      (Word32)
+import           GHC.IO.Handle                  (Handle, hFlush)
 
-import           Worker.Types
+import           System.Restricted.Worker.Types
 
 -- | Result of the deserialization
 type DecodeResult a = Either String a
