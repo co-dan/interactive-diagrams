@@ -61,8 +61,8 @@ import           Diagrams.Interactive.Eval.Handlers
 import           Diagrams.Interactive.Eval.Helpers
 import           GHC                                    hiding (compileExpr)
 import           SignalHandlers
-import           Worker
-import           Worker.Internal
+import           System.Restricted.Worker
+import           System.Restricted.Worker.Internal
 
 -- | Evaluation result together with a list of errors/warnings
 type EvalResultWithErrors = (EvalResult, [EvalError])

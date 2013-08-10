@@ -42,7 +42,7 @@ mkDefaultWorker :: String -> FilePath -> LimitSettings -> Worker a
 mkDefaultWorker name sock set = Worker
     { workerName    = name
     , workerSocket  = sock
-    , workerLimits  = set -- def { secontext = Nothing }
+    , workerLimits  = set 
     , workerPid     = Nothing
     }
 
@@ -51,16 +51,18 @@ mkDefaultWorker name sock set = Worker
   Start a general type of worker.
 
   The pre-forking action is a monadic action that will be run prior to
-  calling 'forkWorker'. It might be some intialization code, running the
-  DB query, anything you want. The resuling 'WData' will be passed to
+  calling 'forkWorker'. It might be some initialization code, running the
+  DB query, anything you want. The resulting 'WData' will be passed to
   the callback.
+
+  The socket that is passed to the callback is a server socket.
 -}
 startWorker :: (WorkerData w, MonadIO (WMonad w),
                 MonadBase (WMonad w) m)
-            => String         -- ^ Name
-            -> FilePath       -- ^ Socket
-            -> Maybe (IO Handle)  -- ^ Where to redirect stdout, stderr
-            -> LimitSettings  -- ^ Restrictions
+            => String              -- ^ Name
+            -> FilePath            -- ^ Socket
+            -> Maybe (IO Handle)   -- ^ Where to redirect stdout, stderr
+            -> LimitSettings       -- ^ Restrictions
             -> WMonad w (WData w)  -- ^ Pre-forking action
             -> (WData w -> Socket -> IO ())  -- ^ Socket callback
             -> WMonad w (Worker w, RestartWorker m w)

@@ -20,7 +20,7 @@ import System.Posix.Resource
 
 import GHC.Paths
 
-import Worker
+import System.Restricted.Types
 
 -- | Datastructure holding the settings for the interpreter
 data EvalSettings = EvalSettings

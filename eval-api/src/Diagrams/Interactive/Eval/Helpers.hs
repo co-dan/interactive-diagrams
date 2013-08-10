@@ -1,7 +1,7 @@
 {-# LANGUAGE CPP                      #-}
 {-# LANGUAGE ForeignFunctionInterface #-}
-{-# LANGUAGE ScopedTypeVariables      #-}
 {-# LANGUAGE OverloadedStrings        #-}
+{-# LANGUAGE ScopedTypeVariables      #-}
 {-|
   Helper functions for the 'EvalM' and 'Ghc' monads
 -}
@@ -20,19 +20,19 @@ module Diagrams.Interactive.Eval.Helpers
     , allExceptions
     ) where
 
-import Control.Monad                (when)
-import Control.Monad.IO.Class       (MonadIO)
-import Unsafe.Coerce                (unsafeCoerce)
+import Control.Monad                       (when)
+import Control.Monad.IO.Class              (MonadIO)
+import Unsafe.Coerce                       (unsafeCoerce)
 
 import DynFlags
 import Exception
-import GHC                          hiding (compileExpr)
+import GHC                                 hiding (compileExpr)
 import GhcMonad
 import HscMain
 import HscTypes
-import MonadUtils                   hiding (MonadIO, liftIO)
+import MonadUtils                          hiding (MonadIO, liftIO)
 import Outputable
-import Packages                     hiding (display)
+import Packages                            hiding (display)
 import Type
 
 import Diagrams.Interactive.Display
@@ -96,8 +96,8 @@ compileExpr expr = do
 ------------------------------------------------------------
 -- Auxilary functions for working with the
 --    GHC API session/environment
-------------------------------------------------------------    
-    
+------------------------------------------------------------
+
 -- | Update fixity environment in the current interactive context.
 updateFixityEnv :: GhcMonad m => FixityEnv -> m ()
 updateFixityEnv fix_env = do
@@ -125,9 +125,9 @@ addPkgDb fp = do
 
 -- | Add a list of package databases to the Ghc monad
 -- This should be equivalen to
---    
+--
 -- > addPkgDbs ls = mapM_ addPkgDb ls
---    
+--
 -- but it is actaully faster, because it does the package
 -- reintialization after adding all the databases
 #if __GLASGOW_HASKELL_ >= 707

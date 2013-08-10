@@ -1,24 +1,47 @@
 name:                restricted-workers
 synopsis:            Running workers under system resource restrictions
 version:             0.1.0.0
-description:         This library provides an abstract interface for running various kinds of workers under resource restrictions.
-                     It was originally developed as part of the interactive-diagrams (<http://github.com/co-dan/interactive-diagrams>) project. To read more about security restrictions read my GSoC report: <http://parenz.wordpress.com/2013/07/15/interactive-diagrams-gsoc-progress-report/>.
+description:         This library provides an abstract interface for
+                     running various kinds of workers under resource
+                     restrictions. It was originally developed as part
+                     of the interactive-diagrams
+                     (<http://github.com/co-dan/interactive-diagrams>)
+                     project. To read more about security restrictions
+                     read my GSoC report:
+                     <http://parenz.wordpress.com/2013/07/15/interactive-diagrams-gsoc-progress-report/>.
+
+
                      .
-                     The library provides Worker and RestartingPool abstractions for as well as configurable security and resource restrictions settings.
+                     
+                     The library provides Worker and RestartingPool
+                     abstractions for as well as configurable security
+                     and resource restrictions settings. .
+
+                     Please consult
+                     <https://github.com/co-dan/interactive-diagrams/tree/master/restricted-workers/README.md>
+                     for more details.
+                     
                      .
-                     Please consult <https://github.com/co-dan/interactive-diagrams/tree/master/restricted-workers/README.md> for more details.
-                     .
-                     /Warning/: this library requires SELinux to function
+                     
+                     /Warning/: this library requires SELinux to
+                     function
 
 homepage:            https://github.com/co-dan/interactive-diagrams/tree/master/restricted-workers/
-license:             BSD3
-license-file:        LICENSE
+
+
 author:              Dan Frumin
 maintainer:          difrumin@gmail.com
+license:             BSD3
+license-file:        LICENSE
 copyright:           (c) 2013 
-category:            System, Concurrency, Data
+
 build-type:          Simple
 cabal-version:       >=1.10
+category:            System, Concurrency, Data
+
+extra-source-files:  examples/EchoWorker.lhs,
+                     examples/EchoPool.lhs,
+                     examples/CommandEvalProtocol.lhs  
 
 library
   exposed-modules:     System.Restricted.Limits,
@@ -49,3 +72,8 @@ library
                        unix >=2.6 && <2.8                       
   hs-source-dirs:      src
   default-language:    Haskell2010
+
+source-repository head
+  type:           git
+  location:       https://github.com/co-dan/interactive-diagrams
+                 

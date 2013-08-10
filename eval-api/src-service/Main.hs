@@ -26,11 +26,11 @@ import           Debug.Trace
 import           Diagrams.Interactive.Eval.EvalSettings
 import           Diagrams.Interactive.Eval.EvalWorker
 import           SignalHandlers
-import           Worker.Internal
-import           Worker.Pool                            (WorkersPool)
-import qualified Worker.Pool                            as W
-import           Worker.Protocol
-import           Worker.Types
+import           System.Restricted.Worker.Internal
+import           System.Restricted.Worker.Pool          (WorkersPool)
+import qualified System.Restricted.Worker.Pool          as W
+import           System.Restricted.Worker.Protocol
+import           System.Restricted.Worker.Types
 
 -- -- | Debug function
 -- traceM :: Monad m => String -> m ()
@@ -55,14 +55,16 @@ limSettings = def {
         totalMemoryLimit = ResourceLimits memlim memlim
         }
      , secontext  = Just "idia_restricted_t"
-     , cgroupPath = Just $ cgroups </> "idiaworkers"
+     -- , cgroupPath = Just $ cgroups </> "idiaworkers"
      }
   where memlim = ResourceLimit $ 104857600 * 6
                                  --- 100mb * 6
 settings :: EvalSettings
 settings = def
-  { limitSet = limSettings
-  , pkgDatabases = ["/home/vagrant/.ghc/x86_64-linux-7.7.20130711/package.conf.d"]
+  { limitSet     = limSettings
+  , pkgDatabases = ["/home/vagrant/.ghc/x86_64-linux-7.7.20130628/package.conf.d"]
+  , verbLevel    = 5
+  , preloadFile  = "../common/Preload.hs"
   }
 
 
@@ -85,6 +87,7 @@ main = do
   hSetBuffering stdin NoBuffering
   let devnull = openFile "/dev/null" WriteMode
   let set = settings { outHandle = Just devnull }
+  putStrLn $ "Using settings = " ++ show set
   pool <- W.mkPool (newWorkerAct set) 1 (60*5)
   currentWorkers <- newMVar []
   soc <- mkSock sockFile

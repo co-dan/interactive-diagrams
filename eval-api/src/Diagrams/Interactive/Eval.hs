@@ -4,8 +4,8 @@
 module Diagrams.Interactive.Eval
     (
       module Diagrams.Interactive.Eval.EvalWorker
-    , module Worker
+    , module System.Restricted.Worker
     ) where  
 
 import Diagrams.Interactive.Eval.EvalWorker
-import Worker
+import System.Restricted.Worker

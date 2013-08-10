@@ -18,7 +18,9 @@ import           Diagrams.Interactive.Eval.EvalM
 import           Diagrams.Interactive.Eval.EvalSettings
 import           Diagrams.Interactive.Eval.EvalWorker
 import           Diagrams.Interactive.Eval.Helpers
-import           Worker
+import           System.Restricted.Worker.Types
+import           System.Restricted.Worker
+    
 
 settings :: EvalSettings
 settings = def {
