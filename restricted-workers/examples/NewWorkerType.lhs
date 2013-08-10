@@ -1,4 +1,4 @@
-> {-# LANGUAGE EmptyDataDecls, OverloadedStrings, TypeFamilies #-}
+> {-# LANGUAGE OverloadedStrings, TypeFamilies #-}
 > module Main where
 
 In this walkthrough we will learn how to make our worker types. Let's
@@ -45,18 +45,21 @@ Some sqlite-simple boilerplate for representing our table in Haskell
 
 
 Now we are going to roll out or worker type and corresponding
-WorkerData instance
+WorkerData instance.
 
 
-> data DBWorker
->
+> data DBWorker = DBWorker
+> 
 > instance WorkerData DBWorker where
 >     type WData  DBWorker = Connection
 >     type WMonad DBWorker = IO
 >     
 
 Our worker would run in the IO monad and it would store 'Connection'
-between sessions. The next thing we should provide is the runner
+between sessions. This information is provided via type families in
+the 'WorkerData' typeclass.
+
+The next thing we should provide is the runner
 function for our worker. Let's examine (a simplified) 'startWorker'
 function:
 
