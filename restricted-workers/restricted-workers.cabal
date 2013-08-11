@@ -1,24 +1,26 @@
 name:                restricted-workers
-synopsis:            Running workers under system resource restrictions
-version:             0.1.0.0
+synopsis:            Running worker processes under system resource restrictions
+version:             0.1.0
+
 description:         This library provides an abstract interface for
                      running various kinds of workers under resource
                      restrictions. It was originally developed as part
                      of the interactive-diagrams
                      (<http://github.com/co-dan/interactive-diagrams>)
-                     project. To read more about security restrictions
-                     read my GSoC report:
+                     project. To read more about the idia behind the
+                     library check out my GSoC report:
                      <http://parenz.wordpress.com/2013/07/15/interactive-diagrams-gsoc-progress-report/>.
-
 
                      .
                      
-                     The library provides Worker and RestartingPool
-                     abstractions for as well as configurable security
-                     and resource restrictions settings. .
+                     The library provides a convenient way of running worker processes,
+                     saving data obtained by the workers at start-up, a simple pool
+                     abstraction and a configurable security and resource limitations.
 
                      Please consult
                      <https://github.com/co-dan/interactive-diagrams/tree/master/restricted-workers/README.md>
+                     and
+                     <https://github.com/co-dan/interactive-diagrams/wiki/Restricted-Workers>
                      for more details.
                      
                      .
@@ -26,7 +28,7 @@ description:         This library provides an abstract interface for
                      /Warning/: this library requires SELinux to
                      function
 
-homepage:            https://github.com/co-dan/interactive-diagrams/tree/master/restricted-workers/
+homepage:            https://github.com/co-dan/interactive-diagrams/wiki/Restricted-Workers
 
 
 author:              Dan Frumin
@@ -41,7 +43,9 @@ category:            System, Concurrency, Data
 
 extra-source-files:  examples/EchoWorker.lhs,
                      examples/EchoPool.lhs,
-                     examples/CommandEvalProtocol.lhs  
+                     examples/CommandEvalProtocol.lhs,
+                     examples/NewWorkerType.lhs,
+                     README.md
 
 library
   exposed-modules:     System.Restricted.Limits,
@@ -68,7 +72,7 @@ library
                        stm >=2.4 && <2.5,
                        text >= 0.10,
                        transformers >=0.3 && <0.4,
-                       transformers-base -any,
+                       transformers-base >= 0.4 && <0.5,
                        unix >=2.6 && <2.8                       
   hs-source-dirs:      src
   default-language:    Haskell2010

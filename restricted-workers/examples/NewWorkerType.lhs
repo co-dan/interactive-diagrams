@@ -53,7 +53,7 @@ WorkerData instance.
 > instance WorkerData DBWorker where
 >     type WData  DBWorker = Connection
 >     type WMonad DBWorker = IO
->     
+     
 
 Our worker would run in the IO monad and it would store 'Connection'
 between sessions. This information is provided via type families in

@@ -4,12 +4,21 @@ This library provides an abstract interface for running various kinds
 of workers under resource restrictions. It was originally developed as
 part of the
 interactive-diagrams (<http://github.com/co-dan/interactive-diagrams>)
-project. You can read more about security restrictions in my GSoC report:
-<http://parenz.wordpress.com/2013/07/15/interactive-diagrams-gsoc-progress-report/>
+project. You can read more about security restrictions in the wiki: <https://github.com/co-dan/interactive-diagrams/wiki/Restricted-Workers>
 
-The library provides Worker and WorkersPool abstractions for as
-well as configurable security and resource restrictions settings.
+The library provides a convenient way of running worker processes,
+saving data obtained by the workers at start-up, a simple pool
+abstraction and a configurable security and resource limitations.
 
+Right now there are several kinds of security restrictions that could
+be applied to the worker process:
+
+- RLimits
+- chroot jail
+- custom process euid
+- cgroups
+- process niceness
+- SELinux security context
 
 # Documentation
 
@@ -35,6 +44,10 @@ own types of workers.
   rewriting our Echo worker to use the provided Protocol module
 - [NewWorkerType.lhs](examples/NewWorkerTypes.lhs) - rolling out your
   own worker types
+
+## Wiki page
+
+<https://github.com/co-dan/interactive-diagrams/wiki/Restricted-Workers>
 
 # External configurations 
 
