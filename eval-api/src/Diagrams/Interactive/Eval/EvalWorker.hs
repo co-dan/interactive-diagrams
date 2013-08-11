@@ -29,7 +29,6 @@ module Diagrams.Interactive.Eval.EvalWorker
     ) where
 
 import           Control.Applicative                    ((<$>), (<*>))
-import           Control.Concurrent                     (threadDelay)
 import           Control.Concurrent.Async               (race)
 import           Control.Exception                      (catch, throwIO)
 import           Control.Monad                          (forever)
@@ -48,9 +47,6 @@ import           System.FilePath.Posix                  ((</>))
 import           System.IO                              (Handle, hClose)
 import           System.IO.Error                        (isAlreadyExistsError,
                                                          isPermissionError)
-import           System.Posix.Signals                   (killProcess,
-                                                         signalProcess)
-import           System.Posix.Types                     (ProcessID)
 
 
 import           Diagrams.Interactive.Display
@@ -61,6 +57,7 @@ import           Diagrams.Interactive.Eval.Handlers
 import           Diagrams.Interactive.Eval.Helpers
 import           GHC                                    hiding (compileExpr)
 import           SignalHandlers
+import           System.Restricted.Limits
 import           System.Restricted.Worker
 import           System.Restricted.Worker.Internal
 
@@ -148,17 +145,6 @@ sendEvalStringRequest :: (Worker EvalWorker, RestartWorker IO EvalWorker)
                       -> IO (EvalResultWithErrors, Worker EvalWorker)
 sendEvalStringRequest w str = sendEvalRequest w (EvalString str)
 
--- | Waits for a certain period of time (3 seconds)
--- and then kills the process
-processTimeout :: ProcessID -- ^ ID of a process to be killed
-               -> Int -- ^ Time limit (in seconds)
-               -> IO (EvalResult, [EvalError])
-processTimeout pid lim = do
-  threadDelay (lim * 1000000)
-  -- putStrLn "Timed out, killing process"
-  signalProcess killProcess pid
-  return (Left (show TooLong), [])
-
 -- | Runs a Ghc monad code and outputs the result to a handle
 runToHandle :: (Serialize a, Show a)
             => EvalM a -> Handle -> EvalM (Either String a, [EvalError])
@@ -240,7 +226,7 @@ data EvalCmd = CompileFile FilePath
 
 instance Serialize EvalCmd
 
--- | Convert an 'EvalCmd' to 'EvalM' action that can be executed         
+-- | Convert an 'EvalCmd' to 'EvalM' action that can be executed
 evalCmdToEvalM :: EvalCmd -> EvalM DisplayResult
 evalCmdToEvalM (CompileFile fpath) = do
   loadFile fpath
@@ -256,13 +242,13 @@ evalCmdToEvalM (EvalFile n txt) = do
   liftIO $ T.writeFile fpath txt
   evalCmdToEvalM (CompileFile fpath)
 
--- | Worker status  
+-- | Worker status
 data WStatus = OK | Timeout | Unknown
              deriving (Generic, Show)
 
 instance Serialize WStatus
 
--- | Commands for the service app         
+-- | Commands for the service app
 data ServiceCmd = RequestWorker
                 | RequestWorkerMaybe
                 | ReturnWorker WStatus (Worker EvalWorker)

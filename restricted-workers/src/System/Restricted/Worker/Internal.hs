@@ -5,9 +5,10 @@
 module System.Restricted.Worker.Internal
     (
       -- * Worker related
-      forkWorker
-    , killWorker
+      killWorker
     , workerAlive
+    , workerTimeout
+    , forkWorker
       -- * Connection related
     , connectToWorker
     , mkSock
@@ -16,6 +17,7 @@ module System.Restricted.Worker.Internal
     , processAlive
     ) where
 
+import Control.Concurrent             (threadDelay)
 import Control.Exception              (IOException, catch, handle, throwIO)
 import Control.Monad                  (void, when)
 import Data.Maybe                     (fromJust)
@@ -90,6 +92,15 @@ killWorker w@Worker{..} = do
                 Just _  -> return ()
                 Nothing -> signalProcess killProcess (fromJust workerPid)
     return (w { workerPid = Nothing })
+
+-- | Waits for a certain period of time
+-- and then kills the worker
+workerTimeout :: Worker a -- ^ ID of a process to be killed
+              -> Int      -- ^ Time limit (in seconds)
+              -> IO (Worker a)
+workerTimeout w lim = do
+  threadDelay (lim * 1000000)
+  killWorker w
 
 
 -----------------------

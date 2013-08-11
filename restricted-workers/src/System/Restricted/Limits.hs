@@ -11,11 +11,13 @@ module System.Restricted.Limits
     , changeUserID
     , setCGroup
     , setupSELinuxCntx
+    , processTimeout
     ) where
 
 import Prelude                 hiding (mapM_)
 
 import Control.Applicative     ((<$>))
+import Control.Concurrent      (threadDelay)
 import Control.Monad           (when)
 import Data.Foldable           (mapM_)
 import Data.List               (intersperse)
@@ -28,12 +30,25 @@ import System.Posix.Directory  (changeWorkingDirectory)
 import System.Posix.Process    (nice)
 import System.Posix.Resource   (setResourceLimit)
 import System.Posix.Resource   (Resource (..))
+import System.Posix.Signals    (killProcess, signalProcess)
 import System.Posix.Types      (CUid (..), ProcessID, UserID)
 import System.Posix.User       (getEffectiveUserID, setEffectiveUserID,
                                 setUserID)
 
 import SignalHandlers
 import System.Restricted.Types
+
+
+-- | Waits for a certain period of time
+-- and then kills the process
+processTimeout :: ProcessID -- ^ ID of a process to be killed
+               -> Int -- ^ Time limit (in seconds)
+               -> IO ()
+processTimeout pid lim = do
+  threadDelay (lim * 1000000)
+  signalProcess killProcess pid
+  return ()
+
 
 foreign import ccall unsafe "unistd.h chroot"
     c_chroot :: CString -> IO CInt
