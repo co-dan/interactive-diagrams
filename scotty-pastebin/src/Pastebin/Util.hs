@@ -74,11 +74,17 @@ hash a = H.hashWithSalt <$> currentTime <*> pure a
 
 renderDR :: DR -> H.Html
 renderDR (DR Html r) = H.preEscapedToHtml r
-renderDR (DR Svg  r) = H.preEscapedToHtml r
+renderDR (DR Svg  r) = H.div ! HA.class_ "csvg" $ do
+    H.preEscapedToHtml r
+    H.button ! HA.id "inc" $ "+"
+    H.button ! HA.id "dec" $ "-"
+    
 renderDR (DR Text r) = H.toHtml r
 renderDR (DR RuntimeErr r) = H.div ! HA.class_ "alert alert-error" $
                                  H.toHtml r
 
 renderCode :: TL.Text -> TL.Text
-renderCode = TL.pack . hscolour CSS defaultColourPrefs False True "Paste" False . TL.unpack
+renderCode = TL.pack
+           . hscolour CSS defaultColourPrefs False True "Paste" False
+           . TL.unpack
 
