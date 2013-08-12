@@ -1,14 +1,14 @@
 function resizeSVG () {
     window._debugme = $(this);
-    var cdiv      = $(this).parent();
+    var cdiv      = $(this).parent().parent();
     var svg       = cdiv.children("svg");
-    var svgWidth  = parseInt(svg.attr("width"),  20);
-    var svgHeight = parseInt(svg.attr("height"), 20);
+    var svgWidth  = parseInt(svg.attr("width"),  10);
+    var svgHeight = parseInt(svg.attr("height"), 10);
     var delta     = 0;
     if ($(this).attr("id") === "inc") {
-        delta = 10;
+        delta = 35;
     } else if ($(this).attr("id") === "dec") {
-        delta = -10;
+        delta = -35;
     }
     svg.attr("width"
              , svgWidth + delta);
@@ -17,6 +17,8 @@ function resizeSVG () {
 }
 
 $(function () {
-    window._debugme = $(".csvg");
-    $(".csvg").children("button").click(resizeSVG);
+    $(".thumbnail")
+        .children(".btn-group")
+        .children("button")
+        .click(resizeSVG);
 });

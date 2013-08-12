@@ -19,6 +19,7 @@ module Pastebin.Util
 import           Control.Applicative
 import qualified Data.Hashable                       as H
 import           Data.List
+import           Data.Monoid                         (mempty)
 import qualified Data.Text.Lazy                      as TL
 import           Data.Time.Clock
 import           Database.Persist.Sqlite             as P
@@ -74,11 +75,14 @@ hash a = H.hashWithSalt <$> currentTime <*> pure a
 
 renderDR :: DR -> H.Html
 renderDR (DR Html r) = H.preEscapedToHtml r
-renderDR (DR Svg  r) = H.div ! HA.class_ "csvg" $ do
+renderDR (DR Svg  r) = H.div ! HA.class_ "thumbnail" $ do
+    H.div ! HA.class_ "btn-group" $ do
+        H.button ! HA.class_ "btn" ! HA.id "inc" $
+            H.i mempty ! HA.class_ "icon-plus"
+        H.button ! HA.class_ "btn" ! HA.id "dec" $
+            H.i mempty ! HA.class_ "icon-minus"
     H.preEscapedToHtml r
-    H.button ! HA.id "inc" $ "+"
-    H.button ! HA.id "dec" $ "-"
-    
+            
 renderDR (DR Text r) = H.toHtml r
 renderDR (DR RuntimeErr r) = H.div ! HA.class_ "alert alert-error" $
                                  H.toHtml r
