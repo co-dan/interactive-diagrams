@@ -2,21 +2,6 @@
   <div class="row-fluid">
     {{#result}}
     <div class="tabbable">
-      <script>
-        $(function () {
-            var hash = document.location.hash;
-            var prefix = "_";
-            if (hash) {
-                $('.nav-tabs a[href='+hash.replace(prefix,"")+']').tab('show');
-            }
-
-            // Change hash for page-reload
-            $('.nav a').on('shown', function (e) {
-                window.location.hash = e.target.hash.replace("#", "#" + prefix);
-            });
-        });
-        
-      </script>
       <ul class="nav nav-tabs">
         <li class="active"><a href="#view" data-toggle="tab">View</a></li>
         <li><a href="#edit" data-toggle="tab">Edit</a></li>

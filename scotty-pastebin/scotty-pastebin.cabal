@@ -14,7 +14,7 @@ cabal-version:       >=1.8
 
 executable scotty-pastebin
   main-is:             Pastebin.hs
-  ghc-options:         -O2 -threaded -Wall -Werror -fno-warn-orphans
+  ghc-options:         -O2 -threaded -Wall -fno-warn-orphans
   hs-source-dirs:      src       
   build-depends:       base >=4.5,
                        aeson, 

@@ -19,7 +19,8 @@ module Pastebin.Util
 import           Control.Applicative
 import qualified Data.Hashable                       as H
 import           Data.List
-import           Data.Monoid                         (mempty)
+import           Data.Monoid                         (mempty,
+                                                      mconcat)
 import qualified Data.Text.Lazy                      as TL
 import           Data.Time.Clock
 import           Database.Persist.Sqlite             as P
@@ -76,13 +77,20 @@ hash a = H.hashWithSalt <$> currentTime <*> pure a
 renderDR :: DR -> H.Html
 renderDR (DR Html r) = H.preEscapedToHtml r
 renderDR (DR Svg  r) = H.div ! HA.class_ "thumbnail" $ do
-    H.div ! HA.class_ "btn-group" $ do
-        H.button ! HA.class_ "btn" ! HA.id "inc" $
+    -- btngrp
+    H.preEscapedToHtml img
+  where
+    btngrp = H.div ! HA.class_ "btn-group" $ do
+        H.button ! HA.class_ "btn btn-mini" ! HA.id "inc" $
             H.i mempty ! HA.class_ "icon-plus"
-        H.button ! HA.class_ "btn" ! HA.id "dec" $
+        H.button ! HA.class_ "btn btn-mini" ! HA.id "dec" $
             H.i mempty ! HA.class_ "icon-minus"
-    H.preEscapedToHtml r
-            
+    img = mconcat [ "<svg xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" version=\"1.1\" width=\"100%\" height=\"400\" class=\"csvg\">"
+                  , "<g id=\"viewport\">"
+                  , r
+                  , "</g></svg>" ]
+
+        
 renderDR (DR Text r) = H.toHtml r
 renderDR (DR RuntimeErr r) = H.div ! HA.class_ "alert alert-error" $
                                  H.toHtml r
