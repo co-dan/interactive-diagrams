@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes       #-}
+{-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE TemplateHaskell   #-}
 module Pastebin.Util
     (
@@ -19,8 +20,7 @@ module Pastebin.Util
 import           Control.Applicative
 import qualified Data.Hashable                       as H
 import           Data.List
-import           Data.Monoid                         (mempty,
-                                                      mconcat)
+import           Data.Monoid                         (mconcat, mempty)
 import qualified Data.Text.Lazy                      as TL
 import           Data.Time.Clock
 import           Database.Persist.Sqlite             as P
@@ -30,10 +30,13 @@ import           Text.Blaze.Html5                    ((!))
 import qualified Text.Blaze.Html5                    as H
 import qualified Text.Blaze.Html5.Attributes         as HA
 
+import           Text.Hastache                       (MuVar (..))
 import           Web.Scotty                          as S
 import           Web.Scotty.Types
 
 import           Diagrams.Interactive.Display        as Display
+
+import           Pastebin.Paste
 
 -- * Convertation & quering
 
@@ -90,13 +93,21 @@ renderDR (DR Svg  r) = H.div ! HA.class_ "thumbnail" $ do
                   , r
                   , "</g></svg>" ]
 
-        
+
 renderDR (DR Text r) = H.toHtml r
 renderDR (DR RuntimeErr r) = H.div ! HA.class_ "alert alert-error" $
                                  H.toHtml r
 
-renderCode :: TL.Text -> TL.Text
-renderCode = TL.pack
-           . hscolour CSS defaultColourPrefs False True "Paste" False
-           . TL.unpack
+renderCode :: Paste -> TL.Text
+renderCode Paste{..} = TL.pack
+           $ hscolour CSS defaultColourPrefs False True "Paste" pasteLiterateHs
+           $ TL.unpack pasteContent
 
+
+----------------------------------------
+-- orphan instance
+
+instance MuVar Bool where
+    isEmpty = not
+    toLByteString True  = "True"
+    toLByteString False = "False"

@@ -5,18 +5,12 @@
           <input class="input-xlarge" type="text" name="author"
           id="author" placeholder="Author"
   style="font-size:13pt;height:32px;" value="{{author}}" />
-          {{#result}}
-          <!--<span class="help-block" id="author">Pasted by {{author}}</span>-->
-          {{/result}}
         </div>
         <div class="control-group">
           <label class="control-label"><i
   class="icon-pencil"></i>&nbsp;</label>
           <input class="input-xlarge" type="text" name="title" id="title" placeholder="Title"
   style="font-size:13pt;height:32px;" value="{{ptitle}}" />
-          {{#result}}
-          <!--<span class="help-block" id="author">{{ptitle}}</span>-->
-          {{/result}}
         </div>
         <div class="control-group">
           <textarea id="codearea" rows="20" name="code" class="row-fluid">{{code}}</textarea>
@@ -29,7 +23,17 @@
             cm.refresh();
           });
           </script>
-          <input type="submit" class="btn btn-primary" value="Paste!" />
+        </div>
+        <div class="control-group">
+          <label class="checkbox">
+            <input type="checkbox" value="True"
+                   name="literate"
+                   id="literate"
+                   {{#literate}}checked{{/literate}}> Literate Haskell
+          </label>
+          <div class="controls">
+            <input type="submit" class="btn btn-primary" value="Paste!" />
+          </div>
         </div>
       </form>
     </div>

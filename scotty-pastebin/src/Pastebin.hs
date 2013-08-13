@@ -20,7 +20,7 @@ import           Control.Monad.Trans                  (lift)
 import           Control.Monad.Trans.Either           (EitherT (..), eitherT)
 import           Control.Monad.Trans.Maybe            (MaybeT (..))
 import           Data.Foldable                        (foldMap)
-import           Data.Monoid                          (mconcat)
+import           Data.Monoid                          (mconcat, mempty)
 import           Network                              (PortID (..), connectTo)
 import           System.IO                            (hClose)
 
@@ -78,14 +78,15 @@ errPage (ptitle, author, code, (msg, errors)) = do
 
 
 renderPaste :: Paste -> ActionH ()
-renderPaste Paste{..} = do
+renderPaste (p@Paste{..}) = do
     setH "code"     $ MuVariable pasteContent
-    setH "codeView" $ MuVariable (renderCode pasteContent)
+    setH "codeView" $ MuVariable (renderCode p)
     setH "title"    $ MuVariable $ mconcat ["Paste / ", T.pack pasteTitle,
                                           " by ", pasteAuthor]
     setH "author"   $ MuVariable pasteAuthor
     setH "ptitle"   $ MuVariable pasteTitle
-    setH "result"   $  MuVariable $ renderHtml $
+    setH "literate" $ MuVariable pasteLiterateHs
+    setH "result"   $ MuVariable $ renderHtml $
         foldMap renderDR (getDR pasteResult)
     hastache "main"
 
@@ -155,24 +156,25 @@ newPaste = do
     usern' <- lift (paramEscaped "author")
     let author = if (T.null usern') then "Anonymous" else usern'
     when (T.null code) $ throwT (title, author, code, ("Empty input", []))
-    pid <- compilePaste title code author
+    lhs <- lift (param "literate"
+                 `rescue` (return (return False)))
+    let p = Paste title code mempty False lhs author
+    pid <- compilePaste p
            `catchT` \e -> throwT (title, author, code, e)
     return (keyToInt pid)
 
 compilePaste :: MonadIO m
-             => String -> Text -> Text
+             => Paste
              -> EitherT (Text, [EvalError]) m (Key (PasteGeneric SqlBackend))
-compilePaste title code author = do
-    fname <- liftIO $ hash code
-    -- let fpath = getPastesDir </> show fname ++ ".hs"
-    -- liftIO $ T.writeFile fpath code
+compilePaste (p@Paste{..}) = do
+    fname <- liftIO $ hash pasteContent
+    let extn = if pasteLiterateHs then ".lhs" else ".hs"
     hndl <- liftIO $ connectTo "localhost" (UnixSocket controlSock)
     _ <- liftIO $ sendData hndl RequestWorker
     (worker :: Worker EvalWorker) <- liftIO $ getData hndl
     liftIO $ hClose hndl
     ((res, errors), wstatus) <- liftIO $ sendEvalRequestNoRestart worker $
-                                EvalFile (show fname ++ ".hs") code
-                             -- CompileFile fpath
+                                EvalFile (show fname ++ extn) pasteContent
     hndl2 <- liftIO $ connectTo "localhost" (UnixSocket controlSock)
     _ <- liftIO $ sendData hndl2 (ReturnWorker wstatus worker)
     liftIO $ hClose hndl2
@@ -181,8 +183,10 @@ compilePaste title code author = do
         Right !r -> do
             let dr = display r
             let containsImage = isJust (hasImage dr)
-            liftIO . runWithSql . insert $
-                Paste title code (display r) containsImage author
+            liftIO . runWithSql . insert $ p
+                { pasteResult = display r
+                , pasteContainsImg = containsImage
+                }
 
 redirPaste :: Monad m => Int -> ActionT m ()
 redirPaste i = redirect $ pack ("/get/" ++ show i)

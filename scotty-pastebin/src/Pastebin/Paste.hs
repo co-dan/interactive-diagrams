@@ -29,6 +29,7 @@ Paste
     content     Text
     result      DisplayResult
     containsImg Bool
+    literateHs  Bool   default=False
     author      Text   default="Anonymous"
     deriving Show
     deriving Generic
