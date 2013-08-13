@@ -51,3 +51,4 @@ executable scotty-pastebin
                        ghc-paths,
                        ghc >= 7.6,
                        eval-api
+

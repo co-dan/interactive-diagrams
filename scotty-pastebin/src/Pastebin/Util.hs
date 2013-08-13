@@ -18,24 +18,23 @@ module Pastebin.Util
     ) where
 
 import           Control.Applicative
-import qualified Data.Hashable                       as H
+import qualified Data.Hashable                as H
 import           Data.List
-import           Data.Monoid                         (mconcat, mempty)
-import qualified Data.Text.Lazy                      as TL
+import           Data.Monoid                  (mconcat, mempty)
+import qualified Data.Text.Lazy               as TL
 import           Data.Time.Clock
-import           Database.Persist.Sqlite             as P
-import           Language.Haskell.HsColour
-import           Language.Haskell.HsColour.Colourise
-import           Text.Blaze.Html5                    ((!))
-import qualified Text.Blaze.Html5                    as H
-import qualified Text.Blaze.Html5.Attributes         as HA
+import           Database.Persist.Sqlite      as P
+import           Text.Blaze.Html5             ((!))
+import qualified Text.Blaze.Html5             as H
+import qualified Text.Blaze.Html5.Attributes  as HA
 
-import           Text.Hastache                       (MuVar (..))
-import           Web.Scotty                          as S
+import           Text.Hastache                (MuVar (..))
+import           Web.Scotty                   as S
 import           Web.Scotty.Types
 
-import           Diagrams.Interactive.Display        as Display
+import           Diagrams.Interactive.Display as Display
 
+import           Pastebin.Coloring
 import           Pastebin.Paste
 
 -- * Convertation & quering
@@ -56,15 +55,16 @@ keyToInt (Key _)                = error "Unknown key format"
 
 paramEscaped :: (Monad m, Functor m) => TL.Text -> ActionT m TL.Text
 paramEscaped = (fmap . fmap) (TL.concatMap escape) S.param
-  where escape :: Char -> TL.Text
-        escape h
-          | h == '&' = "&amp;"
-          | h == '\\'= "&#92;"
-          | h == '"' = "&quot;"
-          | h == '\''= "&#39;"
-          | h == '<' = "&lt;"
-          | h == '>' = "&gt;"
-          | otherwise     = TL.singleton h
+
+escape :: Char -> TL.Text
+escape h
+    | h == '&'  = "&amp;"
+    | h == '\\' = "&#92;"
+    | h == '"'  = "&quot;"
+    | h == '\'' = "&#39;"
+    | h == '<'  = "&lt;"
+    | h == '>'  = "&gt;"
+    | otherwise = TL.singleton h
 
 
 -- * Hashing
@@ -99,10 +99,7 @@ renderDR (DR RuntimeErr r) = H.div ! HA.class_ "alert alert-error" $
                                  H.toHtml r
 
 renderCode :: Paste -> TL.Text
-renderCode Paste{..} = TL.pack
-           $ hscolour CSS defaultColourPrefs False True "Paste" pasteLiterateHs
-           $ TL.unpack pasteContent
-
+renderCode Paste{..} = colorize pasteLiterateHs pasteContent
 
 ----------------------------------------
 -- orphan instance
