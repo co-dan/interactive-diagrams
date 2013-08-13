@@ -65,15 +65,16 @@ hastacheConf = defaultConfig
 
 -- | * Rendering and views
 
-errPage :: (String, Text, Text, (Text, [EvalError])) -> ActionH ()
-errPage (ptitle, author, code, (msg, errors)) = do
+errPage :: (Paste, (Text, [EvalError])) -> ActionH ()
+errPage (Paste{..}, (msg, errors)) = do
     let errmsgs = map (mkGenericContext . mkErrMsg) errors
-    setH "title"  $ MuVariable ("Error :(" :: Text)
-    setH "msg"    $ MuVariable msg
-    setH "errors" $ MuList errmsgs
-    setH "ptitle" $ MuVariable ptitle
-    setH "author" $ MuVariable author
-    setH "code"   $ MuVariable code
+    setH "title"    $ MuVariable ("Error :(" :: Text)
+    setH "msg"      $ MuVariable msg
+    setH "errors"   $ MuList errmsgs
+    setH "ptitle"   $ MuVariable pasteTitle
+    setH "author"   $ MuVariable pasteAuthor
+    setH "literate" $ MuVariable pasteLiterateHs
+    setH "code"     $ MuVariable pasteContent
     hastache "main"
 
 
@@ -148,19 +149,19 @@ listPastes = do
     renderPasteList pastes
 
 
-newPaste :: EitherT (String, Text, Text, (Text, [EvalError])) ActionH Int
+newPaste :: EitherT (Paste, (Text, [EvalError])) ActionH Int
 newPaste = do
     title' <- T.unpack <$> lift (paramEscaped "title")
     let title = if (null title') then "(undefined)" else title'
     code <- lift (param "code")
     usern' <- lift (paramEscaped "author")
     let author = if (T.null usern') then "Anonymous" else usern'
-    when (T.null code) $ throwT (title, author, code, ("Empty input", []))
     lhs <- lift (param "literate"
                  `rescue` (return (return False)))
     let p = Paste title code mempty False lhs author
+    when (T.null code) $ throwT (p, ("Empty input", []))
     pid <- compilePaste p
-           `catchT` \e -> throwT (title, author, code, e)
+           `catchT` \e -> throwT (p, e)
     return (keyToInt pid)
 
 compilePaste :: MonadIO m

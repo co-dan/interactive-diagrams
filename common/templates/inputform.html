@@ -15,8 +15,10 @@
         <div class="control-group">
           <textarea id="codearea" rows="20" name="code" class="row-fluid">{{code}}</textarea>
           <script language="javascript">
+          {{#literate}}var cmMode = "literatehaskell";{{/literate}}
+          {{^literate}}var cmMode = "haskell";{{/literate}}
           cm = CodeMirror.fromTextArea(document.getElementById('codearea'), {
-            mode : "haskell",
+            mode : cmMode,
             lineNumbers : true
           });
           $('.tabbable a[href="#edit"]').on("shown", function() {
@@ -28,7 +30,6 @@
           <label class="checkbox">
             <input type="checkbox" value="True"
                    name="literate"
-                   id="literate"
                    {{#literate}}checked{{/literate}}> Literate Haskell
           </label>
           <div class="controls">
