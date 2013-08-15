@@ -52,6 +52,7 @@ import           Diagrams.Interactive.Display         (DisplayResult (..),
 import           Diagrams.Interactive.Eval
 import           Diagrams.Interactive.Eval.EvalError
 import           Pastebin.ErrorMessage
+import           Pastebin.Feed
 import           Pastebin.Gallery
 import           Pastebin.Paste
 import           Pastebin.Util
@@ -148,6 +149,11 @@ listPastes = do
               selectList [] [LimitTo 20, Desc PasteId]
     renderPasteList pastes
 
+feed :: ActionH ()
+feed = do
+    pastes <- liftIO $ runWithSql $
+              selectList [] [LimitTo 20, Desc PasteId]
+    renderRss $ mkRssFeed pastes
 
 newPaste :: EitherT (Paste, (Text, [EvalError])) ActionH Int
 newPaste = do
@@ -218,7 +224,8 @@ main = do
         S.get "/json/:id" $ maybeT page404 json getPaste
         S.get "/raw/:id/:ind" $ maybeT page404 text getRaw
         S.get "/raw/:id/:ind/pic.svg" $ maybeT page404 html getRaw
-        S.get "/" listPastes
         S.get "/gallery" (listImages >>= renderGallery)
         S.post "/new" $ eitherT errPage redirPaste (measureTime newPaste)
-        
+        S.get "/" listPastes
+        S.get "/feed" feed
+--        S.post "/fetch" $ eitherT errPage redirPaste fetchPaste

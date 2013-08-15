@@ -19,3 +19,7 @@ getPastesDir = "/tmp"
 
 getTemplatesDir :: FilePath
 getTemplatesDir = "../common/templates/"
+
+-- | The website URL, without the trailing slash
+rootPath :: String
+rootPath = "http://localhost:3030"

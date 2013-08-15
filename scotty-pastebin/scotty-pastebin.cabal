@@ -26,6 +26,8 @@ executable scotty-pastebin
                        persistent >=1.2,
                        persistent-sqlite >=1.2,
                        persistent-template >=1.2,
+                       feed -any,
+                       xml -any,
                        scotty ==0.4.6.1, 
                        -- need the scotty-transformer version
                        scotty-hastache,
