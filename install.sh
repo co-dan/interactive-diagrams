@@ -15,4 +15,9 @@ cabal build &&
 cp dist/build/scotty-pastebin/scotty-pastebin /idia/run/bin/scotty-pastebin &&
 sudo restorecon /idia/run/bin/scotty-pastebin &&
 cd .. &&
+wget http://co-dan.github.io/static/css/bootstrap.min.css -O common/static/css/bootstrap.min.css
+wget http://co-dan.github.io/static/css/codemirror.css -O common/static/css/codemirror.css
+wget http://co-dan.github.io/static/js/codemirror.js -O common/static/js/codemirror.js
+wget http://co-dan.github.io/static/js/haskell.js -O common/static/js/haskell.js
+wget http://co-dan.github.io/static/js/bootstrap.min.js -O common/static/js/bootstrap.min.js
 cp -R common/* /idia/run/common/
