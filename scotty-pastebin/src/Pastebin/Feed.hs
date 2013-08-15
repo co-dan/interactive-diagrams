@@ -7,17 +7,19 @@ module Pastebin.Feed
     , mkRssItem
     ) where
 
-import Data.Text.Lazy          (pack, unpack)
-import Data.Text.Lazy.Encoding (encodeUtf8)
-import Database.Persist
+import Data.ByteString.Builder (stringUtf8, toLazyByteString)
+import Data.Text.Lazy          (unpack)
+import Database.Persist        (Entity (..))
 import Text.RSS.Export         (xmlRSS)
 import Text.RSS.Syntax         (RSS (..), RSSChannel (..), RSSItem (..),
                                 nullChannel, nullItem, nullRSS)
 import Text.XML.Light          (showElement)
+
 import Web.Scotty
 import Web.Scotty.Types
 
 import Config
+import Pastebin.Coloring
 import Pastebin.Paste
 import Pastebin.Util
 
@@ -35,8 +37,10 @@ mkRssFeed pastes = (nullRSS "Pastes" rootPath)
 -- | Make a single RSS Item based on a paste and its id number
 mkRssItem :: Int -> Paste -> RSSItem
 mkRssItem pid Paste{..} = (nullItem pasteTitle)
-    { rssItemLink    = Just $ rootPath ++ "/get/" ++ show pid
-    , rssItemAuthor  = Just $ unpack pasteAuthor
+    { rssItemLink        = Just $ rootPath ++ "/get/" ++ show pid
+    , rssItemAuthor      = Just $ unpack pasteAuthor
+    , rssItemDescription =
+        Just $ colorizeStr pasteLiterateHs (unpack pasteContent)
 --    , rssItemPubDate =
     }
 
@@ -44,6 +48,6 @@ mkRssItem pid Paste{..} = (nullItem pasteTitle)
 renderRss :: Monad m => RSS -> ActionT m ()
 renderRss rss = do
     header "Content-Type" "application/rss+xml"
-    raw . encodeUtf8 . pack . showElement . xmlRSS $ rss
+    raw . toLazyByteString . stringUtf8 . showElement . xmlRSS $ rss
 
 

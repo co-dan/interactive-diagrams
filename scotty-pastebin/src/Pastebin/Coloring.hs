@@ -4,6 +4,7 @@
 module Pastebin.Coloring
     (
       colorize
+    , colorizeStr
     ) where
 
 import qualified Data.Text.Lazy                as TL
@@ -22,10 +23,13 @@ colorize :: Bool     -- ^ Is the code Literate haskell?
          -> TL.Text  -- ^ Code to be colourized
          -> TL.Text
 colorize lhs = TL.pack
-             . (if lhs
-                then colorizeLhs
-                else hscolour False)
+             . colorizeStr lhs
              . TL.unpack
+
+colorizeStr :: Bool -> String -> String
+colorizeStr lhs = if lhs
+                  then colorizeLhs
+                  else hscolour False
 
 colorizeLhs :: String -> String
 colorizeLhs = concatMap unChunk
