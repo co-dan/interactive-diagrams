@@ -71,7 +71,7 @@ loadFile file = do
     -- output graph
     loaded <- load LoadAllTargets
     when (failed loaded) $ throw LoadingException
-    setContext $ displayImport:(map (IIModule . moduleName . ms_mod) graph)
+    setContext $ displayImport:(map (IIModule . ms_mod_name) graph)
 
 -- | Compiles an expression to a @DisplayResult@
 compileExpr :: String -> EvalM DisplayResult

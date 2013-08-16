@@ -54,7 +54,7 @@ limSettings = def {
      rlimits = Just def {
         totalMemoryLimit = ResourceLimits memlim memlim
         }
-     , secontext  = Just "idia_restricted_t"
+     -- , secontext  = Just "idia_restricted_t"
      -- , cgroupPath = Just $ cgroups </> "idiaworkers"
      }
   where memlim = ResourceLimit $ 104857600 * 6
@@ -75,13 +75,11 @@ newWorkerAct :: Show a => EvalSettings -> a -> IO (Worker EvalWorker, RestartWor
 newWorkerAct wsettings i = do
   let wname = "EvalWorker" ++ show i
       wdir  = workersDir </> ("worker" ++ show i)
-  uid <- userID <$> getUserEntryForName username
+  -- uid <- userID <$> getUserEntryForName username
   doesDirectoryExist wdir >>= \e -> unless e $
     createDirectory wdir
-  startEvalWorker wname (wsettings { limitSet = limSettings  {
-                                          chrootPath = Just wdir,
-                                          processUid = Just uid }})
-
+  startEvalWorker wname wsettings
+  
 main :: IO ()
 main = do
   hSetBuffering stdin NoBuffering
