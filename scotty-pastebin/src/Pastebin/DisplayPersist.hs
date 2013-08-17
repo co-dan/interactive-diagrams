@@ -7,11 +7,10 @@
 {-# LANGUAGE RankNTypes                 #-}
 {-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE TypeFamilies               #-}
--- I had to put this into a separate module, otherwise TH would complain
+-- This has to be a separate module, otherwise GHC would complain
 module Pastebin.DisplayPersist where
 
 import Database.Persist.TH
-
 import Diagrams.Interactive.Display
 
 derivePersistField "DisplayResult"
