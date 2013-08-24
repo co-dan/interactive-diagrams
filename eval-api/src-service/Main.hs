@@ -8,7 +8,6 @@ import           Control.Applicative                    ((<$>))
 import           Control.Concurrent                     (forkIO)
 import           Control.Concurrent.MVar
 import           Control.Monad                          (forever, unless, void)
-import           Data.Default
 import           Network                                (Socket, accept)
 import           System.Directory                       (createDirectory,
                                                          doesDirectoryExist)
@@ -36,37 +35,7 @@ import           System.Restricted.Worker.Types
 -- traceM :: Monad m => String -> m ()
 -- traceM s = trace s $ return ()
 
-
-sockFile :: FilePath
-sockFile = "/idia/run/sock/control.sock"
-
-username :: String
-username = "vagrant"
-
-workersDir :: FilePath
-workersDir = "/idia/run/workers/"
-
-cgroups :: FilePath
-cgroups = "/cgroups/cpu/"
-
-limSettings :: LimitSettings
-limSettings = def {
-     rlimits = Just def {
-        totalMemoryLimit = ResourceLimits memlim memlim
-        }
-     -- , secontext  = Just "idia_restricted_t"
-     -- , cgroupPath = Just $ cgroups </> "idiaworkers"
-     }
-  where memlim = ResourceLimit $ 104857600 * 6
-                                 --- 100mb * 6
-settings :: EvalSettings
-settings = def
-  { limitSet     = limSettings
-  , pkgDatabases = ["/home/vagrant/.ghc/x86_64-linux-7.7.20130628/package.conf.d"]
-  , verbLevel    = 5
-  , preloadFile  = "../common/Preload.hs"
-  }
-
+import Config
 
 setOwner :: FilePath -> UserID -> IO ()
 setOwner fp u = setOwnerAndGroup fp u (-1)
@@ -75,9 +44,12 @@ newWorkerAct :: Show a => EvalSettings -> a -> IO (Worker EvalWorker, RestartWor
 newWorkerAct wsettings i = do
   let wname = "EvalWorker" ++ show i
       wdir  = workersDir </> ("worker" ++ show i)
-  -- uid <- userID <$> getUserEntryForName username
+  uid <- userID <$> getUserEntryForName username
   doesDirectoryExist wdir >>= \e -> unless e $
     createDirectory wdir
+  -- startEvalWorker wname (wsettings { limitSet = limSettings   {
+  --                                         chrootPath = Just wdir,
+  --                                         processUid = Just uid }})
   startEvalWorker wname wsettings
   
 main :: IO ()
@@ -90,7 +62,7 @@ main = do
   currentWorkers <- newMVar []
   soc <- mkSock sockFile
   userID <$> getUserEntryForName username
-   >>= setOwner sockFile
+      >>= setOwner sockFile
   loop soc pool currentWorkers
   return ()
 
