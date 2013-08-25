@@ -10,7 +10,7 @@ import Diagrams.Backend.SVG
 import System.IO.Unsafe  
 
 allExceptions :: SomeException -> IO DisplayResult
-allExceptions = return . display
+allExceptions = return . Left . display
 
 preload :: (Diagram SVG R2, Int)
 preload = 

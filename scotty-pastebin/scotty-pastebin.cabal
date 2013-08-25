@@ -31,8 +31,6 @@ executable scotty-pastebin
                        eval-api,
                        feed -any,
                        filepath,
-                       ghc >= 7.6,
-                       ghc-paths,
                        hashable,
                        hastache -any,
                        hscolour,

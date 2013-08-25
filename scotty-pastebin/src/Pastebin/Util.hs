@@ -40,11 +40,12 @@ import           Pastebin.Paste
 -- * Convertation & quering
 
 hasImage :: DisplayResult -> Maybe DR
-hasImage (DisplayResult drs) =
+hasImage (Left (StaticResult drs)) =
     find ((==Display.Svg) . clientType) drs
+hasImage (Right (DynamicResult _)) = Nothing
 
-getDR :: DisplayResult -> [DR]
-getDR (DisplayResult drs) = drs
+getDR :: StaticResult -> [DR]
+getDR (StaticResult drs) = drs
 
 intToKey :: Int -> Key a
 intToKey = Key . PersistInt64 . fromIntegral

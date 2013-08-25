@@ -73,8 +73,8 @@ loadFile file = do
     when (failed loaded) $ throw LoadingException
     setContext $ displayImport:(map (IIModule . ms_mod_name) graph)
 
--- | Compiles an expression to a @DisplayResult@
-compileExpr :: String -> EvalM DisplayResult
+-- | Compiles an expression to a @StaticResult@
+compileExpr :: String -> EvalM StaticResult
 compileExpr expr = do
     -- ty <- exprType expr -- throws exception if doesn't typecheck
     -- output ty

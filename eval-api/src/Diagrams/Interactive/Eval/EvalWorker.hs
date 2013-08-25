@@ -146,7 +146,7 @@ sendEvalStringRequest :: (Worker EvalWorker, RestartWorker IO EvalWorker)
 sendEvalStringRequest w str = sendEvalRequest w (EvalString str)
 
 -- | Runs a Ghc monad code and outputs the result to a handle
-runToHandle :: (Serialize a, Show a)
+runToHandle :: (Serialize a)
             => EvalM a -> Handle -> EvalM (Either String a, [EvalError])
 runToHandle act hndl = do
     ref <- liftIO $ newIORef []
@@ -228,13 +228,13 @@ instance Serialize EvalCmd
 
 -- | Convert an 'EvalCmd' to 'EvalM' action that can be executed
 evalCmdToEvalM :: EvalCmd -> EvalM DisplayResult
-evalCmdToEvalM (CompileFile fpath) = do
+evalCmdToEvalM (CompileFile fpath) = fmap Left $ do
   loadFile fpath
   underIO <- isUnderIO "main"
   if underIO
-    then compileExpr "(return . display =<< main) :: IO DisplayResult"
-    else compileExpr "(display (main)) :: DisplayResult"
-evalCmdToEvalM (EvalString s) = compileExpr s
+    then compileExpr "(return . display =<< main) :: IO StaticResult"
+    else compileExpr "(display (main)) :: StaticResult"         
+evalCmdToEvalM (EvalString s) = fmap Left $ compileExpr s
 evalCmdToEvalM (EvalFile n txt) = do
   EvalSettings{..} <- ask
   let fpath = tmpDirPath </> n

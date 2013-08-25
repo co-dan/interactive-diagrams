@@ -24,7 +24,8 @@ import           Data.Monoid                          (mconcat, mempty)
 import           Network                              (PortID (..), connectTo)
 import           System.IO                            (hClose)
 
-import           Control.Error.Util                   (hoistMaybe, maybeT)
+import           Control.Error.Util                   (hoistMaybe, maybeT,
+                                                       nothing)
 import           Data.Aeson                           ()
 import           Data.EitherR                         (catchT, throwT)
 import           Data.Maybe                           (isJust)
@@ -47,7 +48,9 @@ import           Database.Persist.Sqlite              as P
 import           Text.Blaze.Html.Renderer.Text
 
 import           Config
-import           Diagrams.Interactive.Display         (DisplayResult (..),
+import           Diagrams.Interactive.Display         (DisplayResult,
+                                                       DynamicResult (..),
+                                                       StaticResult (..),
                                                        display, result)
 import           Diagrams.Interactive.Eval
 import           Diagrams.Interactive.Eval.EvalError
@@ -88,8 +91,11 @@ renderPaste (p@Paste{..}) = do
     setH "author"   $ MuVariable pasteAuthor
     setH "ptitle"   $ MuVariable pasteTitle
     setH "literate" $ MuVariable pasteLiterateHs
-    setH "result"   $ MuVariable $ renderHtml $
-        foldMap renderDR (getDR pasteResult)
+    setH "result"   $ MuVariable $ case pasteResult of
+        Left staticRes ->
+            renderHtml $ foldMap renderDR (getDR staticRes)
+        Right dynRes   ->
+            error "dynRes"
     hastache "main"
 
 
@@ -125,8 +131,10 @@ getRaw = do
     -- pid <- lift $ param "id"
     ind <- lift $ param "ind"
     paste <- getPaste
-    let (DisplayResult res) = pasteResult paste
-    return . result $ res !! ind
+    case pasteResult paste of
+        Left (StaticResult res) ->
+            return . result $ res !! ind
+        Right _ -> nothing
 
 getPaste :: MaybeT (ActionT HState) Paste
 getPaste = do
@@ -164,7 +172,7 @@ newPaste = do
     let author = if (T.null usern') then "Anonymous" else usern'
     lhs <- lift (param "literate"
                  `rescue` (return (return False)))
-    let p = Paste title code mempty False lhs author
+    let p = Paste title code (Left $ StaticResult []) False lhs author
     when (T.null code) $ throwT (p, ("Empty input", []))
     pid <- compilePaste p
            `catchT` \e -> throwT (p, e)
@@ -187,13 +195,17 @@ compilePaste (p@Paste{..}) = do
     liftIO $ hClose hndl2
     case res of
         Left err -> throwT (pack err, errors)
-        Right !r -> do
-            let dr = display r
-            let containsImage = isJust (hasImage dr)
+        Right (Left dr) -> do
+            liftIO $ putStrLn "DR"
+            liftIO $ print dr
+            liftIO $ putStrLn "/DR"
+            let containsImage = isJust (hasImage (Left dr))
             liftIO . runWithSql . insert $ p
-                { pasteResult = display r
+                { pasteResult = (Left dr)
                 , pasteContainsImg = containsImage
                 }
+        Right (Right dynre) -> do
+            error "compilePaste"
 
 redirPaste :: Monad m => Int -> ActionT m ()
 redirPaste i = redirect $ pack ("/get/" ++ show i)
