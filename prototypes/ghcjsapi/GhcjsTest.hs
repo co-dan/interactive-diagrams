@@ -6,30 +6,36 @@
 module Main where
 
 
-import           DynFlags
-import           GhcMonad
-import           MonadUtils             (MonadIO (..))
-import           Outputable             hiding ((<>))
+import DynFlags
+import GhcMonad
+import MonadUtils         (MonadIO (..))
+import Outputable         hiding ((<>))
 
-import           Compiler.Utils
-import           GHCJS
+import Compiler.Utils
+import GHCJS
 
-import           Debug.Trace
+import Debug.Trace
+import System.Environment (getArgs)
 
 debug :: Bool
 debug = True
 
 
 main :: IO ()
-main = runGhcjsSession Nothing debug $ do
-    traceM "Inside the runGhcjsSession"
-    dflags <- getSessionDynFlags
-    setSessionDynFlags $ dflags { verbosity = 1 }
-    dflags2 <- getSessionDynFlags
-    setTargets =<< sequence
-        [ guessTarget "test.hs" Nothing ]
-    _ <- load LoadAllTargets
-    liftIO $ compilationProgressMsg dflags2 "OK" 
+main = do
+    args <- getArgs
+    let fname = case args of
+            (fn:_) -> fn
+            []     -> "test.hs"
+    runGhcjsSession Nothing debug $ do
+        traceM "Inside the runGhcjsSession"
+        dflags <- getSessionDynFlags
+        setSessionDynFlags $ dflags { verbosity = 1 }
+        dflags2 <- getSessionDynFlags
+        setTargets =<< sequence
+            [ guessTarget fname Nothing ]
+        _ <- load LoadAllTargets
+        liftIO $ compilationProgressMsg dflags2 "OK"
 
 
 -- | Outputs any value that can be pretty-printed using the default style
