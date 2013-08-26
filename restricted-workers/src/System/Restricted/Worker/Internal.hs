@@ -65,7 +65,7 @@ forkWorker (w@Worker{..}) out cb = do
     _ <- setStoppedChildFlag True
     _ <- installHandler processStatusChanged Ignore Nothing
     soc <- mkSock workerSocket
-    addFinalizer w (close soc)
+    addFinalizer soc (close soc)
     forkProcess $ do
         _ <- setStoppedChildFlag False
         _ <- installHandler processStatusChanged Default Nothing

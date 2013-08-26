@@ -1,6 +1,6 @@
 name:                restricted-workers
 synopsis:            Running worker processes under system resource restrictions
-version:             0.1.0
+version:             0.1.1
 
 description:         This library provides an abstract interface for
                      running various kinds of workers under resource
