@@ -4,10 +4,14 @@ module Main where
 import Test.Hspec
 import Test.QuickCheck
 
+import Control.Arrow
 import Control.Applicative
 import Data.Default
 import Data.Monoid
+import Data.Either
 import qualified Data.Text.Lazy as TL
+
+import Unsafe.Coerce
 
 import Diagrams.Interactive.Eval
 import Diagrams.Interactive.Eval.Helpers
@@ -17,7 +21,7 @@ verbosity :: Int
 verbosity = 2
 
 testfile :: FilePath
-testfile = "test.hs"
+testfile = "test/test.hs"
 
 runWithFile :: FilePath -> EvalM a -> IO (Either String a)
 runWithFile fp a = flip run def $ do
@@ -26,19 +30,72 @@ runWithFile fp a = flip run def $ do
 
 main :: IO ()
 main = do
-  hspec $ do
-    describe "loadFile loads a Haskell source file and bring its module content into the current context" $ do
-        it "allows us to inspect the contents of the module" $ do
-            pending            
-    describe "needsInput determines whether the given expression needs additional input from the user" $ do
-        it "does not report on simple datatypes" $
-            pending
-        it "recognizes simple functions" $
-            pending
-        it "recognizes functions with multiple arguments" $
-            pending
-        it "looks under newtypes" $
-            pending
-        it "looks under datatypes" $
-            pending
+  hspec $ sequence_ 
+      [ loadFileSpecs
+      , isUnderIOSpecs
+      , needsInputSpecs
+      ]
     
+loadFileSpecs :: Spec
+loadFileSpecs = describe "loadFile" $ do
+    
+    it "allows us to inspect the contents of the module" $ 
+        runWithFile testfile (unsafeCoerce <$> compileExpr "test")
+            `shouldReturn` Right (2::Int)                
+
+    it "returns an error when we try to load a non-existent file" $ 
+        runWithFile "test/nope.hs" (return ()) >>=
+            (`shouldSatisfy` isLeft)
+
+isUnderIOSpecs :: Spec
+isUnderIOSpecs = describe "isUnderIO" $ do
+    it "detects whether the expression is an IO action" $
+        runWithFile testfile (isUnderIO "undefined :: IO Int")
+            `shouldReturn` Right True                
+    it "detects whether the expression is not an IO action" $
+        runWithFile testfile (isUnderIO "(*)")
+            `shouldReturn` Right False                
+
+        
+needsInputSpecs :: Spec
+needsInputSpecs = describe "needsInput" $ do
+    let needsInput_ = runWithFile testfile . needsInput
+        
+    it "does not report on simple non-function datatypes" $
+        needsInput_ "undefined :: Int"
+            `shouldReturn` Right False
+
+    it "does not report on non-function datatypes" $
+        needsInput_ "undefined :: IO Int"
+            `shouldReturn` Right False
+
+    it "recognizes simple functions" $
+        needsInput_ "undefined :: Int -> String"
+            `shouldReturn` Right True
+        
+    it "recognizes functions with multiple arguments (specialized to concrete types)" $
+        needsInput_ "(+) :: Int -> Int -> Int"
+            `shouldReturn` Right True        
+
+    it "recognizes functions with multiple arguments (polymorphic types)" $
+        needsInput_ "(+) :: Num a => a -> a -> a"
+            `shouldReturn` Right True        
+
+    it "recognizes functions with multiple arguments (no types given)" $
+        needsInput_ "(+)"
+            `shouldReturn` Right True        
+
+    it "looks under newtypes" $
+        needsInput_ "undefined :: MorInt Double"
+            `shouldReturn` Right True        
+
+    it "looks under nested newtypes" $
+        needsInput_ "undefined :: EndoInt"
+            `shouldReturn` Right True        
+
+    it "looks under datatypes" $
+        runWithFile testfile (do
+            what <- needsInput "what"
+            what2 <- needsInput "what2"
+            return (what, what2))
+        `shouldReturn` Right (True, True)

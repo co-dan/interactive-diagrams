@@ -1,6 +1,7 @@
 {-# LANGUAGE CPP                      #-}
 {-# LANGUAGE ForeignFunctionInterface #-}
 {-# LANGUAGE OverloadedStrings        #-}
+{-# LANGUAGE PatternGuards            #-}
 {-# LANGUAGE ScopedTypeVariables      #-}
 {-|
   Helper functions for the 'EvalM' and 'Ghc' monads
@@ -12,6 +13,7 @@ module Diagrams.Interactive.Eval.Helpers
     , compileExpr
       -- * Code queries
     , isUnderIO
+    , needsInput
       -- * Auxilary functions for working with the GHC API session/environment
     , addPkgDb
     , addPkgDbs
@@ -33,7 +35,9 @@ import HscTypes
 import MonadUtils                          hiding (MonadIO, liftIO)
 import Outputable
 import Packages                            hiding (display)
+import TyCon
 import Type
+import Util                                (lengthAtLeast)
 
 import Diagrams.Interactive.Display
 import Diagrams.Interactive.Eval.EvalError
@@ -43,6 +47,53 @@ import Diagrams.Interactive.Eval.EvalM
 -- Code queries
 ------------------------------------------------------------
 
+-- | Can the expression be run statically or does it need
+-- additional input?
+-- NB: IO actions doesn't count seems we can provide almost all of the
+-- RealWorld to the use
+-- See tests for example behaviour
+needsInput :: String -> EvalM Bool
+needsInput expr = do
+    ty <- peelIO <$> exprType expr
+    liftIO $ putStr $ expr ++ " : "
+    isFunc ty
+
+-- | See also 'repType' in Types.lhs
+isFunc :: Type -> EvalM Bool
+isFunc t = do
+    ioTyC <- getIOTyCon
+    let t' = go initRecTc [ioTyC] t
+    output t'
+    return $ isFunTy t'
+  where
+    go :: RecTcChecker -> [TyCon] -> Type -> Type
+    go rec_nts ignore ty    
+      | Just ty' <- coreView ty
+      = go rec_nts ignore ty'
+
+      | Just (_, ty') <- splitForAllTy_maybe ty
+      = go rec_nts ignore ty'
+
+      | Just (tc, tys) <- splitTyConApp_maybe ty
+      , isNewTyCon tc
+      , not (elem tc ignore)  
+      , tys `lengthAtLeast` tyConArity tc
+	  , Just rec_nts' <- checkRecTc rec_nts tc   -- See Note [Expanding newtypes] in TyCon
+      = go rec_nts' ignore (newTyConInstRhs tc tys)
+
+      | otherwise = ty
+
+    -- any isFunTy . flattenRepType . repType
+
+
+--------------------------------------------------
+
+peelIO :: Type -> Type
+peelIO ty = ty
+
+getIOTyCon :: EvalM TyCon
+getIOTyCon = tyConAppTyCon <$> exprType "(return ()) :: IO ()"
+
 -- | Is the expression under the IO Monad?
 isUnderIO :: String -> EvalM Bool
 isUnderIO expr = do
@@ -51,8 +102,7 @@ isUnderIO expr = do
     case splitted of
         Nothing -> return False
         Just tyC -> do
-            ioT <- exprType "(return ()) :: IO ()"
-            let ioTyC = tyConAppTyCon ioT
+            ioTyC <- getIOTyCon
             return $ tyC == ioTyC
 
 
