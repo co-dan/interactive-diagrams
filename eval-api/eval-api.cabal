@@ -91,6 +91,23 @@ executable eval-service
 --                        eval-api,
 --                        display  
 
+test-suite spec
+  main-is:             Spec.hs
+  hs-source-dirs:      test
+  type:                exitcode-stdio-1.0
+  build-depends:       base,
+                       transformers,
+                       readline,
+                       data-default,
+                       time,
+                       ghc,
+                       ghc-paths,
+                       text,
+                       eval-api,
+                       display,
+                       QuickCheck,
+                       hspec
+
 source-repository head
   type:                 git
   location:             git://github.com/co-dan/interactive-diagrams.git

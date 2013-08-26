@@ -9,37 +9,36 @@ import Data.Default
 import Data.Monoid
 import qualified Data.Text.Lazy as TL
 
-import Eval
-import Display
-import Eval.EvalM
-import Eval.EvalSettings
-import Eval.Helpers  
-import Eval.EvalError
+import Diagrams.Interactive.Eval
+import Diagrams.Interactive.Eval.Helpers
+import Diagrams.Interactive.Eval.EvalM
 
-eval :: EvalQueue -> EvalM DisplayResult -> IO (String, [EvalError])
-eval q act = do
-  (r, errors) <- sendEvaluator q act
-  case r of
-    Right (DisplayResult res) ->
-      return (mconcat (map (TL.unpack . result) res), errors)
-    Left err -> return (err, errors)
+verbosity :: Int
+verbosity = 2
 
-cmpexpr :: String -> EvalM DisplayResult
-cmpexpr e = compileExpr $ "(return $ display (" ++ e ++ ")) :: IO DisplayResult"
+testfile :: FilePath
+testfile = "test.hs"
+
+runWithFile :: FilePath -> EvalM a -> IO (Either String a)
+runWithFile fp a = flip run def $ do
+    loadFile fp
+    a
 
 main :: IO ()
 main = do
-  (q, _) <- prepareEvalQueue $ def { secontext = Nothing }
   hspec $ do
-    describe "compileExpr" $ do
-      it "compiles integers and returns `DisplayResult's sucessfully" $
-        property $ \(x :: Integer) -> do
-          eval q (cmpexpr (show x ++ " :: Integer")) 
-            `shouldReturn` (show x, [])
-      it "compiles arithmetic expressions and returns `DisplayResult's sucessfully" $ 
-        eval q (cmpexpr "123 * 5 :: Int")
-          `shouldReturn` ("615", [])
-      it "compiles string expressions and returns `DisplayResult's sucessfully" $ 
-        fst <$> eval q (cmpexpr "\"hello\" ++ \"world\"")
-          `shouldReturn` "\"helloworld\""
-      
+    describe "loadFile loads a Haskell source file and bring its module content into the current context" $ do
+        it "allows us to inspect the contents of the module" $ do
+            pending            
+    describe "needsInput determines whether the given expression needs additional input from the user" $ do
+        it "does not report on simple datatypes" $
+            pending
+        it "recognizes simple functions" $
+            pending
+        it "recognizes functions with multiple arguments" $
+            pending
+        it "looks under newtypes" $
+            pending
+        it "looks under datatypes" $
+            pending
+    
