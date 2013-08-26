@@ -55,16 +55,13 @@ import Diagrams.Interactive.Eval.EvalM
 needsInput :: String -> EvalM Bool
 needsInput expr = do
     ty <- peelIO <$> exprType expr
-    liftIO $ putStr $ expr ++ " : "
     isFunc ty
 
 -- | See also 'repType' in Types.lhs
 isFunc :: Type -> EvalM Bool
 isFunc t = do
     ioTyC <- getIOTyCon
-    let t' = go initRecTc [ioTyC] t
-    output t'
-    return $ isFunTy t'
+    return $ isFunTy $ go initRecTc [ioTyC] t
   where
     go :: RecTcChecker -> [TyCon] -> Type -> Type
     go rec_nts ignore ty    
