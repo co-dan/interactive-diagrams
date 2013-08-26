@@ -48,7 +48,7 @@ import           Database.Persist.Sqlite              as P
 import           Text.Blaze.Html.Renderer.Text
 
 import           Config
-import           Diagrams.Interactive.Display         (DisplayResult,
+import           Diagrams.Interactive.Display         (DisplayResult (..),
                                                        DynamicResult (..),
                                                        StaticResult (..),
                                                        display, result)
@@ -92,9 +92,9 @@ renderPaste (p@Paste{..}) = do
     setH "ptitle"   $ MuVariable pasteTitle
     setH "literate" $ MuVariable pasteLiterateHs
     setH "result"   $ MuVariable $ case pasteResult of
-        Left staticRes ->
+        Static staticRes ->
             renderHtml $ foldMap renderDR (getDR staticRes)
-        Right dynRes   ->
+        Interactive dynRes   ->
             error "dynRes"
     hastache "main"
 
@@ -132,9 +132,9 @@ getRaw = do
     ind <- lift $ param "ind"
     paste <- getPaste
     case pasteResult paste of
-        Left (StaticResult res) ->
+        Static (StaticResult res) ->
             return . result $ res !! ind
-        Right _ -> nothing
+        Interactive _ -> nothing
 
 getPaste :: MaybeT (ActionT HState) Paste
 getPaste = do
@@ -172,7 +172,7 @@ newPaste = do
     let author = if (T.null usern') then "Anonymous" else usern'
     lhs <- lift (param "literate"
                  `rescue` (return (return False)))
-    let p = Paste title code (Left $ StaticResult []) False lhs author
+    let p = Paste title code (Static $ StaticResult []) False lhs author
     when (T.null code) $ throwT (p, ("Empty input", []))
     pid <- compilePaste p
            `catchT` \e -> throwT (p, e)
@@ -195,16 +195,16 @@ compilePaste (p@Paste{..}) = do
     liftIO $ hClose hndl2
     case res of
         Left err -> throwT (pack err, errors)
-        Right (Left dr) -> do
+        Right (Static dr) -> do
             liftIO $ putStrLn "DR"
             liftIO $ print dr
             liftIO $ putStrLn "/DR"
-            let containsImage = isJust (hasImage (Left dr))
+            let containsImage = isJust (hasImage (Static dr))
             liftIO . runWithSql . insert $ p
-                { pasteResult = (Left dr)
+                { pasteResult      = Static dr
                 , pasteContainsImg = containsImage
                 }
-        Right (Right dynre) -> do
+        Right (Interactive dr) -> do
             error "compilePaste"
 
 redirPaste :: Monad m => Int -> ActionT m ()

@@ -108,8 +108,6 @@ startEvalWorker name eset = startWorker name sock out set pre callback
                                         , ghcLink = LinkInMemory
                                         , verbosity = 3
                                         }
-          -- loadFile (preloadFile eset)
-          -- compileExpr "preload"
           oldTrgs <- getTargets
           loadFile (preloadFile eset)
           setTargets oldTrgs
@@ -175,7 +173,6 @@ sendEvalRequest (w, restart) cmd = do
     alive <- processAlive pid
     w' <- case alive of
         True  -> return w
-        -- False -> startEvalWorker (workerName w) (def { limitSet = workerLimits w })
         False -> restart w
     let evres = case r of
             Left _ -> (Left "Process timedout", [])
@@ -228,13 +225,13 @@ instance Serialize EvalCmd
 
 -- | Convert an 'EvalCmd' to 'EvalM' action that can be executed
 evalCmdToEvalM :: EvalCmd -> EvalM DisplayResult
-evalCmdToEvalM (CompileFile fpath) = fmap Left $ do
+evalCmdToEvalM (CompileFile fpath) = fmap Static $ do
   loadFile fpath
   underIO <- isUnderIO "main"
   if underIO
     then compileExpr "(return . display =<< main) :: IO StaticResult"
     else compileExpr "(display (main)) :: StaticResult"         
-evalCmdToEvalM (EvalString s) = fmap Left $ compileExpr s
+evalCmdToEvalM (EvalString s) = fmap Static $ compileExpr s
 evalCmdToEvalM (EvalFile n txt) = do
   EvalSettings{..} <- ask
   let fpath = tmpDirPath </> n

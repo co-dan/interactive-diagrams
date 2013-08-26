@@ -40,9 +40,9 @@ import           Pastebin.Paste
 -- * Convertation & quering
 
 hasImage :: DisplayResult -> Maybe DR
-hasImage (Left (StaticResult drs)) =
+hasImage (Static (StaticResult drs)) =
     find ((==Display.Svg) . clientType) drs
-hasImage (Right (DynamicResult _)) = Nothing
+hasImage (Interactive (DynamicResult _)) = Nothing
 
 getDR :: StaticResult -> [DR]
 getDR (StaticResult drs) = drs
