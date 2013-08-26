@@ -47,6 +47,7 @@ library
                        ghc-paths ==0.1.*,
                        data-default ==0.5.*,
                        ghc >= 7.6,
+                       ghcjs,
                        display ==0.1.*,
                        vector ==0.10.*,
                        hashable, 
@@ -78,19 +79,19 @@ executable eval-service
                        eval-api,
                        display
 
--- executable evali
---   hs-source-dirs:      src-bin
---   main-is:             EvalInteractive.hs
---   ghc-options:         -O2 -Wall
---   build-depends:       base,
---                        transformers,
---                        readline,
---                        data-default,
---                        time,
---                        restricted-workers,
---                        text,
---                        eval-api,
---                        display  
+executable evali
+  hs-source-dirs:      src-bin
+  main-is:             EvalInteractive.hs
+  ghc-options:         -O2 -Wall
+  build-depends:       base,
+                       transformers,
+                       readline,
+                       data-default,
+                       time,
+                       restricted-workers,
+                       text,
+                       eval-api,
+                       display  
 
 test-suite spec
   main-is:             Spec.hs

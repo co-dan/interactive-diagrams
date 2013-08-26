@@ -48,7 +48,6 @@ import           System.IO                              (Handle, hClose)
 import           System.IO.Error                        (isAlreadyExistsError,
                                                          isPermissionError)
 
-
 import           Diagrams.Interactive.Display
 import           Diagrams.Interactive.Eval.EvalError
 import           Diagrams.Interactive.Eval.EvalM
@@ -101,26 +100,25 @@ startEvalWorker name eset = startWorker name sock out set pre callback
                    then return ()
                    else throwIO e
         pre  = flip run' eset $ do
-          liftIO cleanup
-          addPkgDbs (pkgDatabases eset)
-          dfs <- getSessionDynFlags
-          _ <- setSessionDynFlags $ dfs { hscTarget = HscInterpreted
-                                        , ghcLink = LinkInMemory
-                                        , verbosity = 3
-                                        }
-          oldTrgs <- getTargets
-          loadFile (preloadFile eset)
-          setTargets oldTrgs
-          liftIO restoreHandlers
-          getSession
+            liftIO cleanup
+            addPkgDbs (pkgDatabases eset)
+            dfs <- getSessionDynFlags
+            _ <- setSessionDynFlags $ dfs { hscTarget = HscInterpreted
+                                          , ghcLink   = LinkInMemory
+                                          , verbosity = verbLevel eset
+                                          }
+            oldTrgs <- getTargets
+            loadFile (preloadFile eset)
+            setTargets oldTrgs
+            liftIO restoreHandlers
+            getSession
         callback sess soc = forever $ do
-          (hndl, _, _) <- accept soc
-          act <- evalWorkerAction hndl
-          flip run' eset $ do
-            setSession sess
-            r :: EvalResultWithErrors <- runToHandle act hndl
-            return r
-
+            (hndl, _, _) <- accept soc
+            act <- evalWorkerAction hndl
+            flip run' eset $ do
+              setSession sess
+              r :: EvalResultWithErrors <- runToHandle act hndl
+              return r
 
 -- | Read data from a handle and convert it to 'EvalM' action
 evalWorkerAction :: Handle -> IO (EvalM DisplayResult)
@@ -225,12 +223,17 @@ instance Serialize EvalCmd
 
 -- | Convert an 'EvalCmd' to 'EvalM' action that can be executed
 evalCmdToEvalM :: EvalCmd -> EvalM DisplayResult
-evalCmdToEvalM (CompileFile fpath) = fmap Static $ do
+evalCmdToEvalM (CompileFile fpath) = do
   loadFile fpath
+  interactive <- needsInput "main"
   underIO <- isUnderIO "main"
-  if underIO
-    then compileExpr "(return . display =<< main) :: IO StaticResult"
-    else compileExpr "(display (main)) :: StaticResult"         
+  if interactive
+      then fmap Interactive $ do
+           -- liftGhc $ initGhcJs True
+           compileToJS fpath
+      else fmap Static $ if underIO
+           then compileExpr "(return . display =<< main) :: IO StaticResult"
+           else compileExpr "(display (main)) :: StaticResult"         
 evalCmdToEvalM (EvalString s) = fmap Static $ compileExpr s
 evalCmdToEvalM (EvalFile n txt) = do
   EvalSettings{..} <- ask

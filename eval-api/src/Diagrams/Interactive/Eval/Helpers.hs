@@ -2,6 +2,7 @@
 {-# LANGUAGE ForeignFunctionInterface #-}
 {-# LANGUAGE OverloadedStrings        #-}
 {-# LANGUAGE PatternGuards            #-}
+{-# LANGUAGE RecordWildCards          #-}
 {-# LANGUAGE ScopedTypeVariables      #-}
 {-|
   Helper functions for the 'EvalM' and 'Ghc' monads
@@ -11,6 +12,7 @@ module Diagrams.Interactive.Eval.Helpers
       -- * Compilation and interpretation (of computer programs)
       loadFile
     , compileExpr
+    , compileToJS
       -- * Code queries
     , isUnderIO
     , needsInput
@@ -39,8 +41,13 @@ import TyCon
 import Type
 import Util                                (lengthAtLeast)
 
+import GHCJS hiding (compileExpr)
+import Compiler.GhcjsPlatform
+import Compiler.Variants
+
 import Diagrams.Interactive.Display
 import Diagrams.Interactive.Eval.EvalError
+import Diagrams.Interactive.Eval.EvalSettings
 import Diagrams.Interactive.Eval.EvalM
 
 ------------------------------------------------------------
@@ -53,9 +60,7 @@ import Diagrams.Interactive.Eval.EvalM
 -- RealWorld to the use
 -- See tests for example behaviour
 needsInput :: String -> EvalM Bool
-needsInput expr = do
-    ty <- peelIO <$> exprType expr
-    isFunc ty
+needsInput expr = isFunc =<< exprType expr
 
 -- | See also 'repType' in Types.lhs
 isFunc :: Type -> EvalM Bool
@@ -80,14 +85,6 @@ isFunc t = do
 
       | otherwise = ty
 
-    -- any isFunTy . flattenRepType . repType
-
-
---------------------------------------------------
-
-peelIO :: Type -> Type
-peelIO ty = ty
-
 getIOTyCon :: EvalM TyCon
 getIOTyCon = tyConAppTyCon <$> exprType "(return ()) :: IO ()"
 
@@ -111,7 +108,7 @@ displayImport :: InteractiveImport
 displayImport = IIDecl . simpleImportDecl $ mkModuleName "Diagrams.Interactive.Display"
 
 -- | Loads the file into the evaluator
-loadFile :: FilePath -> EvalM ()
+loadFile :: GhcMonad m => FilePath -> m ()
 loadFile file = do
     setTargets =<< sequence [guessTarget file Nothing]
     graph <- depanal [] False
@@ -139,6 +136,22 @@ compileExpr expr = do
         ([_], Right exn) -> return (display exn)
         _                -> panic "compileExpr"
 
+
+compileToJS :: FilePath -> EvalM DynamicResult
+compileToJS fp = do
+    EvalSettings{..} <- evalSettings
+    liftIO $ runGhcjsSession Nothing True $ do
+        dflags <- getSessionDynFlags
+        setSessionDynFlags $ dflags { verbosity = verbLevel
+                                    , objectDir = Just tmpDirPath
+                                    , hiDir     = Just tmpDirPath
+                                    , dumpDir   = Just tmpDirPath
+                                    }
+        trgt <- guessTarget fp Nothing
+        setTargets [trgt]
+        loaded <- load LoadAllTargets
+        when (failed loaded) $ throw LoadingException
+        return (DynamicResult "WOAH")
 
 ------------------------------------------------------------
 -- Auxilary functions for working with the

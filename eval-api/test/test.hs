@@ -16,3 +16,6 @@ what = TEst 1
 what2 :: TEst
 what2 = TEstFun (*2)
 
+main :: IO Int
+main = return 1
+

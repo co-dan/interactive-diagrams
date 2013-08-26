@@ -61,7 +61,7 @@ forkWorker :: Worker a
            -> Maybe (IO Handle)  -- ^ Where to redirect stdout
            -> (Socket -> IO ())  -- ^ Callback funcion
            -> IO ProcessID
-forkWorker (w@Worker{..}) out cb = do
+forkWorker Worker{..} out cb = do
     _ <- setStoppedChildFlag True
     _ <- installHandler processStatusChanged Ignore Nothing
     soc <- mkSock workerSocket
