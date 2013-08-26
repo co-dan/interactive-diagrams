@@ -83,12 +83,21 @@ In the main function we delay for 80000 before killing the worker (or exiting) t
 > main :: IO ()
 > main = do
 >     hSetBuffering stdin NoBuffering
->     (worker,_) <- startIOWorker "Command Evaluator" def
+>     bzz <- startIOWorker "Command Evaluator" def
 >                       "/tmp/commandme.sock" cmdHandler
->     sendCommands worker [Dance, Dance, AddNumbers 1 2, Echo "Hi", Dance]
->     threadDelay 80000
->     killWorker worker
->     return ()
+>     go bzz
+>   where
+>     go (worker, restart) = do
+>         sendCommands worker [ Dance, Dance
+>                             , AddNumbers 1 2
+>                             , Echo "Hi", Echo "wow"
+>                             , Dance, Dance ]
+>         threadDelay 800000
+>         worker' <- restart worker
+>         go (worker', restart)
+>         return ()
+
+
 
 Sample output:
 
