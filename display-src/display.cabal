@@ -1,5 +1,5 @@
 name:                display
-version:             0.1.0.0
+version:             0.1.0
 synopsis:            The backbone Display library for interactive-diagrams
 -- description:         
 license:             BSD3

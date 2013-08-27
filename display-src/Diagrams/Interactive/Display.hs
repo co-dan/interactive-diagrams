@@ -20,6 +20,7 @@ data DisplayResult = Static      StaticResult
 
 instance Serialize DisplayResult
 
--- displayResult :: DisplayResult -> TL.Text
--- displayResult (Left str) = S.display str
--- displayResult (Right _)  = error "Display.displayResult"
+instance (Display a) => Display (JSDisplay a) where
+    display (JSDisplay a) = display a
+
+
