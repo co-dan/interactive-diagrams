@@ -11,6 +11,7 @@ import           Data.Default
 import           Data.Foldable
 import           Data.Monoid
 import           Data.Int
+import           Data.Word
 import qualified Data.Text                            as T
 import qualified Data.Text.IO                         as T
 import qualified Data.Text.Lazy                       as TL
@@ -71,8 +72,6 @@ instance (Inputable a, Renderable b, Show a) => Renderable (a -> b) where
             return (f, area)
         -- ^ we capture the current continuation
         --  in order to return back later
-
-        traceM "rendering.."
         lift $ empty w
         lift $ appendJQuery area w
         -- ^ whatever `area' we get, we move it to our
@@ -91,6 +90,7 @@ instance (Inputable a, Renderable b, Show a) => Renderable (a -> b) where
             -- then we remove our working area completely
             lift $ remove area
             -- .. replacing it with new area with new controls
+            buttonBack kont w
             newArea <- render w (f input)
             -- and we put a "back" button on our new area
             buttonBack kont newArea
@@ -147,6 +147,24 @@ instance Renderable (Diagram Canvas R2) where
         lift $ appendJQuery canvas area
         lift $ appendJQuery area   w
         return area
+
+instance Renderable Int 
+instance Renderable Int8 
+instance Renderable Int16 
+instance Renderable Int32 
+instance Renderable Int64 
+instance Renderable Word 
+instance Renderable Word8 
+instance Renderable Word16 
+instance Renderable Word32 
+instance Renderable Word64 
+instance Renderable Integer 
+instance Renderable Float 
+instance Renderable Double 
+instance Renderable Char
+instance Renderable ()
+instance Display a => Renderable (Maybe a)
+instance (Display a, Display b) => Renderable (Either a b)
 
 ------------------------------------------------------------
 -- Helpers
