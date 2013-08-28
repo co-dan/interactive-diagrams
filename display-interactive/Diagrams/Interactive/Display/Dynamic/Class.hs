@@ -46,6 +46,12 @@ class Renderable a where
 runRender :: Renderable a => a -> JQuery -> IO JQuery
 runRender a w = runContT (render w a) return
 
+runRenderTest :: Renderable a => a -> IO ()
+runRenderTest a = do
+    w <- select "#test"
+    _ <- runRender a w
+    return ()
+    
 --------------------------------------------------
 
 newtype JSDisplay a = JSDisplay a

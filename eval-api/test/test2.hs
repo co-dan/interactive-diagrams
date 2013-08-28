@@ -1,4 +1,6 @@
-module Test2 where
+module Main where
+import Diagrams.Interactive.Display.Dynamic.Class
 
-main :: Int -> Int
-main x = x + 1
+main = return ()
+
+example x = x + 1 :: Integer

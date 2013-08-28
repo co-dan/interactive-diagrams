@@ -27,15 +27,21 @@ module Diagrams.Interactive.Eval.Helpers
 import Control.Monad                       (when)
 import Control.Monad.IO.Class              (MonadIO)
 import Unsafe.Coerce                       (unsafeCoerce)
+import Data.Monoid
 
+import Bag
 import DynFlags
+import DriverPipeline
 import Exception
 import GHC                                 hiding (compileExpr)
 import GhcMonad
 import HscMain
 import HscTypes
+import OccName
+import RdrName
+import HsBinds
 import MonadUtils                          hiding (MonadIO, liftIO)
-import Outputable
+import Outputable                          hiding ((<>))
 import Packages                            hiding (display)
 import TyCon
 import Type
@@ -49,6 +55,7 @@ import Diagrams.Interactive.Display
 import Diagrams.Interactive.Eval.EvalError
 import Diagrams.Interactive.Eval.EvalSettings
 import Diagrams.Interactive.Eval.EvalM
+import Diagrams.Interactive.Eval.SourceMod
 
 ------------------------------------------------------------
 -- Code queries
@@ -66,7 +73,8 @@ needsInput expr = isFunc =<< exprType expr
 isFunc :: Type -> EvalM Bool
 isFunc t = do
     ioTyC <- getIOTyCon
-    return $ isFunTy $ go initRecTc [ioTyC] t
+    t' <- peelIO t
+    return $ isFunTy $ go initRecTc [ioTyC] t'
   where
     go :: RecTcChecker -> [TyCon] -> Type -> Type
     go rec_nts ignore ty    
@@ -85,13 +93,23 @@ isFunc t = do
 
       | otherwise = ty
 
+peelIO :: Type -> EvalM Type
+peelIO ty = do
+    let splitted = splitTyConApp_maybe ty
+    case splitted of
+        Nothing -> return ty
+        Just (tyC, tys) -> do
+            ioTyC <- getIOTyCon
+            if (tyC == ioTyC)
+              then return (head tys)
+              else return ty     
+    
 getIOTyCon :: EvalM TyCon
 getIOTyCon = tyConAppTyCon <$> exprType "(return ()) :: IO ()"
 
 -- | Is the expression under the IO Monad?
-isUnderIO :: String -> EvalM Bool
-isUnderIO expr = do
-    ty <- exprType expr
+isUnderIO :: Type -> EvalM Bool
+isUnderIO ty = do
     let splitted = tyConAppTyCon_maybe ty
     case splitted of
         Nothing -> return False
@@ -146,12 +164,65 @@ compileToJS fp = do
                                     , objectDir = Just tmpDirPath
                                     , hiDir     = Just tmpDirPath
                                     , dumpDir   = Just tmpDirPath
+                                    , stubDir   = Just tmpDirPath
+                                    --, hscTarget = HscInterpreted
                                     }
         trgt <- guessTarget fp Nothing
         setTargets [trgt]
+        graph <- depanal [] False
+        let modSum = head graph
         loaded <- load LoadAllTargets
+        -- load (LoadUpTo (ms_mod_name modSum))
         when (failed loaded) $ throw LoadingException
+
+        parsedMod <- parseModule modSum
+        let src = pm_parsed_source parsedMod
+        let (L srcspan hsmod) = src
+        let hsmod' = modifyModule injectRender hsmod
+        output $ hsmod' 
+        typecheckedMod <- typecheckModule $ parsedMod
+                          { pm_parsed_source = L srcspan hsmod' }
+        output $ tm_typechecked_source typecheckedMod                          
+        -- mod <- loadModule typecheckedMod
+        -- hsc_env <- getSession
+        -- dflags2  <- getSessionDynFlags
+        -- linkresult <- liftIO $ link (ghcLink dflags2) dflags True 
+        --               (hsc_HPT hsc_env)
+        -- output linkresult
         return (DynamicResult "WOAH")
+
+
+injectRender :: SourceMod
+injectRender =  addImportSimple dclass
+             <> replaceDefinition maindef wrapRender
+             <> removeSig maindef
+  where
+    dclass  = "Diagrams.Interactive.Display.Dynamic.Class"
+    maindef = mkVarOcc "example"
+
+wrapRender :: HsBind RdrName -> HsBind RdrName
+wrapRender f@(FunBind{..})
+          | maindef == rdrNameOcc (unLoc fun_id)
+          = f { fun_matches = fun_matches {
+                     mg_alts = [L l (Match [] Nothing grhs)]
+                     } }
+  where
+    grhs = GRHSs { grhssLocalBinds = binds
+                 , grhssGRHSs = [L l $ GRHS [] (L l rhs) ] }
+    
+    dclass  = "Diagrams.Interactive.Display.Dynamic.Class"
+    maindef = mkVarOcc "example"
+    newName = mkRdrUnqual (mkVarOcc "old example")
+    renderF = mkRdrQual (mkModuleName dclass) (mkVarOcc "runRenderTest")
+    renderV = HsVar renderF
+    l = getLoc fun_id
+    rhs :: HsExpr RdrName
+    rhs = HsApp (L l renderV) (L l (HsVar newName))
+    -- rhs = HsLet binds (L l $ HsApp (L l renderV) (L l (HsVar newName)))
+    binds :: HsLocalBinds RdrName
+    binds = HsValBinds $ ValBindsIn (unitBag (L l newF)) []
+    newF = f { fun_id = L l newName }
+wrapRender x = x
 
 ------------------------------------------------------------
 -- Auxilary functions for working with the

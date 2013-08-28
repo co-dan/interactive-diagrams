@@ -35,6 +35,7 @@ library
                        Diagrams.Interactive.Eval.EvalError,
                        Diagrams.Interactive.Eval.Helpers,
                        Diagrams.Interactive.Eval.Handlers,
+                       Diagrams.Interactive.Eval.SourceMod,
                        SignalHandlers
   build-depends:       base >=4.6 && <5,
                        transformers ==0.3.*,

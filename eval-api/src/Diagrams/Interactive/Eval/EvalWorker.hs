@@ -225,8 +225,9 @@ instance Serialize EvalCmd
 evalCmdToEvalM :: EvalCmd -> EvalM DisplayResult
 evalCmdToEvalM (CompileFile fpath) = do
   loadFile fpath
-  interactive <- needsInput "main"
-  underIO <- isUnderIO "main"
+  ty <- exprType "main"
+  interactive <- needsInput "example"
+  underIO <- isUnderIO ty
   if interactive
       then fmap Interactive $ do
            -- liftGhc $ initGhcJs True
