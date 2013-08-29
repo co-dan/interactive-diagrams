@@ -15,8 +15,7 @@ import Text.RSS.Syntax         (RSS (..), RSSChannel (..), RSSItem (..),
                                 nullChannel, nullItem, nullRSS)
 import Text.XML.Light          (showElement)
 
-import Web.Scotty
-import Web.Scotty.Types
+import Web.Scotty.Trans
 
 import Config
 import Pastebin.Coloring
