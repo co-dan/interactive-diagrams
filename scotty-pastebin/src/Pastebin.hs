@@ -232,8 +232,8 @@ main = do
     scottyH 3000 $ do
         -- setTemplatesDir "../common/templates/"
         setHastacheConfig hastacheConf
-        middleware . middlewareIO $ logStdoutDev
-        middleware . middlewareIO $ staticPolicy (addBase "../common/static")
+        middleware logStdoutDev
+        middleware $ staticPolicy (addBase "../common/static")
         S.get "/get/:id" $ maybeT page404 renderPaste getPaste
         S.get "/json/:id" $ maybeT page404 json getPaste
         S.get "/raw/:id/:ind" $ maybeT page404 text getRaw
@@ -243,12 +243,3 @@ main = do
         S.get "/" listPastes
         S.get "/feed" feed
 --        S.post "/fetch" $ eitherT errPage redirPaste fetchPaste
-
-middlewareIO :: Scotty.Middleware IO
-             -> Scotty.Middleware HState
-middlewareIO mw app = transResourceT liftIO . mw app1
-  where
-    app1 :: Scotty.Application IO
-    app1 req = transResourceT morph (app req)
-    morph :: HState a -> IO a
-    morph m = evalStateT m (hastacheConf, mempty)
