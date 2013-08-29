@@ -16,9 +16,11 @@ module Main where
 import           Control.Applicative                  ((<$>))
 import           Control.Monad                        (when)
 import           Control.Monad.IO.Class               (MonadIO (..))
+import           Control.Monad.State
 import           Control.Monad.Trans                  (lift)
 import           Control.Monad.Trans.Either           (EitherT (..), eitherT)
 import           Control.Monad.Trans.Maybe            (MaybeT (..))
+import           Control.Monad.Trans.Resource (transResourceT, ResourceT)
 import           Data.Foldable                        (foldMap)
 import           Data.Monoid                          (mconcat, mempty)
 import           Network                              (PortID (..), connectTo)
@@ -35,14 +37,14 @@ import           Data.Time.Clock                      (diffUTCTime,
                                                        getCurrentTime)
 
 import           Network.HTTP.Types
+import           Network.Wai
 import           Network.Wai.Middleware.RequestLogger
 import           Network.Wai.Middleware.Static
 import           Text.Hastache
 import           Text.Hastache.Context
-import           Web.Scotty                           as S
+import           Web.Scotty.Trans                     as S
 import           Web.Scotty.Hastache
-import           Web.Scotty.Types
-
+import qualified Web.Scotty.Types                     as Scotty
 import           Database.Persist                     as P
 import           Database.Persist.Sqlite              as P
 import           Text.Blaze.Html.Renderer.Text
@@ -230,8 +232,8 @@ main = do
     scottyH 3000 $ do
         -- setTemplatesDir "../common/templates/"
         setHastacheConfig hastacheConf
-        middleware logStdoutDev
-        middleware $ staticPolicy (addBase "../common/static")
+        middleware . middlewareIO $ logStdoutDev
+        middleware . middlewareIO $ staticPolicy (addBase "../common/static")
         S.get "/get/:id" $ maybeT page404 renderPaste getPaste
         S.get "/json/:id" $ maybeT page404 json getPaste
         S.get "/raw/:id/:ind" $ maybeT page404 text getRaw
@@ -241,3 +243,12 @@ main = do
         S.get "/" listPastes
         S.get "/feed" feed
 --        S.post "/fetch" $ eitherT errPage redirPaste fetchPaste
+
+middlewareIO :: Scotty.Middleware IO
+             -> Scotty.Middleware HState
+middlewareIO mw app = transResourceT liftIO . mw app1
+  where
+    app1 :: Scotty.Application IO
+    app1 req = transResourceT morph (app req)
+    morph :: HState a -> IO a
+    morph m = evalStateT m (hastacheConf, mempty)

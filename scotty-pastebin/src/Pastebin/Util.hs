@@ -30,7 +30,7 @@ import qualified Text.Blaze.Html5.Attributes  as HA
 
 import           Text.Hastache                (MuVar (..))
 import           Web.Scotty                   as S
-import           Web.Scotty.Types
+import           Web.Scotty.Trans             as ST
 
 import           Diagrams.Interactive.Display as Display
 
@@ -55,7 +55,7 @@ keyToInt (Key (PersistInt64 i)) = fromIntegral (toInteger i)
 keyToInt (Key _)                = error "Unknown key format"
 
 paramEscaped :: (Monad m, Functor m) => TL.Text -> ActionT m TL.Text
-paramEscaped = (fmap . fmap) (TL.concatMap escape) S.param
+paramEscaped = (fmap . fmap) (TL.concatMap escape) ST.param
 
 escape :: Char -> TL.Text
 escape h
