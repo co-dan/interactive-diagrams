@@ -7,7 +7,7 @@ $(function () {
     // var divRef = h$mkJSRef(div);
     // var render = h$mainZCMainziexample;
     // var action = h$c2(h$ap1_e, render, divRef);
-//    h$main(action);
+    //  h$main(action);
 
- h$main(h$mainZCMainziexample);
+    h$run(h$mainZCMainziexample);
 });

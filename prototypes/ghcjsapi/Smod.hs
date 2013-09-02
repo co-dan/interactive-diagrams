@@ -1,39 +1,24 @@
 {-# LANGUAGE ScopedTypeVariables, RecordWildCards #-}
 module Main where
 
-import Control.Monad                       (when, void)
-import Control.Monad.IO.Class              (MonadIO)
-import Unsafe.Coerce                       (unsafeCoerce)
-import Data.Monoid
+import Control.Monad                       (when)
 import Data.List
 
 import Distribution.Package (PackageName (..))
-
-import Bag
-import DynFlags hiding (PackageName(..))
-import DriverPipeline hiding (PackageName(..))
-import Exception hiding (PackageName(..))
-import GHC                                 hiding (compileExpr, PackageName(..))
-import GHC.Paths hiding (PackageName(..))
-import GhcMonad  hiding (PackageName(..))
--- import HscMain hiding (PackageName(..))
+import DynFlags
+import Exception
+import GHC                                 hiding (compileExpr)
+import GhcMonad  
 import UniqFM (eltsUFM)
-import Module hiding (PackageName(..))
-import HscTypes hiding (PackageName(..))
-import OccName hiding (PackageName(..))
-import RdrName hiding (PackageName(..))
-import HsBinds hiding (PackageName(..))
-import MonadUtils                          hiding (MonadIO, liftIO)
+import Module
+import HscTypes
 import Outputable                          hiding ((<>))
-import Packages                            hiding (display, PackageName(..))
-import TyCon hiding (PackageName(..))
-import Type hiding (PackageName(..))
-import Util                                (lengthAtLeast)
+import Packages                            hiding (display)
 
-import GHCJS hiding (compileExpr, PackageName(..))
-import Compiler.GhcjsPlatform hiding (PackageName(..))
-import Compiler.GhcjsHooks hiding (PackageName(..))
-import Compiler.Variants hiding (PackageName(..))
+import GHCJS hiding (compileExpr(..))
+import Compiler.GhcjsPlatform 
+import Compiler.GhcjsHooks 
+import Compiler.Variants 
 
 import Diagrams.Interactive.Display
 import Diagrams.Interactive.Eval.EvalError
@@ -87,18 +72,21 @@ main = runGhcjsSession Nothing True $ do
     let pkg_deps' | any isInteractivePackage pkg_deps = pkg_deps
                   | otherwise = displayInteractivePackage dflags2 : pkg_deps
     output pkg_deps'
-    liftIO $ ghcjsLinkBinary True [] dflags2 ["/tmp/Main.js_o"] pkg_deps'
+    liftIO $ linkBinary dflags2 pkg_deps' ["/tmp/Main.js_o"] "out.jsexe"
 
-    -- modifySession $ \h -> h { hsc_mod_graph = modSum':(tail graph) }
-    -- -- hsc_env <- getSession
-    -- -- dflags2  <- getSessionDynFlags
-    -- -- linkresult <- liftIO $ link (ghcLink dflags2) dflags True 
-    -- --               (hsc_HPT hsc_env)
+linkBinary :: DynFlags -> [PackageId] -> [FilePath] -> FilePath -> IO ()
+linkBinary dflags pkg_deps targets out =
+    print =<< variantLink gen2Variant dflags True out [] deps targets [] isRoot
+  where
+    isRoot = const True
+    deps   = map (\pkg -> (pkg, packageLibPaths pkg)) pkg_deps'
+    pidMap   = pkgIdMap (pkgState dflags)
+    packageLibPaths :: PackageId -> [FilePath]
+    packageLibPaths pkg = maybe [] libraryDirs (lookupPackage pidMap pkg)
+    -- make sure we link ghcjs-prim even when it's not a dependency
+    pkg_deps' | any isGhcjsPrimPackage pkg_deps = pkg_deps
+              | otherwise                       = ghcjsPrimPackage dflags : pkg_deps
 
-    -- -- output linkresult
-    -- liftIO $ putStrLn "load.."
-    -- void (load LoadAllTargets) `gcatch` \(e::SomeException) -> liftIO $ print e
-    -- liftIO $ putStrLn "loaded"
 
 isInteractivePackage :: PackageId -> Bool
 isInteractivePackage pkgId = "display-interactive-" `isPrefixOf` packageIdString pkgId
@@ -112,4 +100,4 @@ displayInteractivePackage dflags =
     prims = reverse . sort $ filter isInteractivePackage pkgIds
     pkgIds = map packageConfigId . eltsUFM . pkgIdMap . pkgState $ dflags
 
---0 ((PackageName "display-interactive"==) . pkgName
+-- ((PackageName "display-interactive"==) . pkgName
