@@ -19,6 +19,7 @@ import           DsMeta                              (templateHaskellNames)
 import           DynFlags
 import           Exception
 import           GHC
+import           GhcMonad
 import           HscTypes
 import           IfaceEnv                            (initNameCache)
 import           Outputable
@@ -49,15 +50,22 @@ initGhc ref vb = do
     _ <- setSessionDynFlags dfs2
     return ()
 
+-- | This resets the session
 initGhcJs :: Bool -> Ghc ()
 initGhcJs debug = do
+    libDir <- liftIO $ getGlobalPackageBase
+    initGhcMonad (Just libDir)
     base <- liftIO ghcjsDataDir
     dflags <- getSessionDynFlags
-    (dflags2,_) <- liftIO $ initPackages dflags
+    dflags2 <- liftIO $ addPkgConf dflags
+    (dflags3,_) <- liftIO $ initPackages dflags2
     _ <- setSessionDynFlags
          $ setGhcjsPlatform debug [] base
          $ updateWays $ addWay' (WayCustom "js")
-         $ setGhcjsSuffixes False dflags2
+         $ setGhcjsSuffixes False
+         $ dflags3 { ghcLink   = LinkBinary
+                   , hscTarget = HscAsm
+                   }
     fixNameCache
 
 fixNameCache :: GhcMonad m => m ()

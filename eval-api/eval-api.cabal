@@ -48,6 +48,7 @@ library
                        ghc-paths ==0.1.*,
                        data-default ==0.5.*,
                        ghc >= 7.6,
+                       Cabal,
                        ghcjs,
                        display ==0.1.*,
                        vector ==0.10.*,

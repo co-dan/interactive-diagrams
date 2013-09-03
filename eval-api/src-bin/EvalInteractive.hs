@@ -25,10 +25,14 @@ settings = def {
   limitSet = def {
      rlimits = Just def {
         totalMemoryLimit = ResourceLimits memlim memlim
+        , cpuTimeLimit   = ResourceLimits
+                             ResourceLimitUnknown
+                             ResourceLimitUnknown
         },
      secontext = Nothing,
      timeout = 20
      }
+  , verbLevel = 3
   }
   where memlim = ResourceLimit $ 104857600 * 10
                                  --- 100mb * 10

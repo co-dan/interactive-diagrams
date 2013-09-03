@@ -206,8 +206,8 @@ compilePaste (p@Paste{..}) = do
                 { pasteResult      = Static dr
                 , pasteContainsImg = containsImage
                 }
-        Right (Interactive dr) -> do
-            error "compilePaste"
+        Right (Interactive (DynamicResult dr)) -> do
+            throwT (dr, [])
 
 redirPaste :: Monad m => Int -> ActionT m ()
 redirPaste i = redirect $ pack ("/get/" ++ show i)

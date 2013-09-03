@@ -148,7 +148,8 @@ runToHandle act hndl = do
     ref <- liftIO $ newIORef []
     set <- ask
     liftGhc $ initGhc ref (verbLevel set)
-    dr :: Either String a <- handleException act
+    dflags <- getSessionDynFlags
+    dr :: Either String a <- defaultCleanupHandler dflags (handleException act)
     errors :: [EvalError] <- liftIO $ readIORef ref
     _ <- liftIO $ sendData hndl (dr, errors)
     return (dr, errors)
@@ -225,16 +226,18 @@ instance Serialize EvalCmd
 evalCmdToEvalM :: EvalCmd -> EvalM DisplayResult
 evalCmdToEvalM (CompileFile fpath) = do
   loadFile fpath
-  ty <- exprType "main"
   interactive <- needsInput "example"
+  ty <- exprType "example"
   underIO <- isUnderIO ty
   if interactive
       then fmap Interactive $ do
-           -- liftGhc $ initGhcJs True
+           sess <- getSession
            compileToJS fpath
+               `gfinally` setSession sess
       else fmap Static $ if underIO
-           then compileExpr "(return . display =<< main) :: IO StaticResult"
-           else compileExpr "(display (main)) :: StaticResult"         
+           then compileExpr "(return . display =<< example) :: IO StaticResult"
+           else compileExpr "(display example) :: StaticResult"
+                
 evalCmdToEvalM (EvalString s) = fmap Static $ compileExpr s
 evalCmdToEvalM (EvalFile n txt) = do
   EvalSettings{..} <- ask
