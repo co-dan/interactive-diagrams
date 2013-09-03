@@ -1,5 +1,3 @@
-module Main (main, example) where
-
 main = return ()
 
 example :: Integer -> Integer

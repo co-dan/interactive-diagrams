@@ -19,3 +19,5 @@ what2 = TEstFun (*2)
 main :: IO Int
 main = return 1
 
+example :: Integer
+example  = 3
