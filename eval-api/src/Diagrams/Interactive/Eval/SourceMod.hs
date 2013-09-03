@@ -1,9 +1,12 @@
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE RecordWildCards            #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE FlexibleInstances          #-}
 
 -- | Source modifications
 module Diagrams.Interactive.Eval.SourceMod where
 
 import Control.Applicative
+import Control.Monad.Trans.State.Strict
 import Data.Monoid
 import DynFlags
 import GHC
@@ -13,49 +16,73 @@ import OccName
 import RdrName
 import SrcLoc
 
-data SourceMod = SourceMod
-    { getImportsMod :: Endo [LImportDecl RdrName]
-    , getDeclsMod   :: Endo [LHsDecl RdrName]
-    }
+type Decls = ([LImportDecl RdrName], [LHsDecl RdrName])
+newtype SourceMod a = SourceMod (State Decls a)
+                    deriving (Monad)
+-- data SourceMod a = SourceMod
+--     { getImportsMod :: Endo [LImportDecl RdrName]
+--     , getDeclsMod   :: Endo [LHsDecl RdrName]
+--     , getValue      :: a
+--     }
 
-instance Monoid SourceMod where
-    mempty = SourceMod mempty mempty
-    mappend (SourceMod a b) (SourceMod c d) = SourceMod (a <> c) (b <> d)
+instance Monoid (SourceMod ()) where
+    mempty = fromEndo mempty mempty
+    mappend (SourceMod s1) (SourceMod s2) =
+        SourceMod $ s1 >> s2
 
+-- instance Monad SourceMod where
+--     return a = SourceMod mempty mempty a
+--     (SourceMod{..}) >>= f = f getValue
 
-modifyModule :: SourceMod -> HsModule RdrName -> HsModule RdrName
-modifyModule SourceMod{..} m@HsModule{..} =
+modifyModule :: SourceMod a -> HsModule RdrName -> HsModule RdrName
+modifyModule (SourceMod s) m@HsModule{..} =
     m { hsmodImports = newImports
       , hsmodDecls   = newDecls
       }
   where
-    newImports   = appEndo getImportsMod hsmodImports
-    newDecls     = appEndo getDeclsMod   hsmodDecls
+    (newImports, newDecls) = execState s (hsmodImports, hsmodDecls)
 
+ignoreValue :: SourceMod a -> SourceMod ()
+ignoreValue = (=<<) (const (return ()))
 
-removeSig :: OccName -> SourceMod
-removeSig target = SourceMod mempty (Endo (map modify))
-  where
-    modify (L l1 (SigD (TypeSig names (L l2 hst))))
+fromEndo :: Endo [LImportDecl RdrName] -> Endo [LHsDecl RdrName] -> SourceMod ()
+fromEndo e1 e2 = SourceMod $ state $ \(imp,decls) ->
+    ((), (appEndo e1 imp, appEndo e2 decls))
+
+removeSig :: OccName -> SourceMod (Maybe (HsType RdrName))
+removeSig target = SourceMod $ state $ \(inc,decls) ->
+    let (ans, decls') = go decls
+    in (ans, (inc, decls'))
+  where    
+    go ((L l1 (SigD (TypeSig names (L l2 hst)))):xs)
           | Just (name, rest) <- containsOcc target names
-          = L l1 (SigD (TypeSig rest  (L l2 hst)))
-    modify x = x
+          = (Just hst, ((L l1 (SigD (TypeSig rest  (L l2 hst)))):xs))
+    go (x:xs) = let (ans, lst) = go xs in (ans, x:lst)
+    go []     = (Nothing, [])
 
-addImportSimple :: String -> SourceMod
-addImportSimple mname = SourceMod (Endo (imp:)) mempty
+addImportSimple :: String -> SourceMod ()
+addImportSimple mname = fromEndo (Endo (imp:)) mempty
   where
     imp = noLoc $ simpleImportDecl $ mkModuleName mname
 
 replaceDefinition :: OccName
                   -> (HsBind RdrName -> HsBind RdrName) 
-                  -> SourceMod
-replaceDefinition target modify = SourceMod mempty (Endo (map go))
+                  -> SourceMod ()
+replaceDefinition target modify = fromEndo mempty (Endo (map go))
   where
-    go (L l (ValD d)) = L l (ValD (modify d))
+    go (L l (ValD d)) =
+        let relevant = case d of
+                FunBind{..} -> rdrNameOcc (unLoc fun_id) == target
+                VarBind{..} -> rdrNameOcc var_id == target
+                _           -> False
+        in
+         if relevant
+         then L l (ValD (modify d))
+         else L l (ValD d)
     go x              = x
     
-modifyDefinition :: OccName -> (LHsExpr RdrName -> LHsExpr RdrName) -> SourceMod
-modifyDefinition target modify = SourceMod mempty (Endo (map go))
+modifyDefinition :: OccName -> (LHsExpr RdrName -> LHsExpr RdrName) -> SourceMod ()
+modifyDefinition target modify = fromEndo mempty (Endo (map go)) 
   where
     go (L l (ValD f@(FunBind{..})))
       | target == rdrNameOcc (unLoc fun_id)

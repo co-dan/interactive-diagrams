@@ -22,9 +22,10 @@ module Diagrams.Interactive.Eval.Helpers
       -- * Other stuff
     , output
     , allExceptions
+    , injectRender
     ) where
 
-import Control.Monad                       (when)
+import Control.Monad                       (when, void)
 import Control.Monad.IO.Class              (MonadIO)
 import Unsafe.Coerce                       (unsafeCoerce)
 import Data.Monoid
@@ -171,10 +172,10 @@ compileToJS fp = do
         setTargets [trgt]
         graph <- depanal [] False
         let modSum = head graph
-        loaded <- load LoadAllTargets
-        -- load (LoadUpTo (ms_mod_name modSum))
+        output graph
+        -- loaded <- load LoadAllTargets
+        loaded <- load (LoadDependenciesOf (ms_mod_name modSum))
         when (failed loaded) $ throw LoadingException
-
         parsedMod <- parseModule modSum
         let src = pm_parsed_source parsedMod
         let (L srcspan hsmod) = src
@@ -182,27 +183,34 @@ compileToJS fp = do
         output $ hsmod' 
         typecheckedMod <- typecheckModule $ parsedMod
                           { pm_parsed_source = L srcspan hsmod' }
-        output $ tm_typechecked_source typecheckedMod                          
+        output $ tm_typechecked_source typecheckedMod
+        liftIO $ putStrLn "loading mod..."
         -- mod <- loadModule typecheckedMod
+        let modSum' = pm_mod_summary (tm_parsed_module typecheckedMod)
+        modifySession $ \h -> h { hsc_mod_graph = modSum':(tail graph) }
         -- hsc_env <- getSession
         -- dflags2  <- getSessionDynFlags
         -- linkresult <- liftIO $ link (ghcLink dflags2) dflags True 
         --               (hsc_HPT hsc_env)
+        
         -- output linkresult
+        liftIO $ putStrLn "load.."
+        void (load LoadAllTargets) `gcatch` \(e::SomeException) -> liftIO $ print e
+        liftIO $ putStrLn "loaded"
         return (DynamicResult "WOAH")
 
 
-injectRender :: SourceMod
-injectRender =  addImportSimple dclass
-             <> replaceDefinition maindef wrapRender
-             <> removeSig maindef
+injectRender :: SourceMod ()
+injectRender = do
+    addImportSimple dclass
+    maybety <- removeSig maindef
+    replaceDefinition maindef (wrapRender maybety)
   where
     dclass  = "Diagrams.Interactive.Display.Dynamic.Class"
     maindef = mkVarOcc "example"
 
-wrapRender :: HsBind RdrName -> HsBind RdrName
-wrapRender f@(FunBind{..})
-          | maindef == rdrNameOcc (unLoc fun_id)
+wrapRender :: Maybe (HsType RdrName) -> HsBind RdrName -> HsBind RdrName
+wrapRender ty f@(FunBind{..})
           = f { fun_matches = fun_matches {
                      mg_alts = [L l (Match [] Nothing grhs)]
                      } }
@@ -211,18 +219,20 @@ wrapRender f@(FunBind{..})
                  , grhssGRHSs = [L l $ GRHS [] (L l rhs) ] }
     
     dclass  = "Diagrams.Interactive.Display.Dynamic.Class"
-    maindef = mkVarOcc "example"
-    newName = mkRdrUnqual (mkVarOcc "old example")
+    newName = mkRdrUnqual (mkVarOcc "oldexample")
     renderF = mkRdrQual (mkModuleName dclass) (mkVarOcc "runRenderTest")
     renderV = HsVar renderF
     l = getLoc fun_id
-    rhs :: HsExpr RdrName
+    rhs :: HsExpr RdrName    
     rhs = HsApp (L l renderV) (L l (HsVar newName))
     -- rhs = HsLet binds (L l $ HsApp (L l renderV) (L l (HsVar newName)))
     binds :: HsLocalBinds RdrName
-    binds = HsValBinds $ ValBindsIn (unitBag (L l newF)) []
+    binds = HsValBinds $ ValBindsIn (unitBag (L l newF)) sigs
+    sigs = case ty of
+        Nothing  -> []
+        Just ty' -> [L l $ TypeSig [L l newName] (L l ty')]
     newF = f { fun_id = L l newName }
-wrapRender x = x
+wrapRender _ x = x
 
 ------------------------------------------------------------
 -- Auxilary functions for working with the

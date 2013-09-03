@@ -35,35 +35,26 @@ main = runGhcjsSession Nothing True $ do
                                 , hiDir     = Just tmpDirPath
                                 , dumpDir   = Just tmpDirPath
                                 , stubDir   = Just tmpDirPath
-                                --, hscTarget = HscInterpreted
                                 }
     trgt <- guessTarget "testjs.hs" Nothing
     setTargets [trgt]
     graph <- depanal [] False
     
-
     let modSum = head graph
-    output modSum
     dflags'' <- getSessionDynFlags
     (_,dep'') <- liftIO $ initPackages dflags''
-    output dep''
-    loaded <- load LoadAllTargets
-    --loaded <- load (LoadDependenciesOf (ms_mod_name modSum))
-    when (failed loaded) $ throw LoadingException
     parsedMod <- parseModule modSum
-    output (pm_mod_summary parsedMod)
     let src = pm_parsed_source parsedMod
     let (L srcspan hsmod) = src
     let hsmod' = modifyModule injectRender hsmod
-    output $ hsmod' 
+    output hsmod'
     typecheckedMod <- typecheckModule $ parsedMod
                       { pm_parsed_source = L srcspan hsmod' }
-    output $ tm_typechecked_source typecheckedMod
-    liftIO $ putStrLn "loading mod..."
+    -- This will load the module and produce the obj file
     mod <- loadModule typecheckedMod
     let modSum' = pm_mod_summary (tm_parsed_module typecheckedMod)
-    output modSum'
 
+    -- Linking stuff
     hsc_env <- getSession
     dflags2  <- getSessionDynFlags
     let hpt = hsc_HPT hsc_env :: HomePackageTable
@@ -71,7 +62,6 @@ main = runGhcjsSession Nothing True $ do
     let pkg_deps  = concatMap (map fst . dep_pkgs . mi_deps . hm_iface) home_mod_infos
     let pkg_deps' | any isInteractivePackage pkg_deps = pkg_deps
                   | otherwise = displayInteractivePackage dflags2 : pkg_deps
-    output pkg_deps'
     liftIO $ linkBinary dflags2 pkg_deps' ["/tmp/Main.js_o"] "out.jsexe"
 
 linkBinary :: DynFlags -> [PackageId] -> [FilePath] -> FilePath -> IO ()
@@ -99,5 +89,3 @@ displayInteractivePackage dflags =
   where
     prims = reverse . sort $ filter isInteractivePackage pkgIds
     pkgIds = map packageConfigId . eltsUFM . pkgIdMap . pkgState $ dflags
-
--- ((PackageName "display-interactive"==) . pkgName
