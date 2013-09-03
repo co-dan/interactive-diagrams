@@ -1,5 +1,4 @@
-module Main where
-import Diagrams.Interactive.Display.Dynamic.Class
+module Main (main, example) where
 
 main = return ()
 

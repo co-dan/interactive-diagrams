@@ -96,7 +96,6 @@ instance (Inputable a, Renderable b, Show a) => Renderable (a -> b) where
             -- then we remove our working area completely
             lift $ remove area
             -- .. replacing it with new area with new controls
-            buttonBack kont w
             newArea <- render w (f input)
             -- and we put a "back" button on our new area
             buttonBack kont newArea
