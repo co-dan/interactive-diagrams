@@ -25,44 +25,45 @@ module Diagrams.Interactive.Eval.Helpers
     , injectRender
     ) where
 
-import Control.Monad                          (void, when)
-import Control.Monad.IO.Class                 (MonadIO)
-import Data.List
-import Data.Monoid
-import Unsafe.Coerce                          (unsafeCoerce)
+import           Control.Monad                          (void, when)
+import           Control.Monad.IO.Class                 (MonadIO)
+import           Data.List
+import           Data.Monoid
+import qualified Data.Text.Lazy.IO                      as T
+import           Unsafe.Coerce                          (unsafeCoerce)
 
-import Bag
-import Distribution.Package                   (PackageName (..))
-import DynFlags
-import Exception
-import GHC                                    hiding (compileExpr)
-import GhcMonad
-import HsBinds
-import HscMain
-import HscTypes
-import HscTypes
-import Module
-import MonadUtils                             hiding (MonadIO, liftIO)
-import OccName
-import Outputable                             hiding ((<>))
-import Packages                               hiding (display)
-import RdrName
-import TyCon
-import Type
-import UniqFM                                 (eltsUFM)
-import Util                                   (lengthAtLeast)
+import           Bag
+import           Distribution.Package                   (PackageName (..))
+import           DynFlags
+import           Exception
+import           GHC                                    hiding (compileExpr)
+import           GhcMonad
+import           HsBinds
+import           HscMain
+import           HscTypes
+import           HscTypes
+import           Module
+import           MonadUtils                             hiding (MonadIO, liftIO)
+import           OccName
+import           Outputable                             hiding ((<>))
+import           Packages                               hiding (display)
+import           RdrName
+import           TyCon
+import           Type
+import           UniqFM                                 (eltsUFM)
+import           Util                                   (lengthAtLeast)
 
-import Compiler.GhcjsHooks
-import Compiler.GhcjsPlatform
-import Compiler.Variants
-import GHCJS                                  hiding (compileExpr)
+import           Compiler.GhcjsHooks
+import           Compiler.GhcjsPlatform
+import           Compiler.Variants
+import           GHCJS                                  hiding (compileExpr)
 
-import Diagrams.Interactive.Display
-import Diagrams.Interactive.Eval.EvalError
-import Diagrams.Interactive.Eval.EvalM
-import Diagrams.Interactive.Eval.EvalSettings
-import Diagrams.Interactive.Eval.Handlers
-import Diagrams.Interactive.Eval.SourceMod
+import           Diagrams.Interactive.Display
+import           Diagrams.Interactive.Eval.EvalError
+import           Diagrams.Interactive.Eval.EvalM
+import           Diagrams.Interactive.Eval.EvalSettings
+import           Diagrams.Interactive.Eval.Handlers
+import           Diagrams.Interactive.Eval.SourceMod
 
 ------------------------------------------------------------
 -- Code queries
@@ -167,8 +168,8 @@ compileToJS fp = do
     EvalSettings{..} <- evalSettings
     -- liftIO $ runGhcjsSession Nothing True $ do
     liftGhc $ initGhcJs True
-    do
-        dflags <- getSessionDynFlags
+    dflags <- getSessionDynFlags        
+    defaultCleanupHandler dflags $ do
         setSessionDynFlags $ dflags { verbosity = verbLevel
                                     , objectDir = Just tmpDirPath
                                     , hiDir     = Just tmpDirPath
@@ -203,7 +204,8 @@ compileToJS fp = do
         let pkg_deps' | any isInteractivePackage pkg_deps = pkg_deps
                       | otherwise = displayInteractivePackage dflags2 : pkg_deps
         liftIO $ linkBinary dflags2 pkg_deps' ["/tmp/Main.js_o"] "/tmp/out.jsexe"
-        return (DynamicResult "WOAH")
+        contents <- liftIO $ T.readFile "/tmp/out.jsexe/all.js"
+        return (DynamicResult contents)
 
 linkBinary :: DynFlags -> [PackageId] -> [FilePath] -> FilePath -> IO ()
 linkBinary dflags pkg_deps targets out =

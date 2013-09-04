@@ -9,6 +9,7 @@
 {-# LANGUAGE RecordWildCards            #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE TemplateHaskell            #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE TypeHoles                  #-}
 module Main where
@@ -84,8 +85,8 @@ errPage (Paste{..}, (msg, errors)) = do
     hastache "main"
 
 
-renderPaste :: Paste -> ActionH ()
-renderPaste (p@Paste{..}) = do
+renderPaste :: (Paste, Int) -> ActionH ()
+renderPaste ((p@Paste{..}), k) = do
     setH "code"     $ MuVariable pasteContent
     setH "codeView" $ MuVariable (renderCode p)
     setH "title"    $ MuVariable $ mconcat ["Paste / ", T.pack pasteTitle,
@@ -97,7 +98,7 @@ renderPaste (p@Paste{..}) = do
         Static staticRes ->
             renderHtml $ foldMap renderDR (getDR staticRes)
         Interactive dynRes   ->
-            error "dynRes"
+            renderHtml $ renderJS dynRes k
     hastache "main"
 
 
@@ -132,17 +133,17 @@ getRaw :: MaybeT ActionH Text
 getRaw = do
     -- pid <- lift $ param "id"
     ind <- lift $ param "ind"
-    paste <- getPaste
+    (paste,_) <- getPaste
     case pasteResult paste of
         Static (StaticResult res) ->
             return . result $ res !! ind
-        Interactive _ -> nothing
+        Interactive (DynamicResult res) -> return res
 
-getPaste :: MaybeT (ActionT HState) Paste
+getPaste :: MaybeT (ActionT HState) (Paste, Int)
 getPaste = do
     pid <- lift $ param "id"
     paste <- liftIO $ runWithSql $ P.get (intToKey pid)
-    hoistMaybe paste
+    fmap (,pid) $ hoistMaybe paste
 
 -- | ** Select 20 recent images
 listImages :: ActionH [(Int, Paste)]
@@ -206,8 +207,9 @@ compilePaste (p@Paste{..}) = do
                 { pasteResult      = Static dr
                 , pasteContainsImg = containsImage
                 }
-        Right (Interactive (DynamicResult dr)) -> do
-            throwT (dr, [])
+        Right (Interactive dr) -> do
+            liftIO . runWithSql . insert $ p
+                { pasteResult = Interactive dr }
 
 redirPaste :: Monad m => Int -> ActionT m ()
 redirPaste i = redirect $ pack ("/get/" ++ show i)
@@ -238,6 +240,7 @@ main = do
         S.get "/json/:id" $ maybeT page404 json getPaste
         S.get "/raw/:id/:ind" $ maybeT page404 text getRaw
         S.get "/raw/:id/:ind/pic.svg" $ maybeT page404 html getRaw
+        S.get "/raw/:id/:ind/all.js" $ maybeT page404 html getRaw
         S.get "/gallery" (listImages >>= renderGallery)
         S.post "/new" $ eitherT errPage redirPaste (measureTime newPaste)
         S.get "/" listPastes
