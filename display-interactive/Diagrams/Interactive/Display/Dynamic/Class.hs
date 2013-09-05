@@ -1,20 +1,22 @@
 {-# LANGUAGE DefaultSignatures    #-}
 {-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE OverloadedStrings    #-}
+{-# LANGUAGE TypeFamilies         #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 module Diagrams.Interactive.Display.Dynamic.Class where
 
 import           Control.Applicative                  hiding (empty)
+import           Control.Error.Safe
 import           Control.Monad
 import           Control.Monad.Cont
 import           Data.Default
 import           Data.Foldable
-import           Data.Monoid
 import           Data.Int
-import           Data.Word
+import           Data.Monoid
 import qualified Data.Text                            as T
 import qualified Data.Text.IO                         as T
 import qualified Data.Text.Lazy                       as TL
+import           Data.Word
 import           Diagrams.Backend.GHCJS               hiding (Renderable,
                                                        render)
 import           Diagrams.Interactive.Display
@@ -36,7 +38,7 @@ import           Debug.Trace
 -- Main classes
 
 class Inputable a where
-    inputable :: JQuery -> ContT JQuery IO (JQuery, IO a)
+    inputable :: JQuery -> ContT JQuery IO (JQuery, IO (Either String a))
 
 class Renderable a where
     render :: JQuery -> a -> ContT JQuery IO JQuery
@@ -51,7 +53,7 @@ runRenderTest a = do
     w <- select "#test"
     _ <- runRender a w
     return ()
-    
+
 --------------------------------------------------
 
 newtype JSDisplay a = JSDisplay a
@@ -90,8 +92,20 @@ instance (Inputable a, Renderable b, Show a) => Renderable (a -> b) where
         -- .. and a "Next" button
         nextBtn <- lift $ appendBtn "Next" area
         lift $ onClick nextBtn $ \_ -> void $ flip runContT return $ do
-            -- Upon receiving the "click" event we get the user input
-            input <- lift $ getInput
+            -- ^ Upon receiving the "click" event we get the user input
+            inputErr <- lift $ getInput
+            --  we also jump back in the time if we can't parse input
+            input <- case inputErr of
+                Right x  -> return x
+                Left err -> do
+                    let errmsg = "Error getting input: " ++ err
+                    lift $ putStrLn errmsg
+                    lift $ remove area
+                    area' <- lift $ select "<div>"
+                    lift $ append ("<p><font color=red>" <> T.pack errmsg <> "</font></p>")
+                                  area'                    
+                    kont area'
+                    return undefined
             lift $ putStrLn $ "input: " ++ show input
             -- then we remove our working area completely
             lift $ remove area
@@ -124,7 +138,7 @@ instance Inputable String where
     inputable w = do
         inputBox <- lift $ newInputBox
         lift $ appendJQuery inputBox w
-        let act = T.unpack <$> getVal inputBox
+        let act = return . T.unpack <$> getVal inputBox
         return (inputBox, act)
       where
         newInputBox = select "<input type=\"text\" />"
@@ -132,13 +146,14 @@ instance Inputable String where
 instance Inputable Integer where
     inputable w = do
         (jq, act) <- inputable w
-        let act' = read <$> act
+        let errmsg = "Cannot read an integer"
+        let act' = (=<<) <$> pure (readErr errmsg) <*> (act :: IO (Either String String))
         return (jq, act')
 
 --------------------------------------------------
 -- Renderable instances
 
-instance Renderable (Diagram Canvas R2) where
+instance (b ~ Canvas) => Renderable (Diagram b R2) where
     render w d = do
         let nm = "testcanvas"
         canvas <- lift $ select $
@@ -153,19 +168,19 @@ instance Renderable (Diagram Canvas R2) where
         lift $ appendJQuery area   w
         return area
 
-instance Renderable Int 
-instance Renderable Int8 
-instance Renderable Int16 
-instance Renderable Int32 
-instance Renderable Int64 
-instance Renderable Word 
-instance Renderable Word8 
-instance Renderable Word16 
-instance Renderable Word32 
-instance Renderable Word64 
-instance Renderable Integer 
-instance Renderable Float 
-instance Renderable Double 
+instance Renderable Int
+instance Renderable Int8
+instance Renderable Int16
+instance Renderable Int32
+instance Renderable Int64
+instance Renderable Word
+instance Renderable Word8
+instance Renderable Word16
+instance Renderable Word32
+instance Renderable Word64
+instance Renderable Integer
+instance Renderable Float
+instance Renderable Double
 instance Renderable Char
 instance Renderable ()
 instance Display a => Renderable (Maybe a)
