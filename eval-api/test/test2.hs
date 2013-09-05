@@ -1,5 +1,10 @@
+{-# LANGUAGE FlexibleContexts #-}
 module Main (main, example) where
+
+import Diagrams.Prelude
+import Diagrams.Backend.SVG
 
 main = return ()
 
-example x = x + 1 :: Integer
+example :: Integer -> Diagram SVG R2
+example x = circle (fromInteger x)

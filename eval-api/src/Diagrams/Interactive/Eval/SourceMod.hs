@@ -71,6 +71,18 @@ addImportSimpleQual mname = fromEndo (Endo (imp:)) mempty
     imp = noLoc $ (simpleImportDecl (mkModuleName mname))
                 { ideclQualified = True }
 
+removeImport :: ModuleName -> SourceMod (Maybe (ImportDecl RdrName))
+removeImport target = SourceMod $ state $ \(imps, decls) ->
+    let (ans, imps') = go imps
+    in (ans, (imps', decls))
+  where
+    go ((L l idecl):xs)
+        | unLoc (ideclName idecl) == target
+        = (Just idecl, xs)
+    go (x:xs) = let (ans, lst) = go xs in (ans, x:lst)
+    go []     = (Nothing, [])
+
+
 replaceDefinition :: OccName
                   -> (HsBind RdrName -> HsBind RdrName) 
                   -> SourceMod ()

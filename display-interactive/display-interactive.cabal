@@ -17,7 +17,8 @@ build-type:          Simple
 cabal-version:       >=1.10
 
 library
-  exposed-modules:     Diagrams.Interactive.Display.Dynamic.Class
+  exposed-modules:     Diagrams.Interactive.Display.Dynamic.Class,
+                       Diagrams.Interactive.TypeShims
   -- other-modules:       
   -- other-extensions:    
   build-depends:       base >=4.7 && <4.8,

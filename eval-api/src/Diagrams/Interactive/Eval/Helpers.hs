@@ -223,11 +223,15 @@ linkBinary dflags pkg_deps targets out =
 
 injectRender :: SourceMod ()
 injectRender = do
+    mapM_ (removeImport . mkModuleName) backends
+    addImportSimple     tshims
     addImportSimpleQual dclass
     maybety <- removeSig maindef
     replaceDefinition maindef (wrapRender maybety)
   where
     dclass  = "Diagrams.Interactive.Display.Dynamic.Class"
+    tshims  = "Diagrams.Interactive.TypeShims"
+    backends = ["Diagrams.Backend.SVG", "Diagrams.Backend.Cairo"]
     maindef = mkVarOcc "example"
 
 wrapRender :: Maybe (HsType RdrName) -> HsBind RdrName -> HsBind RdrName
