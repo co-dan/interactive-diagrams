@@ -188,6 +188,7 @@ compileToJS fp = do
         let src = pm_parsed_source parsedMod
         let (L srcspan hsmod) = src
         let hsmod' = modifyModule injectRender hsmod
+        output hsmod'
         typecheckedMod <- typecheckModule $ parsedMod
                           { pm_parsed_source = L srcspan hsmod' }
         -- This will load the module and produce the obj file
@@ -222,7 +223,7 @@ linkBinary dflags pkg_deps targets out =
 
 injectRender :: SourceMod ()
 injectRender = do
-    addImportSimple dclass
+    addImportSimpleQual dclass
     maybety <- removeSig maindef
     replaceDefinition maindef (wrapRender maybety)
   where

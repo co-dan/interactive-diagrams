@@ -65,6 +65,12 @@ addImportSimple mname = fromEndo (Endo (imp:)) mempty
   where
     imp = noLoc $ simpleImportDecl $ mkModuleName mname
 
+addImportSimpleQual :: String -> SourceMod ()
+addImportSimpleQual mname = fromEndo (Endo (imp:)) mempty
+  where
+    imp = noLoc $ (simpleImportDecl (mkModuleName mname))
+                { ideclQualified = True }
+
 replaceDefinition :: OccName
                   -> (HsBind RdrName -> HsBind RdrName) 
                   -> SourceMod ()
