@@ -14,6 +14,7 @@ module Diagrams.Interactive.Eval.Helpers
     , compileExpr
     , compileToJS
       -- * Code queries
+    , isExprUnderIO
     , isUnderIO
     , needsInput
       -- * Auxilary functions for working with the GHC API session/environment
@@ -25,7 +26,7 @@ module Diagrams.Interactive.Eval.Helpers
     , injectRender
     ) where
 
-import           Control.Monad                          (void, when)
+import           Control.Monad                          (void, when, (<=<))
 import           Control.Monad.IO.Class                 (MonadIO)
 import           Data.List
 import           Data.Monoid
@@ -116,6 +117,10 @@ getIOTyCon :: EvalM TyCon
 getIOTyCon = tyConAppTyCon <$> exprType "(return ()) :: IO ()"
 
 -- | Is the expression under the IO Monad?
+isExprUnderIO :: String -> EvalM Bool
+isExprUnderIO = isUnderIO <=< exprType
+
+-- | Is the given type has a @IO a@ shape?
 isUnderIO :: Type -> EvalM Bool
 isUnderIO ty = do
     let splitted = tyConAppTyCon_maybe ty
@@ -168,7 +173,7 @@ compileToJS fp = do
     EvalSettings{..} <- evalSettings
     -- liftIO $ runGhcjsSession Nothing True $ do
     liftGhc $ initGhcJs True
-    dflags <- getSessionDynFlags        
+    dflags <- getSessionDynFlags
     defaultCleanupHandler dflags $ do
         setSessionDynFlags $ dflags { verbosity = verbLevel
                                     , objectDir = Just tmpDirPath

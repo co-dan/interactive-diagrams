@@ -50,7 +50,7 @@ library
                        ghc >= 7.6,
                        Cabal,
                        ghcjs,
-                       display ==0.1.*,
+                       display ==0.1.0,
                        vector ==0.10.*,
                        hashable, 
                        text,

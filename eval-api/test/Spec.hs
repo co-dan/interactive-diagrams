@@ -50,10 +50,10 @@ loadFileSpecs = describe "loadFile" $ do
 isUnderIOSpecs :: Spec
 isUnderIOSpecs = describe "isUnderIO" $ do
     it "detects whether the expression is an IO action" $
-        runWithFile testfile (isUnderIO "undefined :: IO Int")
+        runWithFile testfile (isExprUnderIO "undefined :: IO Int")
             `shouldReturn` Right True
     it "detects whether the expression is not an IO action" $
-        runWithFile testfile (isUnderIO "(*)")
+        runWithFile testfile (isExprUnderIO "(*)")
             `shouldReturn` Right False
 
 
@@ -93,6 +93,7 @@ needsInputSpecs = describe "needsInput" $ do
         needsInput_ "undefined :: EndoInt"
             `shouldReturn` Right True
 
+    -- | not sure if it's possible at all
     it "looks under datatypes" $
         runWithFile testfile (do
             what <- needsInput "what"
