@@ -23,7 +23,7 @@ import           Data.List
 import           Data.Monoid                  (mconcat, mempty)
 import qualified Data.Text.Lazy               as TL
 import           Data.Time.Clock
-import           Database.Persist.Sqlite      as P
+import           Database.Persist.Postgresql  as P
 import           Text.Blaze.Html5             ((!))
 import qualified Text.Blaze.Html5             as H
 import qualified Text.Blaze.Html5.Attributes  as HA

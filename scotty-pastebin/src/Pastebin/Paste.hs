@@ -26,12 +26,12 @@ import Pastebin.DisplayPersist ()
 
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistUpperCase|
 Paste
-    title       String  default="(untitled)"
+    title       String default='(untitled)'
     content     Text
     result      DisplayResult
     containsImg Bool
     literateHs  Bool   default=False
-    author      Text   default="Anonymous"
+    author      Text   default='Anonymous'
     deriving Show
     deriving Generic
 |]
