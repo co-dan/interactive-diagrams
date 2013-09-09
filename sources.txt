@@ -1,8 +1,8 @@
+./restricted-workers/
 ./display-src/
 ./eval-api/
 ./scotty-pastebin/
 https://github.com/simonmar/async.git
-https://github.com/co-dan/hastache.git
-https://github.com/co-dan/scotty.git scotty-transformer
+https://github.com/xich/scotty.git
 https://github.com/co-dan/scotty-hastache.git
 https://github.com/yesodweb/persistent.git

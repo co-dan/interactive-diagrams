@@ -1,10 +1,9 @@
 #!/bin/sh
 killall -9 scotty-pastebin
 killall -9 eval-service
-# cabal install workers/ eval-api/ &&
+cabal install --ghcjs ./display-interactive/
 cd ./eval-api/ &&
-cabal build && 
- cabal install . ../workers &&
+cabal install . &&
 cp dist/build/evali/evali /idia/run/bin/evali &&
 cp dist/build/eval-service/eval-service /idia/run/bin/eval-service &&
 sudo restorecon /idia/run/bin/evali &&
