@@ -23,6 +23,6 @@ library
                        cereal ==0.3.*,
                        data-default,
                        diagrams-lib >= 0.6 && < 0.8,
-                       diagrams-svg >= 0.6 && < 0.8,
+                       diagrams-svg >= 0.6 && < 0.9,
                        text ==0.11.*
 

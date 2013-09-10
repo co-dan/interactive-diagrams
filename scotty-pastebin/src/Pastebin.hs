@@ -45,7 +45,6 @@ import           Text.Hastache
 import           Text.Hastache.Context
 import           Web.Scotty.Trans                     as S
 import           Web.Scotty.Hastache
-import qualified Web.Scotty.Types                     as Scotty
 import           Database.Persist                     as P
 import           Database.Persist.Sqlite              as P
 import           Text.Blaze.Html.Renderer.Text
