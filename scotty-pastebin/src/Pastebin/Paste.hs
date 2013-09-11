@@ -18,6 +18,7 @@ module Pastebin.Paste where
 
 import Data.Aeson
 import Data.Text.Lazy          (Text)
+import Data.Time.Clock
 import Database.Persist.TH     as P
 import GHC.Generics
 
@@ -31,7 +32,8 @@ Paste
     result      DisplayResult
     containsImg Bool
     literateHs  Bool   default=False
-    author      Text   default='Anonymous'
+    author      Text
+    createdAt   UTCTime
     deriving Show
     deriving Generic
 |]

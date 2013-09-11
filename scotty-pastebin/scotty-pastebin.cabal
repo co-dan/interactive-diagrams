@@ -49,6 +49,7 @@ executable scotty-pastebin
                        scotty-hastache,
                        text ==0.11.*,
                        time,
+                       old-locale,
                        transformers ==0.3.*,
                        unix,
                        wai-extra,

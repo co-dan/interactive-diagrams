@@ -20,7 +20,8 @@ import           Control.Monad.State
 import           Control.Monad.Trans                  (lift)
 import           Control.Monad.Trans.Either           (EitherT (..), eitherT)
 import           Control.Monad.Trans.Maybe            (MaybeT (..))
-import           Control.Monad.Trans.Resource (transResourceT, ResourceT)
+import           Control.Monad.Trans.Resource         (ResourceT,
+                                                       transResourceT)
 import           Data.Foldable                        (foldMap)
 import           Data.Monoid                          (mconcat, mempty)
 import           Network                              (PortID (..), connectTo)
@@ -34,19 +35,21 @@ import           Data.Text.Lazy                       (Text, pack)
 import qualified Data.Text.Lazy                       as T
 import           Data.Time.Clock                      (diffUTCTime,
                                                        getCurrentTime)
+import           Data.Time.Format                     (formatTime)
+import           System.Locale                        (defaultTimeLocale)
 
+
+import           Database.Persist                     as P
+import           Database.Persist.Postgresql          as P
 import           Network.HTTP.Types
 import           Network.Wai
 import           Network.Wai.Middleware.RequestLogger
 import           Network.Wai.Middleware.Static
+import           Text.Blaze.Html.Renderer.Text
 import           Text.Hastache
 import           Text.Hastache.Context
-import           Web.Scotty.Trans                     as S
 import           Web.Scotty.Hastache
-import qualified Web.Scotty.Types                     as Scotty
-import           Database.Persist                     as P
-import           Database.Persist.Postgresql          as P
-import           Text.Blaze.Html.Renderer.Text
+import           Web.Scotty.Trans                     as S
 
 import           Config
 import           Diagrams.Interactive.Display         (DisplayResult (..),
@@ -78,6 +81,7 @@ errPage (Paste{..}, (msg, errors)) = do
     setH "author"   $ MuVariable pasteAuthor
     setH "literate" $ MuVariable pasteLiterateHs
     setH "code"     $ MuVariable pasteContent
+    setH "date"     $ MuVariable (formatTime defaultTimeLocale "%c" pasteCreatedAt)
     hastache "main"
 
 
@@ -88,6 +92,7 @@ renderPaste (p@Paste{..}) = do
     setH "title"    $ MuVariable $ mconcat ["Paste / ", T.pack pasteTitle,
                                           " by ", pasteAuthor]
     setH "author"   $ MuVariable pasteAuthor
+    setH "date"     $ MuVariable (formatTime defaultTimeLocale "%c" pasteCreatedAt)
     setH "ptitle"   $ MuVariable pasteTitle
     setH "literate" $ MuVariable pasteLiterateHs
     setH "result"   $ MuVariable $ renderHtml $
@@ -166,7 +171,8 @@ newPaste = do
     let author = if (T.null usern') then "Anonymous" else usern'
     lhs <- lift (param "literate"
                  `rescue` (return (return False)))
-    let p = Paste title code mempty False lhs author
+    now <- liftIO getCurrentTime
+    let p = Paste title code mempty False lhs author now
     when (T.null code) $ throwT (p, ("Empty input", []))
     pid <- compilePaste p
            `catchT` \e -> throwT (p, e)
