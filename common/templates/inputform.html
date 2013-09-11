@@ -33,6 +33,8 @@
                    {{#literate}}checked{{/literate}}> Literate Haskell
           </label>
           <div class="controls">
+            <input type="hidden" name="parent" 
+                value="{{#parent}}{{parent}}{{/parent}}">
             <input type="submit" class="btn btn-primary" value="Paste!" />
           </div>
         </div>

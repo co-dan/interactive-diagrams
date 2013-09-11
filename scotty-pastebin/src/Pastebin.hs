@@ -85,8 +85,8 @@ errPage (Paste{..}, (msg, errors)) = do
     hastache "main"
 
 
-renderPaste :: Paste -> ActionH ()
-renderPaste (p@Paste{..}) = do
+renderPaste :: (Entity Paste) -> ActionH ()
+renderPaste (Entity k p@Paste{..}) = do
     setH "code"     $ MuVariable pasteContent
     setH "codeView" $ MuVariable (renderCode p)
     setH "title"    $ MuVariable $ mconcat ["Paste / ", T.pack pasteTitle,
@@ -95,6 +95,7 @@ renderPaste (p@Paste{..}) = do
     setH "date"     $ MuVariable (formatTime defaultTimeLocale "%c" pasteCreatedAt)
     setH "ptitle"   $ MuVariable pasteTitle
     setH "literate" $ MuVariable pasteLiterateHs
+    setH "parent"   $ MuVariable $ keyToInt k
     setH "result"   $ MuVariable $ renderHtml $
         foldMap renderDR (getDR pasteResult)
     hastache "main"
@@ -131,15 +132,15 @@ getRaw :: MaybeT ActionH Text
 getRaw = do
     -- pid <- lift $ param "id"
     ind <- lift $ param "ind"
-    paste <- getPaste
+    (Entity _ paste) <- getPaste
     let (DisplayResult res) = pasteResult paste
     return . result $ res !! ind
 
-getPaste :: MaybeT (ActionT HState) Paste
+getPaste :: MaybeT (ActionT HState) (Entity Paste)
 getPaste = do
     pid <- lift $ param "id"
     paste <- liftIO $ runWithSql $ P.get (intToKey pid)
-    hoistMaybe paste
+    hoistMaybe $ liftM (Entity (intToKey pid)) paste
 
 -- | ** Select 20 recent images
 listImages :: ActionH [(Int, Paste)]
@@ -166,13 +167,20 @@ newPaste :: EitherT (Paste, (Text, [EvalError])) ActionH Int
 newPaste = do
     title' <- T.unpack <$> lift (paramEscaped "title")
     let title = if (null title') then "(undefined)" else title'
+        
     code <- lift (param "code")
+    
     usern' <- lift (paramEscaped "author")
     let author = if (T.null usern') then "Anonymous" else usern'
+        
     lhs <- lift (param "literate"
                  `rescue` (return (return False)))
+           
+    parentP' <- lift (paramMaybe "parent")
+    let parentP = fmap intToKey parentP'
+        
     now <- liftIO getCurrentTime
-    let p = Paste title code mempty False lhs author now
+    let p = Paste title code mempty False lhs author now parentP
     when (T.null code) $ throwT (p, ("Empty input", []))
     pid <- compilePaste p
            `catchT` \e -> throwT (p, e)

@@ -19,6 +19,7 @@ module Pastebin.Paste where
 import Data.Aeson
 import Data.Text.Lazy          (Text)
 import Data.Time.Clock
+import Database.Persist        as P
 import Database.Persist.TH     as P
 import GHC.Generics
 
@@ -34,6 +35,7 @@ Paste
     literateHs  Bool   default=False
     author      Text
     createdAt   UTCTime
+    parent      PasteId Maybe
     deriving Show
     deriving Generic
 |]
