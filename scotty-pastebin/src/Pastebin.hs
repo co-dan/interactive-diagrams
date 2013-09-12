@@ -95,7 +95,7 @@ renderPaste (Entity k p@Paste{..}) = do
     setH "date"     $ MuVariable (formatTime defaultTimeLocale "%c" pasteCreatedAt)
     setH "ptitle"   $ MuVariable pasteTitle
     setH "literate" $ MuVariable pasteLiterateHs
-    setH "parent"   $ MuVariable $ keyToInt k
+    setH "parent"   $ MuVariable $ fmap keyToInt pasteParent
     setH "result"   $ MuVariable $ renderHtml $
         foldMap renderDR (getDR pasteResult)
     hastache "main"
