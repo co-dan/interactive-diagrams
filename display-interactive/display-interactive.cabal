@@ -31,6 +31,7 @@ library
                        ghcjs-canvas,
                        ghcjs-base,
                        errors,
-                       ghcjs-jquery
+                       ghcjs-jquery,
+                       ghcjs-jqueryui
   -- hs-source-dirs:      
   default-language:    Haskell2010

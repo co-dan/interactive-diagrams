@@ -21,13 +21,14 @@ import           Diagrams.Backend.GHCJS               hiding (Renderable,
                                                        render)
 import           Diagrams.Interactive.Display
 import           Diagrams.Prelude                     hiding (Renderable,
-                                                       render, (<>))
+                                                       render, with, (<>))
 import           GHC.Generics
 import           GHCJS.Foreign
 import           GHCJS.Types
 import           JavaScript.Canvas                    (getContext)
 import           JavaScript.JQuery
-
+import           JavaScript.JQuery.UI
+import           JavaScript.JQuery.UI.Class
 
 import           Diagrams.Interactive.Display.Dynamic
 import           Diagrams.Interactive.Display.Static
@@ -62,7 +63,8 @@ instance (Display a) => Renderable (JSDisplay a) where
     render w (JSDisplay a) = do
         traceM (show txt)
         area <- lift $ select "<div>"
-        lift $ setHtml txt area
+        lift $ setText txt area
+        lift $ wrapInner "<code>" area
         lift $ appendJQuery area w
         return area
         -- ^ if necessary, we will remove this div,
@@ -92,7 +94,7 @@ instance (Inputable a, Renderable b, Show a) => Renderable (a -> b) where
         -- .. and a "Next" button
         nextBtn <- lift $ appendBtn "Next" area
         lift $ onClick nextBtn $ \_ -> void $ flip runContT return $ do
-            -- ^ Upon receiving the "click" event we get the user input
+            -- Upon receiving the "click" event we get the user input
             inputErr <- lift $ getInput
             --  we also jump back in the time if we can't parse input
             input <- case inputErr of
@@ -107,10 +109,20 @@ instance (Inputable a, Renderable b, Show a) => Renderable (a -> b) where
                     kont area'
                     return undefined
             lift $ putStrLn $ "input: " ++ show input
+
+            -- Show the "loading.." message
+            pbar <- lift $ select "<div id=\"progressbar\">Muching bits</div>"
+            lift $ empty area
+            lift $ appendJQuery pbar area -- replace the inside of an
+                -- area with our progressbar                
+            lift $ initWidget pbar Progressbar with { progressbarValue = F }
+            
+            
+            -- .. replacing the old area with the new area with new controls
+            newArea <- render w (f input)
             -- then we remove our working area completely
             lift $ remove area
-            -- .. replacing it with new area with new controls
-            newArea <- render w (f input)
+            
             -- and we put a "back" button on our new area
             buttonBack kont newArea
             return newArea
@@ -120,6 +132,7 @@ instance (Inputable a, Renderable b, Show a) => Renderable (a -> b) where
         appendBtn t place = do
             btn <- newBtn t
             appendJQuery btn place
+            initWidget btn Button with { buttonLabel = t }
             return btn
         buttonBack kont area = do
             lift $ append "<br />\n" area
@@ -141,14 +154,30 @@ instance Inputable String where
         let act = return . T.unpack <$> getVal inputBox
         return (inputBox, act)
       where
-        newInputBox = select "<input type=\"text\" />"
+        newInputBox = select "<input type=\"text\" class=\"input-xmedium\" />"
 
-instance Inputable Integer where
-    inputable w = do
-        (jq, act) <- inputable w
-        let errmsg = "Cannot read an integer"
-        let act' = (=<<) <$> pure (readErr errmsg) <*> (act :: IO (Either String String))
-        return (jq, act')
+
+inputableNum :: (Num a, Read a) => JQuery -> ContT JQuery IO (JQuery, IO (Either String a))
+inputableNum w = do
+    (jq, act) <- inputable w
+    liftIO $ initWidget jq Spinner with { spinnerPage = 5 }
+    let errmsg = "Cannot read an number"
+    let act' = (=<<) <$> pure (readErr errmsg) <*> (act :: IO (Either String String))
+    return (jq, act')
+
+instance Inputable Int     where { inputable = inputableNum }
+instance Inputable Int8    where { inputable = inputableNum }
+instance Inputable Int16   where { inputable = inputableNum }
+instance Inputable Int32   where { inputable = inputableNum }
+instance Inputable Int64   where { inputable = inputableNum }
+instance Inputable Word    where { inputable = inputableNum }
+instance Inputable Word8   where { inputable = inputableNum }
+instance Inputable Word16  where { inputable = inputableNum }
+instance Inputable Word32  where { inputable = inputableNum }
+instance Inputable Word64  where { inputable = inputableNum }
+instance Inputable Integer where { inputable = inputableNum }
+instance Inputable Float   where { inputable = inputableNum }
+instance Inputable Double  where { inputable = inputableNum }
 
 --------------------------------------------------
 -- Renderable instances
