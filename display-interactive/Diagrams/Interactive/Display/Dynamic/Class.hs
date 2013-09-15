@@ -111,7 +111,7 @@ instance (Inputable a, Renderable b, Show a) => Renderable (a -> b) where
             lift $ putStrLn $ "input: " ++ show input
 
             -- Show the "loading.." message
-            pbar <- lift $ select "<div id=\"progressbar\">Muching bits</div>"
+            pbar <- lift $ select "<div id=\"progressbar\"><div class=\"progresstext\">Munching bits...</div></div>"
             lift $ empty area
             lift $ appendJQuery pbar area -- replace the inside of an
                 -- area with our progressbar                
