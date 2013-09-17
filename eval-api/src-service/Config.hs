@@ -34,9 +34,7 @@ limSettings = def {
 settings :: EvalSettings
 settings = def
   { limitSet     = limSettings
---  , pkgDatabases =
-                   --  ["/home/vagrant/.ghc/x86_64-linux-7.7.20130628/package.conf.d"]
-  , pkgDatabases = ["/home/vagrant/.ghc/i386-linux-7.7.20130826/package.conf.d"]
+  , pkgDatabases = ["/home/vagrant/.ghc/i386-linux-7.7.20130908/package.conf.d"]
   , verbLevel    = 0
   , preloadFile  = "../common/Preload.hs"
   }
