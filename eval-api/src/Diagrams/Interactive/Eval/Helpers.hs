@@ -1,6 +1,8 @@
 {-# LANGUAGE CPP                      #-}
 {-# LANGUAGE ForeignFunctionInterface #-}
 {-# LANGUAGE OverloadedStrings        #-}
+{-# LANGUAGE PatternGuards            #-}
+{-# LANGUAGE RecordWildCards          #-}
 {-# LANGUAGE ScopedTypeVariables      #-}
 {-|
   Helper functions for the 'EvalM' and 'Ghc' monads
@@ -10,49 +12,122 @@ module Diagrams.Interactive.Eval.Helpers
       -- * Compilation and interpretation (of computer programs)
       loadFile
     , compileExpr
+    , compileToJS
       -- * Code queries
+    , isExprUnderIO
     , isUnderIO
+    , needsInput
       -- * Auxilary functions for working with the GHC API session/environment
     , addPkgDb
     , addPkgDbs
       -- * Other stuff
     , output
     , allExceptions
+    , injectRender
     ) where
 
-import Control.Monad                       (when)
-import Control.Monad.IO.Class              (MonadIO)
-import Unsafe.Coerce                       (unsafeCoerce)
+import           Control.Monad                          (void, when, (<=<))
+import           Control.Monad.IO.Class                 (MonadIO)
+import           Data.List
+import           Data.Monoid
+import qualified Data.Text.Lazy.IO                      as T
+import           Unsafe.Coerce                          (unsafeCoerce)
 
-import DynFlags
-import Exception
-import GHC                                 hiding (compileExpr)
-import GhcMonad
-import HscMain
-import HscTypes
-import MonadUtils                          hiding (MonadIO, liftIO)
-import Outputable
-import Packages                            hiding (display)
-import Type
+import           Bag
+import           Distribution.Package                   (PackageName (..))
+import           DynFlags
+import           Exception
+import           GHC                                    hiding (compileExpr)
+import           GhcMonad
+import           HsBinds
+import           HscMain
+import           HscTypes
+import           HscTypes
+import           Module
+import           MonadUtils                             hiding (MonadIO, liftIO)
+import           OccName
+import           Outputable                             hiding ((<>))
+import           Packages                               hiding (display)
+import           RdrName
+import           TyCon
+import           Type
+import           UniqFM                                 (eltsUFM)
+import           Util                                   (lengthAtLeast)
 
-import Diagrams.Interactive.Display
-import Diagrams.Interactive.Eval.EvalError
-import Diagrams.Interactive.Eval.EvalM
+import           Compiler.GhcjsHooks
+import           Compiler.GhcjsPlatform
+import           Compiler.Variants
+import           GHCJS                                  hiding (compileExpr)
+
+import           Diagrams.Interactive.Display
+import           Diagrams.Interactive.Eval.EvalError
+import           Diagrams.Interactive.Eval.EvalM
+import           Diagrams.Interactive.Eval.EvalSettings
+import           Diagrams.Interactive.Eval.Handlers
+import           Diagrams.Interactive.Eval.SourceMod
 
 ------------------------------------------------------------
 -- Code queries
 ------------------------------------------------------------
 
+-- | Can the expression be run statically or does it need
+-- additional input?
+-- NB: IO actions doesn't count seems we can provide almost all of the
+-- RealWorld to the use
+-- See tests for example behaviour
+needsInput :: String -> EvalM Bool
+needsInput expr = isFunc =<< exprType expr
+
+-- | See also 'repType' in Types.lhs
+isFunc :: Type -> EvalM Bool
+isFunc t = do
+    ioTyC <- getIOTyCon
+    t' <- peelIO t
+    return $ isFunTy $ go initRecTc [ioTyC] t'
+  where
+    go :: RecTcChecker -> [TyCon] -> Type -> Type
+    go rec_nts ignore ty
+      | Just ty' <- coreView ty
+      = go rec_nts ignore ty'
+
+      | Just (_, ty') <- splitForAllTy_maybe ty
+      = go rec_nts ignore ty'
+
+      | Just (tc, tys) <- splitTyConApp_maybe ty
+      , isNewTyCon tc
+      , not (elem tc ignore)
+      , tys `lengthAtLeast` tyConArity tc
+	  , Just rec_nts' <- checkRecTc rec_nts tc   -- See Note [Expanding newtypes] in TyCon
+      = go rec_nts' ignore (newTyConInstRhs tc tys)
+
+      | otherwise = ty
+
+peelIO :: Type -> EvalM Type
+peelIO ty = do
+    let splitted = splitTyConApp_maybe ty
+    case splitted of
+        Nothing -> return ty
+        Just (tyC, tys) -> do
+            ioTyC <- getIOTyCon
+            if (tyC == ioTyC)
+              then return (head tys)
+              else return ty
+
+getIOTyCon :: EvalM TyCon
+getIOTyCon = tyConAppTyCon <$> exprType "(return ()) :: IO ()"
+
 -- | Is the expression under the IO Monad?
-isUnderIO :: String -> EvalM Bool
-isUnderIO expr = do
-    ty <- exprType expr
+isExprUnderIO :: String -> EvalM Bool
+isExprUnderIO = isUnderIO <=< exprType
+
+-- | Is the given type has a @IO a@ shape?
+isUnderIO :: Type -> EvalM Bool
+isUnderIO ty = do
     let splitted = tyConAppTyCon_maybe ty
     case splitted of
         Nothing -> return False
         Just tyC -> do
-            ioT <- exprType "(return ()) :: IO ()"
-            let ioTyC = tyConAppTyCon ioT
+            ioTyC <- getIOTyCon
             return $ tyC == ioTyC
 
 
@@ -64,7 +139,7 @@ displayImport :: InteractiveImport
 displayImport = IIDecl . simpleImportDecl $ mkModuleName "Diagrams.Interactive.Display"
 
 -- | Loads the file into the evaluator
-loadFile :: FilePath -> EvalM ()
+loadFile :: GhcMonad m => FilePath -> m ()
 loadFile file = do
     setTargets =<< sequence [guessTarget file Nothing]
     graph <- depanal [] False
@@ -73,8 +148,8 @@ loadFile file = do
     when (failed loaded) $ throw LoadingException
     setContext $ displayImport:(map (IIModule . ms_mod_name) graph)
 
--- | Compiles an expression to a @DisplayResult@
-compileExpr :: String -> EvalM DisplayResult
+-- | Compiles an expression to a @StaticResult@
+compileExpr :: String -> EvalM StaticResult
 compileExpr expr = do
     -- ty <- exprType expr -- throws exception if doesn't typecheck
     -- output ty
@@ -92,6 +167,114 @@ compileExpr expr = do
         ([_], Right exn) -> return (display exn)
         _                -> panic "compileExpr"
 
+
+compileToJS :: FilePath -> EvalM DynamicResult
+compileToJS fp = do
+    EvalSettings{..} <- evalSettings
+    -- liftIO $ runGhcjsSession Nothing True $ do
+    liftGhc $ initGhcJs True
+    dflags <- getSessionDynFlags
+    defaultCleanupHandler dflags $ do
+        setSessionDynFlags $ dflags { verbosity = verbLevel
+                                    , objectDir = Just tmpDirPath
+                                    , hiDir     = Just tmpDirPath
+                                    , dumpDir   = Just tmpDirPath
+                                    , stubDir   = Just tmpDirPath
+                                    }
+        trgt <- guessTarget fp Nothing
+        setTargets [trgt]
+        graph <- depanal [] False
+        let modSum = head graph
+        when (moduleNameString (ms_mod_name modSum) /= "Main") $
+            panic "DynamicResult only allowed in `Main' module"
+        dflags'' <- getSessionDynFlags
+        (_,dep'') <- liftIO $ initPackages dflags''
+        parsedMod <- parseModule modSum
+        let src = pm_parsed_source parsedMod
+        let (L srcspan hsmod) = src
+        let hsmod' = modifyModule injectRender hsmod
+        output hsmod'
+        typecheckedMod <- typecheckModule $ parsedMod
+                          { pm_parsed_source = L srcspan hsmod' }
+        -- This will load the module and produce the obj file
+        mod <- loadModule typecheckedMod
+        let modSum' = pm_mod_summary (tm_parsed_module typecheckedMod)
+        -- Linking stuff
+        hsc_env <- getSession
+        dflags2  <- getSessionDynFlags
+        let hpt = hsc_HPT hsc_env :: HomePackageTable
+        let home_mod_infos = eltsUFM hpt
+        let pkg_deps  = concatMap ( map fst . dep_pkgs
+                                  . mi_deps . hm_iface )
+                        home_mod_infos
+        let pkg_deps' | any isInteractivePackage pkg_deps = pkg_deps
+                      | otherwise = displayInteractivePackage dflags2 : pkg_deps
+        liftIO $ linkBinary dflags2 pkg_deps' ["/tmp/Main.js_o"] "/tmp/out.jsexe"
+        contents <- liftIO $ T.readFile "/tmp/out.jsexe/all.js"
+        return (DynamicResult contents)
+
+linkBinary :: DynFlags -> [PackageId] -> [FilePath] -> FilePath -> IO ()
+linkBinary dflags pkg_deps targets out =
+    void $ variantLink gen2Variant dflags True out [] deps targets [] isRoot
+  where
+    isRoot = const True
+    deps   = map (\pkg -> (pkg, packageLibPaths pkg)) pkg_deps'
+    pidMap   = pkgIdMap (pkgState dflags)
+    packageLibPaths :: PackageId -> [FilePath]
+    packageLibPaths pkg = maybe [] libraryDirs (lookupPackage pidMap pkg)
+    -- make sure we link ghcjs-prim even when it's not a dependency
+    pkg_deps' | any isGhcjsPrimPackage pkg_deps = pkg_deps
+              | otherwise                       = ghcjsPrimPackage dflags : pkg_deps
+
+injectRender :: SourceMod ()
+injectRender = do
+    mapM_ (removeImport . mkModuleName) backends
+    addImportSimple     tshims
+    addImportSimpleQual dclass
+    maybety <- removeSig maindef
+    replaceDefinition maindef (wrapRender maybety)
+  where
+    dclass  = "Diagrams.Interactive.Display.Dynamic.Class"
+    tshims  = "Diagrams.Interactive.TypeShims"
+    backends = ["Diagrams.Backend.SVG", "Diagrams.Backend.Cairo"]
+    maindef = mkVarOcc "example"
+
+wrapRender :: Maybe (HsType RdrName) -> HsBind RdrName -> HsBind RdrName
+wrapRender ty f@(FunBind{..})
+          = f { fun_matches = fun_matches {
+                     mg_alts = [L l (Match [] Nothing grhs)]
+                     } }
+  where
+    grhs = GRHSs { grhssLocalBinds = binds
+                 , grhssGRHSs = [L l $ GRHS [] (L l rhs) ] }
+
+    dclass  = "Diagrams.Interactive.Display.Dynamic.Class"
+    newName = mkRdrUnqual (mkVarOcc "old example")
+    renderF = mkRdrQual (mkModuleName dclass) (mkVarOcc "runRenderTest")
+    renderV = HsVar renderF
+    l = getLoc fun_id
+    rhs :: HsExpr RdrName
+    rhs = HsApp (L l renderV) (L l (HsVar newName))
+    -- rhs = HsLet binds (L l $ HsApp (L l renderV) (L l (HsVar newName)))
+    binds :: HsLocalBinds RdrName
+    binds = HsValBinds $ ValBindsIn (unitBag (L l newF)) sigs
+    sigs = case ty of
+        Nothing  -> []
+        Just ty' -> [L l $ TypeSig [L l newName] (L l ty')]
+    newF = f { fun_id = L l newName }
+wrapRender _ x = x
+
+isInteractivePackage :: PackageId -> Bool
+isInteractivePackage pkgId = "display-interactive-" `isPrefixOf` packageIdString pkgId
+
+displayInteractivePackage :: DynFlags -> PackageId
+displayInteractivePackage dflags =
+  case prims of
+    (x:_) -> x
+    _     -> error "Cannot find display-interactive"
+  where
+    prims = reverse . sort $ filter isInteractivePackage pkgIds
+    pkgIds = map packageConfigId . eltsUFM . pkgIdMap . pkgState $ dflags
 
 ------------------------------------------------------------
 -- Auxilary functions for working with the

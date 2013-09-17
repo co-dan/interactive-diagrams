@@ -1,8 +1,13 @@
+./restricted-workers/
 ./display-src/
-./eval-api/
-./scotty-pastebin/
-https://github.com/simonmar/async.git
-https://github.com/co-dan/hastache.git
-https://github.com/co-dan/scotty.git scotty-transformer
-https://github.com/co-dan/scotty-hastache.git
-https://github.com/yesodweb/persistent.git
+-- ./eval-api/
+-- ./scotty-pastebin/
+git://github.com/simonmar/async.git
+git://github.com/xich/scotty.git
+git://github.com/co-dan/scotty-hastache.git
+-- git://github.com/yesodweb/persistent.git
+git://github.com/diagrams/active.git active-0.1
+git://github.com/diagrams/diagrams-core.git
+git://github.com/diagrams/diagrams-lib.git
+-- git://github.com/diagrams/diagrams-svg.git
+

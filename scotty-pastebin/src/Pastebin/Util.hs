@@ -15,12 +15,14 @@ module Pastebin.Util
       -- * Rendering
     , renderCode
     , renderDR
+    , renderJS
     ) where
 
 import           Control.Applicative
 import qualified Data.Hashable                as H
 import           Data.List
-import           Data.Monoid                  (mconcat, mempty)
+import Data.String (fromString)
+import           Data.Monoid                  (mconcat, mempty, (<>))
 import qualified Data.Text.Lazy               as TL
 import           Data.Time.Clock
 import           Database.Persist.Sqlite      as P
@@ -36,15 +38,17 @@ import           Diagrams.Interactive.Display as Display
 
 import           Pastebin.Coloring
 import           Pastebin.Paste
+import           Config
 
 -- * Convertation & quering
 
 hasImage :: DisplayResult -> Maybe DR
-hasImage (DisplayResult drs) =
+hasImage (Static (StaticResult drs)) =
     find ((==Display.Svg) . clientType) drs
+hasImage (Interactive (DynamicResult _)) = Nothing
 
-getDR :: DisplayResult -> [DR]
-getDR (DisplayResult drs) = drs
+getDR :: StaticResult -> [DR]
+getDR (StaticResult drs) = drs
 
 intToKey :: Int -> Key a
 intToKey = Key . PersistInt64 . fromIntegral
@@ -101,6 +105,18 @@ renderDR (DR RuntimeErr r) = H.div ! HA.class_ "alert alert-error" $
 renderCode :: Paste -> TL.Text
 renderCode Paste{..} = colorize pasteLiterateHs pasteContent
 
+
+renderJS :: DynamicResult -> Int -> H.Html
+renderJS (DynamicResult dr) pid = mconcat
+    [ H.div ! HA.id "test" $ mconcat
+      [ H.p   $ H.toHtml ("Loading..." :: String)
+      , H.img ! HA.src "/img/loader.gif" ]
+    , H.script ! HA.src (fromString p) $ mempty
+    , H.script $
+      H.preEscapedToHtml ("$(function(){h$run(h$mainZCMainziexample);})"::String) ]
+  where
+    p = "/raw/" ++ show pid ++ "/0/all.js"
+    
 ----------------------------------------
 -- orphan instance
 

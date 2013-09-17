@@ -10,6 +10,7 @@ module Diagrams.Interactive.Eval.EvalM
     , run
     , run'
     , liftGhc
+    , evalSettings
     ) where
 
 import           Control.Applicative          ((<$>))
@@ -35,6 +36,10 @@ newtype EvalM a = EvalM { unEvalM :: ReaderT EvalSettings Ghc a }
   deriving (Monad,
             MonadReader EvalSettings,
             MonadIO)
+
+-- | Ask specialized to 'EvalSettings'
+evalSettings :: EvalM EvalSettings
+evalSettings = ask
 
 -- | Runs an EvalM monad action and returns either a result, or an error message
 run :: EvalM a -> EvalSettings -> IO (Either String a)

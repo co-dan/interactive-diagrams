@@ -7,21 +7,36 @@
 module Diagrams.Interactive.Eval.Handlers
     (
       initGhc
+    , initGhcJs
     , handleException
     ) where
 
-import Control.Monad          (liftM)
-import Control.Monad.IO.Class (MonadIO, liftIO)
-import Data.IORef             (IORef, modifyIORef')
+import           Control.Monad                       (liftM)
+import           Control.Monad.IO.Class              (MonadIO, liftIO)
+import           Data.IORef                          (IORef, modifyIORef')
 
-import DynFlags
-import Exception
-import GHC
-import Outputable
-import Panic
+import           DsMeta                              (templateHaskellNames)
+import           DynFlags
+import           Exception
+import           GHC
+import           GhcMonad
+import           HscTypes
+import           IfaceEnv                            (initNameCache)
+import           Outputable
+import           Packages                            (initPackages)
+import           Panic
+import           PrelInfo                            (wiredInThings)
+import           PrelNames                           (basicKnownKeyNames)
+import           PrimOp                              (allThePrimOps)
 
-import Diagrams.Interactive.Eval.EvalError
-import SignalHandlers
+import           Compiler.GhcjsPlatform
+import           Compiler.Info
+import           Compiler.Variants
+import qualified Gen2.PrimIface                      as Gen2
+import           GHCJS
+
+import           Diagrams.Interactive.Eval.EvalError
+import           SignalHandlers
 
 -- | Inits the GHC API, sets the mode and the log handler
 initGhc :: IORef [EvalError] -> Int -> Ghc ()
@@ -35,6 +50,36 @@ initGhc ref vb = do
     _ <- setSessionDynFlags dfs2
     return ()
 
+-- | This resets the session
+initGhcJs :: Bool -> Ghc ()
+initGhcJs debug = do
+    libDir <- liftIO $ getGlobalPackageBase
+    initGhcMonad (Just libDir)
+    base <- liftIO ghcjsDataDir
+    dflags <- getSessionDynFlags
+    dflags2 <- liftIO $ addPkgConf dflags
+    (dflags3,_) <- liftIO $ initPackages dflags2
+    _ <- setSessionDynFlags
+         $ setGhcjsPlatform debug [] base
+         $ updateWays $ addWay' (WayCustom "js")
+         $ setGhcjsSuffixes False
+         $ dflags3 { ghcLink   = LinkBinary
+                   , hscTarget = HscAsm
+                   }
+    fixNameCache
+
+fixNameCache :: GhcMonad m => m ()
+fixNameCache = do
+  sess <- getSession
+  liftIO $ modifyIORef' (hsc_NC sess) $ \(NameCache u _) ->
+    (initNameCache u knownNames)
+    where
+      knownNames = map getName (filter (not.isPrimOp) wiredInThings) ++
+                      basicKnownKeyNames ++
+                      templateHaskellNames ++
+                      map (getName . AnId . Gen2.mkGhcjsPrimOpId) allThePrimOps
+      isPrimOp (AnId i) = isPrimOpId i
+      isPrimOp _        = False
 
 -- | A log handler for GHC API. Saves the errors and warnings in an 'IORef'
 -- LogAction == DynFlags -> Severity -> SrcSpan -> PprStyle -> MsgDoc -> IO ()

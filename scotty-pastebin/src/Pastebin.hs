@@ -9,6 +9,7 @@
 {-# LANGUAGE RecordWildCards            #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE TemplateHaskell            #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE TypeHoles                  #-}
 module Main where
@@ -26,7 +27,8 @@ import           Data.Monoid                          (mconcat, mempty)
 import           Network                              (PortID (..), connectTo)
 import           System.IO                            (hClose)
 
-import           Control.Error.Util                   (hoistMaybe, maybeT)
+import           Control.Error.Util                   (hoistMaybe, maybeT,
+                                                       nothing)
 import           Data.Aeson                           ()
 import           Data.EitherR                         (catchT, throwT)
 import           Data.Maybe                           (isJust)
@@ -43,13 +45,14 @@ import           Text.Hastache
 import           Text.Hastache.Context
 import           Web.Scotty.Trans                     as S
 import           Web.Scotty.Hastache
-import qualified Web.Scotty.Types                     as Scotty
 import           Database.Persist                     as P
 import           Database.Persist.Sqlite              as P
 import           Text.Blaze.Html.Renderer.Text
 
 import           Config
 import           Diagrams.Interactive.Display         (DisplayResult (..),
+                                                       DynamicResult (..),
+                                                       StaticResult (..),
                                                        display, result)
 import           Diagrams.Interactive.Eval
 import           Diagrams.Interactive.Eval.EvalError
@@ -81,8 +84,8 @@ errPage (Paste{..}, (msg, errors)) = do
     hastache "main"
 
 
-renderPaste :: Paste -> ActionH ()
-renderPaste (p@Paste{..}) = do
+renderPaste :: (Paste, Int) -> ActionH ()
+renderPaste ((p@Paste{..}), k) = do
     setH "code"     $ MuVariable pasteContent
     setH "codeView" $ MuVariable (renderCode p)
     setH "title"    $ MuVariable $ mconcat ["Paste / ", T.pack pasteTitle,
@@ -90,8 +93,11 @@ renderPaste (p@Paste{..}) = do
     setH "author"   $ MuVariable pasteAuthor
     setH "ptitle"   $ MuVariable pasteTitle
     setH "literate" $ MuVariable pasteLiterateHs
-    setH "result"   $ MuVariable $ renderHtml $
-        foldMap renderDR (getDR pasteResult)
+    setH "result"   $ MuVariable $ case pasteResult of
+        Static staticRes ->
+            renderHtml $ foldMap renderDR (getDR staticRes)
+        Interactive dynRes   ->
+            renderHtml $ renderJS dynRes k
     hastache "main"
 
 
@@ -126,15 +132,17 @@ getRaw :: MaybeT ActionH Text
 getRaw = do
     -- pid <- lift $ param "id"
     ind <- lift $ param "ind"
-    paste <- getPaste
-    let (DisplayResult res) = pasteResult paste
-    return . result $ res !! ind
+    (paste,_) <- getPaste
+    case pasteResult paste of
+        Static (StaticResult res) ->
+            return . result $ res !! ind
+        Interactive (DynamicResult res) -> return res
 
-getPaste :: MaybeT (ActionT HState) Paste
+getPaste :: MaybeT (ActionT HState) (Paste, Int)
 getPaste = do
     pid <- lift $ param "id"
     paste <- liftIO $ runWithSql $ P.get (intToKey pid)
-    hoistMaybe paste
+    fmap (,pid) $ hoistMaybe paste
 
 -- | ** Select 20 recent images
 listImages :: ActionH [(Int, Paste)]
@@ -166,7 +174,7 @@ newPaste = do
     let author = if (T.null usern') then "Anonymous" else usern'
     lhs <- lift (param "literate"
                  `rescue` (return (return False)))
-    let p = Paste title code mempty False lhs author
+    let p = Paste title code (Static $ StaticResult []) False lhs author
     when (T.null code) $ throwT (p, ("Empty input", []))
     pid <- compilePaste p
            `catchT` \e -> throwT (p, e)
@@ -189,13 +197,18 @@ compilePaste (p@Paste{..}) = do
     liftIO $ hClose hndl2
     case res of
         Left err -> throwT (pack err, errors)
-        Right !r -> do
-            let dr = display r
-            let containsImage = isJust (hasImage dr)
+        Right (Static dr) -> do
+            liftIO $ putStrLn "DR"
+            liftIO $ print dr
+            liftIO $ putStrLn "/DR"
+            let containsImage = isJust (hasImage (Static dr))
             liftIO . runWithSql . insert $ p
-                { pasteResult = display r
+                { pasteResult      = Static dr
                 , pasteContainsImg = containsImage
                 }
+        Right (Interactive dr) -> do
+            liftIO . runWithSql . insert $ p
+                { pasteResult = Interactive dr }
 
 redirPaste :: Monad m => Int -> ActionT m ()
 redirPaste i = redirect $ pack ("/get/" ++ show i)
@@ -226,6 +239,7 @@ main = do
         S.get "/json/:id" $ maybeT page404 json getPaste
         S.get "/raw/:id/:ind" $ maybeT page404 text getRaw
         S.get "/raw/:id/:ind/pic.svg" $ maybeT page404 html getRaw
+        S.get "/raw/:id/:ind/all.js" $ maybeT page404 html getRaw
         S.get "/gallery" (listImages >>= renderGallery)
         S.post "/new" $ eitherT errPage redirPaste (measureTime newPaste)
         S.get "/" listPastes

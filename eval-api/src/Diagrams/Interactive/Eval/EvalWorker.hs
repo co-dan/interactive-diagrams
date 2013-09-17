@@ -48,7 +48,6 @@ import           System.IO                              (Handle, hClose)
 import           System.IO.Error                        (isAlreadyExistsError,
                                                          isPermissionError)
 
-
 import           Diagrams.Interactive.Display
 import           Diagrams.Interactive.Eval.EvalError
 import           Diagrams.Interactive.Eval.EvalM
@@ -101,28 +100,25 @@ startEvalWorker name eset = startWorker name sock out set pre callback
                    then return ()
                    else throwIO e
         pre  = flip run' eset $ do
-          liftIO cleanup
-          addPkgDbs (pkgDatabases eset)
-          dfs <- getSessionDynFlags
-          _ <- setSessionDynFlags $ dfs { hscTarget = HscInterpreted
-                                        , ghcLink = LinkInMemory
-                                        , verbosity = 3
-                                        }
-          -- loadFile (preloadFile eset)
-          -- compileExpr "preload"
-          oldTrgs <- getTargets
-          loadFile (preloadFile eset)
-          setTargets oldTrgs
-          liftIO restoreHandlers
-          getSession
+            liftIO cleanup
+            addPkgDbs (pkgDatabases eset)
+            dfs <- getSessionDynFlags
+            _ <- setSessionDynFlags $ dfs { hscTarget = HscInterpreted
+                                          , ghcLink   = LinkInMemory
+                                          , verbosity = verbLevel eset
+                                          }
+            oldTrgs <- getTargets
+            loadFile (preloadFile eset)
+            setTargets oldTrgs
+            liftIO restoreHandlers
+            getSession
         callback sess soc = forever $ do
-          (hndl, _, _) <- accept soc
-          act <- evalWorkerAction hndl
-          flip run' eset $ do
-            setSession sess
-            r :: EvalResultWithErrors <- runToHandle act hndl
-            return r
-
+            (hndl, _, _) <- accept soc
+            act <- evalWorkerAction hndl
+            flip run' eset $ do
+              setSession sess
+              r :: EvalResultWithErrors <- runToHandle act hndl
+              return r
 
 -- | Read data from a handle and convert it to 'EvalM' action
 evalWorkerAction :: Handle -> IO (EvalM DisplayResult)
@@ -146,13 +142,14 @@ sendEvalStringRequest :: (Worker EvalWorker, RestartWorker IO EvalWorker)
 sendEvalStringRequest w str = sendEvalRequest w (EvalString str)
 
 -- | Runs a Ghc monad code and outputs the result to a handle
-runToHandle :: (Serialize a, Show a)
+runToHandle :: (Serialize a)
             => EvalM a -> Handle -> EvalM (Either String a, [EvalError])
 runToHandle act hndl = do
     ref <- liftIO $ newIORef []
     set <- ask
     liftGhc $ initGhc ref (verbLevel set)
-    dr :: Either String a <- handleException act
+    dflags <- getSessionDynFlags
+    dr :: Either String a <- defaultCleanupHandler dflags (handleException act)
     errors :: [EvalError] <- liftIO $ readIORef ref
     _ <- liftIO $ sendData hndl (dr, errors)
     return (dr, errors)
@@ -175,7 +172,6 @@ sendEvalRequest (w, restart) cmd = do
     alive <- processAlive pid
     w' <- case alive of
         True  -> return w
-        -- False -> startEvalWorker (workerName w) (def { limitSet = workerLimits w })
         False -> restart w
     let evres = case r of
             Left _ -> (Left "Process timedout", [])
@@ -230,11 +226,19 @@ instance Serialize EvalCmd
 evalCmdToEvalM :: EvalCmd -> EvalM DisplayResult
 evalCmdToEvalM (CompileFile fpath) = do
   loadFile fpath
-  underIO <- isUnderIO "main"
-  if underIO
-    then compileExpr "(return . display =<< main) :: IO DisplayResult"
-    else compileExpr "(display (main)) :: DisplayResult"
-evalCmdToEvalM (EvalString s) = compileExpr s
+  interactive <- needsInput "example"
+  ty <- exprType "example"
+  underIO <- isUnderIO ty
+  if interactive
+      then fmap Interactive $ do
+           sess <- getSession
+           compileToJS fpath
+               `gfinally` setSession sess
+      else fmap Static $ if underIO
+           then compileExpr "(return . display =<< example) :: IO StaticResult"
+           else compileExpr "(display example) :: StaticResult"
+                
+evalCmdToEvalM (EvalString s) = fmap Static $ compileExpr s
 evalCmdToEvalM (EvalFile n txt) = do
   EvalSettings{..} <- ask
   let fpath = tmpDirPath </> n

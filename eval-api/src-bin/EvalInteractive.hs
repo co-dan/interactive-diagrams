@@ -18,8 +18,6 @@ import           Diagrams.Interactive.Eval.EvalM
 import           Diagrams.Interactive.Eval.EvalSettings
 import           Diagrams.Interactive.Eval.EvalWorker
 import           Diagrams.Interactive.Eval.Helpers
-import           System.Restricted.Worker.Types
-import           System.Restricted.Worker
     
 
 settings :: EvalSettings
@@ -27,12 +25,17 @@ settings = def {
   limitSet = def {
      rlimits = Just def {
         totalMemoryLimit = ResourceLimits memlim memlim
+        , cpuTimeLimit   = ResourceLimits
+                             ResourceLimitUnknown
+                             ResourceLimitUnknown
         },
-     secontext = Nothing
+     secontext = Nothing,
+     timeout = 20
      }
+  , verbLevel = 3
   }
-  where memlim = ResourceLimit $ 104857600 * 2
-                                 --- 100mb * 2
+  where memlim = ResourceLimit $ 104857600 * 10
+                                 --- 100mb * 10
 
 
 main :: IO ()
@@ -51,9 +54,10 @@ loop c (worker, restart) = do
       worker' <- measureTime $ do
         ((r, errors), w') <- evalLn ln (worker, restart)
         case r of
-          Right (DisplayResult res) ->
+          Right (Static (StaticResult res)) ->
             mapM_ (putStr . TL.unpack . result) res
             >> putStrLn ""
+          Right (Interactive _) -> putStrLn "interactive result"
           Left err -> putStrLn err
         putStrLn "Errors:"
         mapM_ print errors
@@ -67,7 +71,7 @@ evalLn s wrk
   | ":load" `isPrefixOf` s =
     let fname = dropWhile (==' ') $ drop 5 s
     in sendCompileFileRequest wrk fname
-  | otherwise = let expr = ("(return $ display (" ++ s ++ ")) :: IO DisplayResult")
+  | otherwise = let expr = ("(return $ display (" ++ s ++ ")) :: IO StaticResult")
                 in sendEvalStringRequest wrk expr
 
 cleanUp :: Worker a -> IO ()

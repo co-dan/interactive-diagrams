@@ -44,4 +44,6 @@ instance ToJSON DR where
                      , "result"     .= r ]
 
 instance ToJSON DisplayResult
+instance ToJSON StaticResult
+instance ToJSON DynamicResult
 instance ToJSON Paste

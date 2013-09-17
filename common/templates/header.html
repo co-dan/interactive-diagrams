@@ -15,9 +15,86 @@ href="http://co-dan.github.io/static/css/hscolour-emacs.css" />
 <script src="http://co-dan.github.io/static/js/haskell.js"></script>
 <script src="/js/literatehaskell.js"></script>
 <script src="http://codeorigin.jquery.com/jquery-2.0.3.min.js"></script>
+<script src="http://code.jquery.com/ui/1.10.3/jquery-ui.js"></script>
+<link rel="stylesheet" href="http://code.jquery.com/ui/1.10.3/themes/smoothness/jquery-ui.css">
 <script src="http://co-dan.github.io/static/js/bootstrap.min.js"></script>
 <script src="http://talos.github.com/jquery-svgpan/jquery-svgpan.min.js"></script>
 <script src="/js/render.js"></script>
+<style type="text/css">
+input[type="text"] {
+    font-size:13pt;
+    height:32px;
+}
+.ui-progressbar {
+    position: relative;
+}
+.progresstext {
+    position: absolute;
+    left: 50%;
+    top: 4px;
+    font-weight: bold;
+    text-shadow: 1px 1px 0 #fff;
+}
+</style>
+<style type="text/css">
+      html,
+      body {
+        height: 100%;
+        /* The html and body elements cannot have any padding or margin. */
+      }
+
+      /* Wrapper for page content to push down footer */
+      #wrap {
+        min-height: 100%;
+        height: auto !important;
+        height: 100%;
+        /* Negative indent footer by it's height */
+        margin: 0 auto -60px;
+      }
+
+      /* Set the fixed height of the footer here */
+      #push,
+      #footer {
+        height: 60px;
+      }
+      #footer {
+        background-color: #f5f5f5;
+      }
+
+      /* Lastly, apply responsive CSS fixes as necessary */
+      @media (max-width: 767px) {
+        #footer {
+          margin-left: -20px;
+          margin-right: -20px;
+          padding-left: 20px;
+          padding-right: 20px;
+        }
+      }
+
+      .container {
+        width: auto;
+        max-width: 800px;
+      }
+      .container .footer-inner {
+        margin: 20px 0;
+      }
+
+      /* codemirror editor */
+      .CodeMirror {
+        height: 450px;
+        font-size: 90%;
+        background-color: white;
+        border: solid 1px #ccc;
+        -webkit-border-radius: 4px;
+          -moz-border-radius: 4px;
+          border-radius: 4px;
+      }
+
+      /* code view */
+      .lhs-comment {
+        font-family: monospace;
+      }
+</style>
 <script language="javascript">
   var cm; // code mirror
 </script>
