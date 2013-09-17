@@ -66,8 +66,6 @@ import           Pastebin.Gallery
 import           Pastebin.Paste
 import           Pastebin.Util
 
-import Debug.Trace
-
 hastacheConf :: MonadIO m => MuConfig m
 hastacheConf = defaultConfig
    { muTemplateFileDir = Just getTemplatesDir
@@ -87,6 +85,7 @@ errPage (Paste{..}, (msg, errors)) = do
     setH "author"   $ MuVariable pasteAuthor
     setH "literate" $ MuVariable pasteLiterateHs
     setH "code"     $ MuVariable pasteContent
+    setH "current"  $ MuVariable $ fmap keyToInt pasteParent
     setH "date"     $ MuVariable (formatTime defaultTimeLocale "%c" pasteCreatedAt)
     hastache "main"
 
@@ -179,27 +178,27 @@ newPaste :: EitherT (Paste, (Text, [EvalError])) ActionH Int
 newPaste = do
     title' <- T.unpack <$> lift (paramEscaped "title")
     let title = if (null title') then "(undefined)" else title'
-    traceM (show title)
+
     code <- lift (param "code")
 
     usern' <- lift (paramEscaped "author")
     let author = if (T.null usern') then "Anonymous" else usern'
-    traceM (show author)
+
     lhs <- lift (param "literate"
                  `rescue` (return (return False)))
-    traceM (show lhs)
+
     parentP' <- lift (paramMaybe "parent")
-    traceM (show parentP')
+
     let parentP = fmap intToKey parentP'
     -- parentP' <- lift (param "parent")
     -- let parentP = Just (intToKey parentP')
     now <- liftIO getCurrentTime
-    traceM (show now)
+
     let p = Paste title code (Static $ StaticResult []) False lhs author now parentP
     when (T.null code) $ throwT (p, ("Empty input", []))
     pid <- compilePaste p
            `catchT` \e -> throwT (p, e)
-    traceM (show (keyToInt pid))
+
     return (keyToInt pid)
 
 compilePaste :: MonadIO m
