@@ -108,9 +108,12 @@ renderCode Paste{..} = colorize pasteLiterateHs pasteContent
 
 renderJS :: DynamicResult -> Int -> H.Html
 renderJS (DynamicResult dr) pid = mconcat
-    [ H.div ! HA.id "test" $ mempty
+    [ H.div ! HA.id "test" $ mconcat
+      [ H.p   $ H.toHtml ("Loading..." :: String)
+      , H.img ! HA.src "/img/loader.gif" ]
     , H.script ! HA.src (fromString p) $ mempty
-    , H.script $ H.preEscapedToHtml ("h$run(h$mainZCMainziexample);"::String) ]
+    , H.script $
+      H.preEscapedToHtml ("$(function(){h$run(h$mainZCMainziexample);})"::String) ]
   where
     p = "/raw/" ++ show pid ++ "/0/all.js"
     
