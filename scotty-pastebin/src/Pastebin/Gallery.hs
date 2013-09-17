@@ -14,7 +14,7 @@ import Data.Maybe                   (fromJust)
 import Data.Monoid ((<>))    
 import Data.Text.Lazy               (Text, pack)
 import Database.Persist             (Entity)
-import Database.Persist.Sqlite      (SqlPersistT, rawSql, toPersistValue)
+import Database.Persist.Postgresql  (SqlPersistT, rawSql, toPersistValue)
 
 import Diagrams.Interactive.Display    
 import Pastebin.Paste
@@ -31,5 +31,5 @@ mkItem (k, p) = GalleryItem { itemIndex = k
               . pasteResult $ p 
 
 gallerySql :: SqlPersistT (LoggingT (ResourceT IO)) [Entity Paste]
-gallerySql = rawSql "SELECT ?? FROM \"Paste\" WHERE (\"containsImg\"=?) ORDER BY RANDOM() LIMIT 20"
+gallerySql = rawSql "SELECT ?? FROM \"Paste\" WHERE (\"containsImg\"=?) ORDER BY random() LIMIT 20"
              [toPersistValue True]

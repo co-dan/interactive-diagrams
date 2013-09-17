@@ -7,6 +7,15 @@
   <tr>  
    <td><i class="icon-pencil"></i>&nbsp;Title&nbsp;</td><td>{{ptitle}}</td>
   </tr>
+  <tr>
+    <td><i class="icon-calendar"></i>&nbsp;Created at&nbsp;</td><td>{{date}}</td>
+  </tr>
+  {{#parent}}
+  <tr>
+    <td><i class="icon-calendar"></i>&nbsp;Parent paste&nbsp;</td>
+    <td><a href="/get/{{parent}}">#{{parent}}</a></td>
+  </tr>
+  {{/parent}}
   </tbody>
   </table>
   {{#literate}}<hr />{{/literate}}

@@ -18,6 +18,8 @@ module Pastebin.Paste where
 
 import Data.Aeson
 import Data.Text.Lazy          (Text)
+import Data.Time.Clock
+import Database.Persist        as P
 import Database.Persist.TH     as P
 import GHC.Generics
 
@@ -26,12 +28,14 @@ import Pastebin.DisplayPersist ()
 
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistUpperCase|
 Paste
-    title       String  default="(untitled)"
+    title       String default='(untitled)'
     content     Text
     result      DisplayResult
     containsImg Bool
     literateHs  Bool   default=False
-    author      Text   default="Anonymous"
+    author      Text
+    createdAt   UTCTime
+    parent      PasteId Maybe
     deriving Show
     deriving Generic
 |]

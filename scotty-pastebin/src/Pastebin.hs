@@ -21,7 +21,8 @@ import           Control.Monad.State
 import           Control.Monad.Trans                  (lift)
 import           Control.Monad.Trans.Either           (EitherT (..), eitherT)
 import           Control.Monad.Trans.Maybe            (MaybeT (..))
-import           Control.Monad.Trans.Resource (transResourceT, ResourceT)
+import           Control.Monad.Trans.Resource         (ResourceT,
+                                                       transResourceT)
 import           Data.Foldable                        (foldMap)
 import           Data.Monoid                          (mconcat, mempty)
 import           Network                              (PortID (..), connectTo)
@@ -36,18 +37,21 @@ import           Data.Text.Lazy                       (Text, pack)
 import qualified Data.Text.Lazy                       as T
 import           Data.Time.Clock                      (diffUTCTime,
                                                        getCurrentTime)
+import           Data.Time.Format                     (formatTime)
+import           System.Locale                        (defaultTimeLocale)
 
+
+import           Database.Persist                     as P
+import           Database.Persist.Postgresql          as P
 import           Network.HTTP.Types
 import           Network.Wai
 import           Network.Wai.Middleware.RequestLogger
 import           Network.Wai.Middleware.Static
+import           Text.Blaze.Html.Renderer.Text
 import           Text.Hastache
 import           Text.Hastache.Context
-import           Web.Scotty.Trans                     as S
 import           Web.Scotty.Hastache
-import           Database.Persist                     as P
-import           Database.Persist.Sqlite              as P
-import           Text.Blaze.Html.Renderer.Text
+import           Web.Scotty.Trans                     as S
 
 import           Config
 import           Diagrams.Interactive.Display         (DisplayResult (..),
@@ -62,11 +66,13 @@ import           Pastebin.Gallery
 import           Pastebin.Paste
 import           Pastebin.Util
 
+import Debug.Trace
+
 hastacheConf :: MonadIO m => MuConfig m
 hastacheConf = defaultConfig
    { muTemplateFileDir = Just getTemplatesDir
    , muTemplateFileExt = Just ".html"
-   , muEscapeFunc      = emptyEscape
+   , muEscapeFunc      = emptyEscape -- dont escape
    }
 
 -- | * Rendering and views
@@ -81,23 +87,27 @@ errPage (Paste{..}, (msg, errors)) = do
     setH "author"   $ MuVariable pasteAuthor
     setH "literate" $ MuVariable pasteLiterateHs
     setH "code"     $ MuVariable pasteContent
+    setH "date"     $ MuVariable (formatTime defaultTimeLocale "%c" pasteCreatedAt)
     hastache "main"
 
 
-renderPaste :: (Paste, Int) -> ActionH ()
-renderPaste ((p@Paste{..}), k) = do
+renderPaste :: (Entity Paste) -> ActionH ()
+renderPaste (Entity k p@Paste{..}) = do
     setH "code"     $ MuVariable pasteContent
     setH "codeView" $ MuVariable (renderCode p)
     setH "title"    $ MuVariable $ mconcat ["Paste / ", T.pack pasteTitle,
                                           " by ", pasteAuthor]
     setH "author"   $ MuVariable pasteAuthor
+    setH "date"     $ MuVariable (formatTime defaultTimeLocale "%c" pasteCreatedAt)
     setH "ptitle"   $ MuVariable pasteTitle
     setH "literate" $ MuVariable pasteLiterateHs
+    setH "parent"   $ MuVariable $ fmap keyToInt pasteParent
+    setH "current"  $ MuVariable $ keyToInt k
     setH "result"   $ MuVariable $ case pasteResult of
         Static staticRes ->
             renderHtml $ foldMap renderDR (getDR staticRes)
         Interactive dynRes   ->
-            renderHtml $ renderJS dynRes k
+            renderHtml $ renderJS dynRes (keyToInt k)
     hastache "main"
 
 
@@ -132,17 +142,17 @@ getRaw :: MaybeT ActionH Text
 getRaw = do
     -- pid <- lift $ param "id"
     ind <- lift $ param "ind"
-    (paste,_) <- getPaste
+    (Entity _ paste) <- getPaste
     case pasteResult paste of
         Static (StaticResult res) ->
             return . result $ res !! ind
         Interactive (DynamicResult res) -> return res
 
-getPaste :: MaybeT (ActionT HState) (Paste, Int)
+getPaste :: MaybeT (ActionT HState) (Entity Paste)
 getPaste = do
     pid <- lift $ param "id"
     paste <- liftIO $ runWithSql $ P.get (intToKey pid)
-    fmap (,pid) $ hoistMaybe paste
+    hoistMaybe $ liftM (Entity (intToKey pid)) paste
 
 -- | ** Select 20 recent images
 listImages :: ActionH [(Int, Paste)]
@@ -169,15 +179,27 @@ newPaste :: EitherT (Paste, (Text, [EvalError])) ActionH Int
 newPaste = do
     title' <- T.unpack <$> lift (paramEscaped "title")
     let title = if (null title') then "(undefined)" else title'
+    traceM (show title)
     code <- lift (param "code")
+
     usern' <- lift (paramEscaped "author")
     let author = if (T.null usern') then "Anonymous" else usern'
+    traceM (show author)
     lhs <- lift (param "literate"
                  `rescue` (return (return False)))
-    let p = Paste title code (Static $ StaticResult []) False lhs author
+    traceM (show lhs)
+    parentP' <- lift (paramMaybe "parent")
+    traceM (show parentP')
+    let parentP = fmap intToKey parentP'
+    -- parentP' <- lift (param "parent")
+    -- let parentP = Just (intToKey parentP')
+    now <- liftIO getCurrentTime
+    traceM (show now)
+    let p = Paste title code (Static $ StaticResult []) False lhs author now parentP
     when (T.null code) $ throwT (p, ("Empty input", []))
     pid <- compilePaste p
            `catchT` \e -> throwT (p, e)
+    traceM (show (keyToInt pid))
     return (keyToInt pid)
 
 compilePaste :: MonadIO m
@@ -235,13 +257,13 @@ main = do
         setHastacheConfig hastacheConf
         middleware logStdoutDev
         middleware $ staticPolicy (addBase "../common/static")
+        S.post "/new" $ eitherT errPage redirPaste (measureTime newPaste)
         S.get "/get/:id" $ maybeT page404 renderPaste getPaste
         S.get "/json/:id" $ maybeT page404 json getPaste
         S.get "/raw/:id/:ind" $ maybeT page404 text getRaw
         S.get "/raw/:id/:ind/pic.svg" $ maybeT page404 html getRaw
         S.get "/raw/:id/:ind/all.js" $ maybeT page404 html getRaw
         S.get "/gallery" (listImages >>= renderGallery)
-        S.post "/new" $ eitherT errPage redirPaste (measureTime newPaste)
         S.get "/" listPastes
         S.get "/feed" feed
 --        S.post "/fetch" $ eitherT errPage redirPaste fetchPaste
