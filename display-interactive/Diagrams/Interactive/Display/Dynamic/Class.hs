@@ -3,14 +3,17 @@
 {-# LANGUAGE OverloadedStrings    #-}
 {-# LANGUAGE TypeFamilies         #-}
 {-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE TypeOperators        #-}
+{-# LANGUAGE FlexibleContexts     #-}
 module Diagrams.Interactive.Display.Dynamic.Class where
 
+import           Control.Arrow                        ((***))
 import           Control.Applicative                  hiding (empty)
-import           Control.Error.Safe
+import           Control.Error
 import           Control.Monad
 import           Control.Monad.Cont
 import           Data.Default
-import           Data.Foldable
+import           Data.Foldable                        hiding (find)
 import           Data.Int
 import           Data.Monoid
 import qualified Data.Text                            as T
@@ -40,7 +43,11 @@ import           Debug.Trace
 
 class Inputable a where
     inputable :: JQuery -> ContT JQuery IO (JQuery, IO (Either String a))
-
+    default inputable :: (Generic a, GInputable (Rep a))
+                      => JQuery
+                      -> ContT JQuery IO (JQuery, IO (Either String a))
+    inputable jq = (id *** tto) <$> ginputable jq
+      where tto = liftM $ liftM to
 class Renderable a where
     render :: JQuery -> a -> ContT JQuery IO JQuery
     default render :: Display a => JQuery -> a -> ContT JQuery IO JQuery
@@ -154,13 +161,14 @@ instance Inputable String where
         let act = return . T.unpack <$> getVal inputBox
         return (inputBox, act)
       where
-        newInputBox = select "<input type=\"text\" class=\"input-xmedium\" />"
+        newInputBox = select "<div><input type=\"text\" class=\"input-xmedium\" /></div>"
 
 
 inputableNum :: (Num a, Read a) => JQuery -> ContT JQuery IO (JQuery, IO (Either String a))
 inputableNum w = do
     (jq, act) <- inputable w
-    liftIO $ initWidget jq Spinner with { spinnerPage = 5 }
+    jq' <- lift $ find "input" jq
+    liftIO $ initWidget jq' Spinner with { spinnerPage = 5 }
     let errmsg = "Cannot read an number"
     let act' = (=<<) <$> pure (readErr errmsg) <*> (act :: IO (Either String String))
     return (jq, act')
@@ -222,3 +230,117 @@ onClick jq a = click a def jq
 
 displayText (StaticResult drs) =
     foldMap (TL.toStrict . result) drs
+
+-- * GInputable
+
+type GInputCont f a = ContT JQuery IO (JQuery, IO (Either String (f a)))
+
+class GInputable f where
+    ginputable :: JQuery
+               -> ContT JQuery IO (JQuery, IO (Either String (f a)))
+
+instance GInputable U1 where
+    ginputable jq = do
+        codeblock <- lift $ select "<div><code></code></div>"
+        return (codeblock, return (Right U1))
+
+instance (Inputable c) => GInputable (K1 i c) where
+    ginputable = liftM (id *** ((fmap . fmap) K1)) . inputable
+
+instance (GInputable f) => GInputable (M1 i c f) where
+    ginputable = liftM (id *** ((fmap . fmap) M1)) . ginputable
+
+instance (GInputable f, GInputable g) => GInputable (f :*: g) where
+    ginputable jq = do
+        (inpArea1, inpAct1) <- ginputable jq
+        (inpArea2, inpAct2) <- ginputable jq
+        div <- lift $ select "<div>"
+                    >>= appendJQuery inpArea1
+                    >>= appendJQuery inpArea2
+        let act = runEitherT $ do
+                res1 <- EitherT inpAct1
+                res2 <- EitherT inpAct2
+                return (res1 :*: res2)
+        return (div, act)
+
+-- sumInputable :: (GInputable f, GInputable g)
+--                 => JQuery -> GInputCont (f :+: g) a
+-- sumInputable jq = do
+--         area <- lift $ do
+--             traceM ":+:"
+--             sumDiv <- parent jq >>= find "#sum"
+--             found <- (>0) <$> lengthArray (castRef sumDiv)
+--             if found
+--                 then return sumDiv
+--                 else newDiv
+--         lift $ select "<h3>Option</h3>" >>= appendToJQuery area
+--         -- div1 <- lift $ select "<div>"
+--         --              >>= appendToJQuery area
+--         (inpArea1, inpAct1) <- ginputable area
+
+--         lift $ select "<h3>Option</h3>" >>= appendToJQuery area
+--         -- div2 <- lift $ select "<div>"
+--         --              >>= appendToJQuery area        
+--         (inpArea2, inpAct2) <- ginputable area
+--         lift $ initWidget area Accordion def
+--         let act = do
+                
+--                 (Just opts) <- getWidgetOptions area Accordion
+--                 let n = accordionActive opts
+--                 if n == 0
+--                     then liftM L1 <$> inpAct1
+--                     else do
+--                       initWidget area Accordion
+--                           (opts { accordionActive = n - 1 })
+--                       liftM R1 <$> inpAct2
+--         return (area, act)
+--         where newDiv = do
+--                   accord <- select "<div id=\"sum\">"
+--                   appendJQuery accord jq
+--                   initWidget accord Accordion def
+--                   return accord
+
+-- instance (GInputable f) => GInputable (f :+: U1) where
+--     ginputable = sumInputable
+
+-- instance (GInputable f, Inputable c)
+--          => GInputable (f :+: K1 i c) where
+--     ginputable = sumInputable
+
+-- instance (GInputable f, GInputable g)
+--          => GInputable (f :+: M1 i c g) where
+--     ginputable = sumInputable
+    
+-- instance (GInputable f, GInputable g, GInputable h)
+--          => GInputable (f :+: (g :*: h)) where
+--     ginputable = sumInputable
+
+instance (GInputable f, GInputable g)
+         => GInputable (f :+: g) where
+    ginputable jq = do
+        area <- lift $ do
+            traceM ":+:"
+            sumDiv <- parent jq >>= find ".sum"
+            found <- (>0) <$> lengthArray (castRef sumDiv)
+            if found
+                then return sumDiv
+                else newDiv
+        (inpArea1, inpAct1) <- ginputable area
+        (inpArea2, inpAct2) <- ginputable area
+        lift $ initWidget area Accordion def
+        let act = do
+                (Just opts) <- getWidgetOptions area Accordion
+                let n = accordionActive opts
+                if n == 0
+                    then liftM L1 <$> inpAct1
+                    else do
+                      initWidget area Accordion
+                          (opts { accordionActive = n - 1 })
+                      liftM R1 <$> inpAct2
+        return (area, act)
+        where newDiv = do
+                  accord <- select "<div class=\"sum\">"
+                  appendJQuery accord jq
+                  initWidget accord Accordion def
+                  return accord
+                        
