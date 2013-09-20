@@ -234,7 +234,7 @@ injectRender = do
     maybety <- removeSig maindef
     replaceDefinition maindef (wrapRender maybety)
   where
-    dclass  = "Diagrams.Interactive.Display.Dynamic.Class"
+    dclass  = "Diagrams.Interactive.Display.Dynamic"
     tshims  = "Diagrams.Interactive.TypeShims"
     backends = ["Diagrams.Backend.SVG", "Diagrams.Backend.Cairo"]
     maindef = mkVarOcc "example"
@@ -248,7 +248,7 @@ wrapRender ty f@(FunBind{..})
     grhs = GRHSs { grhssLocalBinds = binds
                  , grhssGRHSs = [L l $ GRHS [] (L l rhs) ] }
 
-    dclass  = "Diagrams.Interactive.Display.Dynamic.Class"
+    dclass  = "Diagrams.Interactive.Display.Dynamic"
     newName = mkRdrUnqual (mkVarOcc "old example")
     renderF = mkRdrQual (mkModuleName dclass) (mkVarOcc "runRenderTest")
     renderV = HsVar renderF
@@ -265,13 +265,13 @@ wrapRender ty f@(FunBind{..})
 wrapRender _ x = x
 
 isInteractivePackage :: PackageId -> Bool
-isInteractivePackage pkgId = "display-interactive-" `isPrefixOf` packageIdString pkgId
+isInteractivePackage pkgId = "display-" `isPrefixOf` packageIdString pkgId
 
 displayInteractivePackage :: DynFlags -> PackageId
 displayInteractivePackage dflags =
   case prims of
     (x:_) -> x
-    _     -> error "Cannot find display-interactive"
+    _     -> error "Cannot find display"
   where
     prims = reverse . sort $ filter isInteractivePackage pkgIds
     pkgIds = map packageConfigId . eltsUFM . pkgIdMap . pkgState $ dflags

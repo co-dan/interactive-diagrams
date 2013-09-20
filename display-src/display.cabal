@@ -1,7 +1,6 @@
 name:                display
 version:             0.1.0
 synopsis:            The backbone Display library for interactive-diagrams
--- description:         
 license:             BSD3
 license-file:        LICENSE
 author:              Dan Frumin
@@ -11,18 +10,28 @@ build-type:          Simple
 cabal-version:       >=1.8
 
 
-library
-  exposed-modules:     Diagrams.Interactive.Display,
+library       
+  exposed-modules:     Diagrams.Interactive,
+                       Diagrams.Interactive.Display,
                        Diagrams.Interactive.Display.Static,
                        Diagrams.Interactive.Display.Dynamic
+  if impl(ghcjs)
+    exposed-modules:   Diagrams.Interactive.TypeShims
   other-modules:       Diagrams.Interactive.Display.Orphans                     
-  ghc-options:         -O2 -threaded -Wall -Werror -fno-warn-orphans
+  ghc-options:         -O2 -threaded -Wall -fno-warn-orphans
   build-depends:       base >=4.6,
                        blaze-html ==0.6.*,  
                        blaze-svg ==0.3.*,
                        cereal ==0.3.*,
-                       data-default,
+                       data-default >= 0.5 && <0.6,
                        diagrams-lib >= 0.6 && < 0.8,
                        diagrams-svg >= 0.6 && < 0.9,
-                       text ==0.11.*
-
+                       errors,
+                       mtl >=2.1 && <2.2,
+                       text >= 0.11 && < 0.12
+  if impl(ghcjs)
+    build-depends:     ghcjs-base,
+                       ghcjs-canvas,
+                       ghcjs-jquery,
+                       ghcjs-jqueryui,
+                       diagrams-ghcjs
