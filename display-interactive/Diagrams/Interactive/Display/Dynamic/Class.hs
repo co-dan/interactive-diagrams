@@ -51,7 +51,6 @@ class Inputable a where
                       -> ContT JQuery IO (JQuery, IO (Either String a))
     inputable jq = do
         (jq', act) <- ginputable jq
-        -- doc <- lift $ select "document"
         jq'' <- lift $ postprocess jq
         return (jq', tto act)
       --   (id *** tto) <$> ginputable jq
@@ -176,13 +175,18 @@ instance Inputable String where
 
 
 inputableNum :: (Num a, Read a) => JQuery -> ContT JQuery IO (JQuery, IO (Either String a))
-inputableNum w = do
+inputableNum = inputable' (readErr "Cannot read a number") 
+
+inputable' :: (String -> Either String a)
+           -> JQuery
+           -> ContT JQuery IO (JQuery, IO (Either String a))
+inputable' readF w = do
     (jq, act) <- inputable w
     jq' <- lift $ find "input" jq
     liftIO $ initWidget jq' Spinner with { spinnerPage = 5 }
-    let errmsg = "Cannot read an number"
-    let act' = (=<<) <$> pure (readErr errmsg) <*> (act :: IO (Either String String))
+    let act' = (=<<) <$> pure readF <*> (act :: IO (Either String String))
     return (jq, act')
+           
 
 instance Inputable Int     where { inputable = inputableNum }
 instance Inputable Int8    where { inputable = inputableNum }
@@ -197,6 +201,8 @@ instance Inputable Word64  where { inputable = inputableNum }
 instance Inputable Integer where { inputable = inputableNum }
 instance Inputable Float   where { inputable = inputableNum }
 instance Inputable Double  where { inputable = inputableNum }
+instance Inputable T.Text  where { inputable = inputable' (Right . T.pack)  }
+instance Inputable TL.Text where { inputable = inputable' (Right . TL.pack) }
 
 --------------------------------------------------
 -- Renderable instances
