@@ -227,13 +227,13 @@ instance Inputable TL.Text where { inputable = inputableRead (Right . TL.pack) }
 
 instance Inputable Bool where
     inputable = inputableSelect [("True", True), ("False", False)]
-
 instance Inputable Ordering where
-    inputable = inputableSelect [("<", LT), ("=", EQ), (">", GT)]
-    
+    inputable = inputableSelect [("<", LT), ("=", EQ), (">", GT)]    
 instance (Inputable a, Inputable b) => Inputable (Either a b)
 instance (Inputable a) => Inputable (Maybe a)
 
+instance (Inputable a, Inputable b) => Inputable (a,b)
+instance (Inputable a, Inputable b, Inputable c) => Inputable (a,b,c)
 
 --------------------------------------------------
 -- Renderable instances
@@ -271,6 +271,8 @@ instance Renderable String
 instance Renderable ()
 instance Display a => Renderable (Maybe a)
 instance (Display a, Display b) => Renderable (Either a b)
+instance (Display a, Display b) => Renderable (a, b)
+instance (Display a, Display b, Display c) => Renderable (a,b,c)
 
 ------------------------------------------------------------
 -- Helpers
