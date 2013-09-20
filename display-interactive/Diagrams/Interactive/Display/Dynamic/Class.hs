@@ -1,21 +1,23 @@
 {-# LANGUAGE DefaultSignatures    #-}
+{-# LANGUAGE FlexibleContexts     #-}
 {-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE OverloadedStrings    #-}
-{-# LANGUAGE TypeFamilies         #-}
 {-# LANGUAGE ScopedTypeVariables  #-}
-{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE TypeFamilies         #-}
 {-# LANGUAGE TypeOperators        #-}
-{-# LANGUAGE FlexibleContexts     #-}
+{-# LANGUAGE TypeSynonymInstances #-}
 module Diagrams.Interactive.Display.Dynamic.Class where
 
-import           Control.Arrow                        ((***))
 import           Control.Applicative                  hiding (empty)
+import           Control.Arrow                        ((***))
 import           Control.Error
 import           Control.Monad
-import           Control.Monad.Cont
+import           Control.Monad.Cont                   hiding (mapM_)
 import           Data.Default
-import           Data.Foldable                        hiding (find)
+import           Data.Foldable                        hiding (find, mapM_)
 import           Data.Int
+import           Data.List                            (lookup)
+import           Data.Maybe
 import           Data.Monoid
 import qualified Data.Text                            as T
 import qualified Data.Text.IO                         as T
@@ -33,8 +35,8 @@ import           GHCJS.Types
 import           JavaScript.Canvas                    (getContext)
 import           JavaScript.JQuery
 import           JavaScript.JQuery.UI
-import           JavaScript.JQuery.UI.Internal
 import           JavaScript.JQuery.UI.Class
+import           JavaScript.JQuery.UI.Internal
 
 import           Diagrams.Interactive.Display.Dynamic
 import           Diagrams.Interactive.Display.Static
@@ -55,7 +57,7 @@ class Inputable a where
         return (jq', tto act)
       --   (id *** tto) <$> ginputable jq
       where tto = liftM $ liftM to
-        
+
 class Renderable a where
     render :: JQuery -> a -> ContT JQuery IO JQuery
     default render :: Display a => JQuery -> a -> ContT JQuery IO JQuery
@@ -120,7 +122,7 @@ instance (Inputable a, Renderable b, Show a) => Renderable (a -> b) where
                     lift $ remove area
                     area' <- lift $ select "<div>"
                     lift $ append ("<p><font color=red>" <> T.pack errmsg <> "</font></p>")
-                                  area'                    
+                                  area'
                     kont area'
                     return undefined
             lift $ putStrLn $ "input: " ++ show input
@@ -129,15 +131,15 @@ instance (Inputable a, Renderable b, Show a) => Renderable (a -> b) where
             pbar <- lift $ select "<div id=\"progressbar\"><div class=\"progresstext\">Munching bits...</div></div>"
             lift $ empty area
             lift $ appendJQuery pbar area -- replace the inside of an
-                -- area with our progressbar                
+                -- area with our progressbar
             lift $ initWidget pbar Progressbar with { progressbarValue = F }
-            
-            
+
+
             -- .. replacing the old area with the new area with new controls
             newArea <- render w (f input)
             -- then we remove our working area completely
             lift $ remove area
-            
+
             -- and we put a "back" button on our new area
             buttonBack kont newArea
             return newArea
@@ -175,18 +177,36 @@ instance Inputable String where
 
 
 inputableNum :: (Num a, Read a) => JQuery -> ContT JQuery IO (JQuery, IO (Either String a))
-inputableNum = inputable' (readErr "Cannot read a number") 
+inputableNum = inputableRead (readErr "Cannot read a number")
 
-inputable' :: (String -> Either String a)
+inputableRead :: (String -> Either String a)
            -> JQuery
            -> ContT JQuery IO (JQuery, IO (Either String a))
-inputable' readF w = do
+inputableRead readF w = do
     (jq, act) <- inputable w
     jq' <- lift $ find "input" jq
     liftIO $ initWidget jq' Spinner with { spinnerPage = 5 }
     let act' = (=<<) <$> pure readF <*> (act :: IO (Either String String))
     return (jq, act')
-           
+
+-- Useful for enums
+inputableSelect :: [(T.Text, a)]
+                -> JQuery
+                -> ContT JQuery IO (JQuery, IO (Either String a))
+inputableSelect options w = do
+    sel <- lift $ newSelect
+    lift $ mapM_ (appendToJQuery sel <=< (mkOpt . fst)) options
+    let act = maybe (Left "Unknown option") Right
+               .  (`lookup` options)
+              <$> getVal sel
+    div <- lift $ select "<div>"
+    lift $ appendJQuery sel div
+           >>= appendToJQuery w
+    return (div, act)
+  where
+    mkOpt s = select "<option>"
+              >>= setText s
+    newSelect = select "<select>"
 
 instance Inputable Int     where { inputable = inputableNum }
 instance Inputable Int8    where { inputable = inputableNum }
@@ -201,8 +221,19 @@ instance Inputable Word64  where { inputable = inputableNum }
 instance Inputable Integer where { inputable = inputableNum }
 instance Inputable Float   where { inputable = inputableNum }
 instance Inputable Double  where { inputable = inputableNum }
-instance Inputable T.Text  where { inputable = inputable' (Right . T.pack)  }
-instance Inputable TL.Text where { inputable = inputable' (Right . TL.pack) }
+
+instance Inputable T.Text  where { inputable = inputableRead (Right . T.pack)  }
+instance Inputable TL.Text where { inputable = inputableRead (Right . TL.pack) }
+
+instance Inputable Bool where
+    inputable = inputableSelect [("True", True), ("False", False)]
+
+instance Inputable Ordering where
+    inputable = inputableSelect [("<", LT), ("=", EQ), (">", GT)]
+    
+instance (Inputable a, Inputable b) => Inputable (Either a b)
+instance (Inputable a) => Inputable (Maybe a)
+
 
 --------------------------------------------------
 -- Renderable instances
@@ -283,57 +314,6 @@ instance (GInputable f, GInputable g) => GInputable (f :*: g) where
                 return (res1 :*: res2)
         return (inpArea1, act)
 
--- sumInputable :: (GInputable f, GInputable g)
---                 => JQuery -> GInputCont (f :+: g) a
--- sumInputable jq = do
---         area <- lift $ do
---             traceM ":+:"
---             sumDiv <- parent jq >>= find "#sum"
---             found <- (>0) <$> lengthArray (castRef sumDiv)
---             if found
---                 then return sumDiv
---                 else newDiv
---         lift $ select "<h3>Option</h3>" >>= appendToJQuery area
---         -- div1 <- lift $ select "<div>"
---         --              >>= appendToJQuery area
---         (inpArea1, inpAct1) <- ginputable area
-
---         lift $ select "<h3>Option</h3>" >>= appendToJQuery area
---         -- div2 <- lift $ select "<div>"
---         --              >>= appendToJQuery area        
---         (inpArea2, inpAct2) <- ginputable area
---         lift $ initWidget area Accordion def
---         let act = do
-                
---                 (Just opts) <- getWidgetOptions area Accordion
---                 let n = accordionActive opts
---                 if n == 0
---                     then liftM L1 <$> inpAct1
---                     else do
---                       initWidget area Accordion
---                           (opts { accordionActive = n - 1 })
---                       liftM R1 <$> inpAct2
---         return (area, act)
---         where newDiv = do
---                   accord <- select "<div id=\"sum\">"
---                   appendJQuery accord jq
---                   initWidget accord Accordion def
---                   return accord
-
--- instance (GInputable f) => GInputable (f :+: U1) where
---     ginputable = sumInputable
-
--- instance (GInputable f, Inputable c)
---          => GInputable (f :+: K1 i c) where
---     ginputable = sumInputable
-
--- instance (GInputable f, GInputable g)
---          => GInputable (f :+: M1 i c g) where
---     ginputable = sumInputable
-    
--- instance (GInputable f, GInputable g, GInputable h)
---          => GInputable (f :+: (g :*: h)) where
---     ginputable = sumInputable
 
 instance (GInputable f, GInputable g)
          => GInputable (f :+: g) where
@@ -357,7 +337,7 @@ instance (GInputable f, GInputable g)
                 if (n::Int) <= mid
                     then do
                       (n'::JSRef Int) <- toJSRef (n+1)
-                      jq_setOptWidget "accordion" "active" n' area                      
+                      jq_setOptWidget "accordion" "active" n' area
                       liftM L1 <$> inpAct1
                     else do
                       (n'::JSRef Int) <- toJSRef (n-1)
@@ -368,7 +348,7 @@ instance (GInputable f, GInputable g)
                   accord <- select "<div class=\"sum\">"
                   appendJQuery accord jq
                   return accord
-                        
+
 
 postprocess jq = do
     traceM "postprocess"
@@ -378,4 +358,4 @@ postprocess jq = do
     widgetMethod sum Accordion "destroy"
     initWidget sum Accordion def
     return sum
-        
+
