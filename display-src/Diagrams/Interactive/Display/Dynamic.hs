@@ -18,12 +18,13 @@ import           Control.Monad
 import           Control.Monad.Cont                   hiding (mapM_)
 import           Data.Default
 import           Data.Foldable                        hiding (find, mapM_)
-import            Data.Function
+import           Data.Function
 import           Data.Int
 import           Data.IORef
 import           Data.List                            (lookup,sortBy)
 import           Data.Maybe
 import           Data.Monoid
+import           Data.Ord
 import           Data.Serialize
 import qualified Data.Text                            as T
 import qualified Data.Text.Lazy                       as TL
@@ -210,7 +211,7 @@ defInputableList jq = do
                          =<< widgetMethod listUl Sortable "toArray"
             (_, elems) <- readIORef listData
             let lst = map fst
-                    $ sortBy (compare `on` snd)
+                    $ sortBy (compare `on` (Down . snd))
                     $ zip elems positions                    
             return (Right lst)
     return (area, act)
@@ -226,7 +227,7 @@ defInputableList jq = do
         li <- lift $ select ("<li class=\"ui-state-default\" id=\""
                              <> T.pack (show n)
                              <> "\">")
-                   >>= prependToJQuery ul
+                   >>= appendToJQuery ul
         span <- lift $ select "<span class=\"ui-icon ui-icon-arrowthick-2-n-s\">"
                       >>= appendToJQuery li
         lift $ writeIORef dat (n+1, a:elems)
