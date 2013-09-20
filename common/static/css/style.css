@@ -67,3 +67,30 @@ body {
     cursor: move;
     /*cursor: url(https://mail.google.com/mail/images/2/closehand.cur), move;*/
 }
+
+/* Widgets */
+
+input[type="text"] {
+    font-size:13pt;
+    height:32px;
+}
+.ui-progressbar {
+    position: relative;
+}
+.progresstext {
+    position: absolute;
+    left: 50%;
+    top: 4px;
+    font-weight: bold;
+    text-shadow: 1px 1px 0 #fff;
+}
+
+.sortable { 
+    list-style-type: none; 
+    margin: 10px;
+    background: #eee;
+    padding: 5px;
+    width: 60%; 
+}
+.sortable li { margin: 0 3px 3px 3px; padding: 0.4em; padding-left: 1.5em; font-size: 1.4em; height: 18px; }
+.sortable li span { position: absolute; margin-left: -1.3em; }

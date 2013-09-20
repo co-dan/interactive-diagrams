@@ -182,6 +182,8 @@ instance Display Char where
 instance Display () where display () = displayString "()"
 
 -- generic instances
+instance Display Bool
+instance Display Ordering
 instance Display a => Display (Maybe a)
 instance (Display a, Display b) => Display (Either a b)
 

@@ -18,8 +18,10 @@ import           Control.Monad
 import           Control.Monad.Cont                   hiding (mapM_)
 import           Data.Default
 import           Data.Foldable                        hiding (find, mapM_)
+import            Data.Function
 import           Data.Int
-import           Data.List                            (lookup)
+import           Data.IORef
+import           Data.List                            (lookup,sortBy)
 import           Data.Maybe
 import           Data.Monoid
 import           Data.Serialize
@@ -41,7 +43,7 @@ import           GHCJS.Foreign
 import           GHCJS.Marshal
 import           GHCJS.Types
 import           JavaScript.Canvas                    (getContext)
-import           JavaScript.JQuery
+import           JavaScript.JQuery                    hiding (on)
 import           JavaScript.JQuery.UI
 import           JavaScript.JQuery.UI.Class
 import           JavaScript.JQuery.UI.Internal
@@ -72,6 +74,11 @@ class Inputable a where
         return (jq', tto act)
       --   (id *** tto) <$> ginputable jq
       where tto = liftM $ liftM to
+    inputableList :: JQuery -> ContT JQuery IO (JQuery, IO (Either String [a]))
+    default inputableList :: (Renderable a)
+                          => JQuery
+                          -> ContT JQuery IO (JQuery, IO (Either String [a]))
+    inputableList = defInputableList
 
 class Renderable a where
     render :: JQuery -> a -> ContT JQuery IO JQuery
@@ -136,8 +143,7 @@ instance (Inputable a, Renderable b, Show a) => Renderable (a -> b) where
                     lift $ putStrLn errmsg
                     lift $ remove area
                     area' <- lift $ select "<div>"
-                    lift $ append ("<p><font color=red>" <> T.pack errmsg <> "</font></p>")
-                                  area'
+                    lift $ append ("<p><font color=red>" <> T.pack errmsg <> "</font></p>") area'
                     kont area'
                     return undefined
             lift $ putStrLn $ "input: " ++ show input
@@ -176,19 +182,68 @@ instance (Inputable a, Renderable b, Show a) => Renderable (a -> b) where
             kont area'
             return area'
 
+defInputableList :: (Renderable a, Inputable a)
+                 => JQuery
+                 -> ContT JQuery IO (JQuery, IO (Either String [a]))
+defInputableList jq = do
+    area <- lift $ select "<div>" >>= appendToJQuery jq
+    msgarea <- lift $ select "<p>" >>= appendToJQuery area
+    listUl <- lift $ select "<ul class=\"sortable\">"
+                   >>= appendToJQuery area
+    lift $ initWidget listUl Sortable def
+    (inpArea, inpAct) <- inputable area
+    addBtn <- lift (newBtn "Add"
+                   >>= appendToJQuery area)
+    listData <- lift $ newIORef (0, [])
+    lift $ onClick addBtn $ \_ -> do
+        setText "" msgarea
+        res <- inpAct
+        case res of
+            Left str -> void $
+                let errmsg = "<font color=red>" <> (T.pack str) <> "</font>"
+                in setHtml errmsg msgarea
+            Right a -> void $ flip runContT return $ addItem a listUl listData
+    let -- act :: IO (Either String [a])
+        act = do
+            (positions :: [Int]) <- mapM (liftM fromJust . fromJSRef . castRef)
+                         =<< fromArray . castRef
+                         =<< widgetMethod listUl Sortable "toArray"
+            (_, elems) <- readIORef listData
+            let lst = map fst
+                    $ sortBy (compare `on` snd)
+                    $ zip elems positions                    
+            return (Right lst)
+    return (area, act)
+  where
+    newBtn t = select $ "<button>" <> t <> "</button>"
+    appendBtn t place = do
+            btn <- newBtn t
+            appendJQuery btn place
+            initWidget btn Button with { buttonLabel = t }
+            return btn
+    addItem a ul dat = do
+        (n, elems) <- lift $ readIORef dat
+        li <- lift $ select ("<li class=\"ui-state-default\" id=\""
+                             <> T.pack (show n)
+                             <> "\">")
+                   >>= prependToJQuery ul
+        span <- lift $ select "<span class=\"ui-icon ui-icon-arrowthick-2-n-s\">"
+                      >>= appendToJQuery li
+        lift $ writeIORef dat (n+1, a:elems)
+        render li a
+
 --------------------------------------------------
 -- Inputtable instances
 
-instance Inputable String where
-    inputable w = do
-        inputBox <- lift $ newInputBox
-        let act = return . T.unpack <$> getVal inputBox
-        div <- lift $ select "<div>"
-        lift $ appendJQuery inputBox div
-               >>= appendToJQuery w
-        return (div, act)
-      where
-        newInputBox = select "<input type=\"text\" class=\"input-xmedium\" />"
+inputableString w = do
+    inputBox <- lift $ newInputBox
+    let act = return . T.unpack <$> getVal inputBox
+    div <- lift $ select "<div>"
+    lift $ appendJQuery inputBox div
+        >>= appendToJQuery w
+    return (div, act)
+  where
+    newInputBox = select "<input type=\"text\" class=\"input-xmedium\" />"
 
 
 inputableNum :: (Num a, Read a) => JQuery -> ContT JQuery IO (JQuery, IO (Either String a))
@@ -198,7 +253,7 @@ inputableRead :: (String -> Either String a)
            -> JQuery
            -> ContT JQuery IO (JQuery, IO (Either String a))
 inputableRead readF w = do
-    (jq, act) <- inputable w
+    (jq, act) <- inputableString w
     jq' <- lift $ find "input" jq
     liftIO $ initWidget jq' Spinner with { spinnerPage = 5 }
     let act' = (=<<) <$> pure readF <*> (act :: IO (Either String String))
@@ -223,6 +278,13 @@ inputableSelect options w = do
               >>= setText s
     newSelect = select "<select>"
 
+instance Inputable Char where
+    inputable = inputableRead (headErr "Cannot read a char")                
+    inputableList = inputableString
+
+instance (Inputable a, Renderable a, Display a) => Inputable [a] where
+    inputable = inputableList
+
 instance Inputable Int     where { inputable = inputableNum }
 instance Inputable Int8    where { inputable = inputableNum }
 instance Inputable Int16   where { inputable = inputableNum }
@@ -244,11 +306,18 @@ instance Inputable Bool where
     inputable = inputableSelect [("True", True), ("False", False)]
 instance Inputable Ordering where
     inputable = inputableSelect [("<", LT), ("=", EQ), (">", GT)]    
-instance (Inputable a, Inputable b) => Inputable (Either a b)
-instance (Inputable a) => Inputable (Maybe a)
+instance (Inputable a, Inputable b,
+          Display a, Display b) => Inputable (Either a b)
+instance (Inputable a, Display a) => Inputable (Maybe a)
 
-instance (Inputable a, Inputable b) => Inputable (a,b)
-instance (Inputable a, Inputable b, Inputable c) => Inputable (a,b,c)
+instance (Inputable a, Inputable b,
+          Display a, Display b,
+          Renderable a, Renderable b)
+         => Inputable (a,b)
+instance (Inputable a, Inputable b, Inputable c,
+          Display a, Display b, Display c,
+          Renderable a, Renderable b, Renderable c)
+         => Inputable (a,b,c)
 
 --------------------------------------------------
 -- Renderable instances
@@ -282,11 +351,19 @@ instance Renderable Integer
 instance Renderable Float
 instance Renderable Double
 instance Renderable Char
-instance Renderable String
+instance Renderable T.Text
+instance Renderable TL.Text
 instance Renderable ()
+
+instance (Renderable a, Display a) => Renderable [a]
+
+instance Renderable Bool
+instance Renderable Ordering
 instance Display a => Renderable (Maybe a)
 instance (Display a, Display b) => Renderable (Either a b)
-instance (Display a, Display b) => Renderable (a, b)
+
+instance (Display a, Display b)
+         => Renderable (a, b)
 instance (Display a, Display b, Display c) => Renderable (a,b,c)
 
 ------------------------------------------------------------
