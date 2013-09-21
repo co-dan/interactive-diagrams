@@ -1,5 +1,5 @@
 name:                scotty-pastebin
-version:             0.1.0.0
+version:             0.2.0
 synopsis:            A pastebin web app for the interactive-diagrams project
 description:         A simple pastebin website for the interactive-diagrams project.
                      This runs http://paste.hskll.org
