@@ -219,9 +219,6 @@ compilePaste (p@Paste{..}) = do
     case res of
         Left err -> throwT (pack err, errors)
         Right (Static dr) -> do
-            liftIO $ putStrLn "DR"
-            liftIO $ print dr
-            liftIO $ putStrLn "/DR"
             let containsImage = isJust (hasImage (Static dr))
             liftIO . runWithSql . insert $ p
                 { pasteResult      = Static dr

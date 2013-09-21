@@ -101,7 +101,6 @@ newtype JSDisplay a = JSDisplay a
 
 instance (Display a) => Renderable (JSDisplay a) where
     render w (JSDisplay a) = do
-        traceM (show txt)
         area <- lift $ select "<div>"
         lift $ setText txt area
         lift $ wrapInner "<code>" area
@@ -114,6 +113,7 @@ instance (Display a) => Renderable (JSDisplay a) where
         txt :: T.Text
         txt = displayText (display a)
 
+-- * Renderable instance for functions        
 instance (Inputable a, Renderable b, Show a) => Renderable (a -> b) where
     render w f = do
         (kont, area) <- callCC $ \k -> do
@@ -141,13 +141,12 @@ instance (Inputable a, Renderable b, Show a) => Renderable (a -> b) where
                 Right x  -> return x
                 Left err -> do
                     let errmsg = "Error getting input: " ++ err
-                    lift $ putStrLn errmsg
+                    lift $ putStrLn ("Interactive Widgets: " ++ errmsg)
                     lift $ remove area
                     area' <- lift $ select "<div>"
                     lift $ append ("<p><font color=red>" <> T.pack errmsg <> "</font></p>") area'
                     kont area'
                     return undefined
-            lift $ putStrLn $ "input: " ++ show input
 
             -- Show the "loading.." message
             pbar <- lift $ select "<div id=\"progressbar\"><div class=\"progresstext\">Munching bits...</div></div>"
@@ -390,24 +389,20 @@ instance GInputable U1 where
         return (codeblock, return (Right U1))
 
 instance (Inputable c) => GInputable (K1 i c) where
-    ginputable = traceShow "K1" $ liftM (id *** ((fmap . fmap) K1)) . inputable
+    ginputable = liftM (id *** ((fmap . fmap) K1)) . inputable
 
 instance (GInputable f) => GInputable (M1 i c f) where
-    ginputable = traceShow "M1" $ liftM (id *** ((fmap . fmap) M1)) . ginputable
+    ginputable = liftM (id *** ((fmap . fmap) M1)) . ginputable
 
 instance (GInputable f, GInputable g) => GInputable (f :*: g) where
     ginputable jq = do
-        traceM ":*:"
         (inpArea1, inpAct1) <- ginputable jq
         (inpArea2, inpAct2) <- ginputable jq
-        -- div <- lift $ select "<div>"
-        --             >>= appendJQuery inpArea1
-        --             >>= appendJQuery inpArea2
         let act = runEitherT $ do
                 res1 <- EitherT inpAct1
                 res2 <- EitherT inpAct2
                 return (res1 :*: res2)
-        return (inpArea1, act)
+        return (jq, act)
 
 
 instance (GInputable f, GInputable g)
@@ -427,8 +422,6 @@ instance (GInputable f, GInputable g)
                 divs <- find "div" area
                 len <- lengthArray (castRef divs)
                 let mid = floor $ ((fromIntegral len)/2) - 1
-                traceM $ "Mid = " ++ show mid
-                traceM $ "N = " ++ (show n)
                 if (n::Int) <= mid
                     then do
                       (n'::JSRef Int) <- toJSRef (n+1)
@@ -445,8 +438,8 @@ instance (GInputable f, GInputable g)
                   return accord
 
 
+-- | XXX: this is a hack
 postprocess jq = do
-    traceM "postprocess"
     sum <- find ".sum" jq
     find "div" sum
         >>= before "<h3>Option</h3>"
