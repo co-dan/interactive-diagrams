@@ -101,5 +101,20 @@ don't hesitate to contact me.
 
 # Technology used
 
+This site is powered by [Scotty](http://github.com/xich/scotty) and
+[scotty-hastache](http://github.com/co-dan/scotty-hastache), the
+access to PosgreSQL db is done via the excellent
+[persistent](http://hackage.haskell.org/package/persistent)
+library. The compilation is done using [GHC](http://ghc.haskell.org)
+and [GHCJS](http://github.com/ghcjs/ghcjs) inside the workers
+processes powered by the
+[restricted-workers](http://hackage.haskell.org/package/restricted-workers)
+library. 
+
+You can read some my previous report on this project which is still
+pretty relevant: <http://parenz.wordpress.com/XXX>
+
+# Acknowledgments 
+
 This project was developed as part of the Google Summer of Code 2013
-program, 
+program, and I would like to thank people
