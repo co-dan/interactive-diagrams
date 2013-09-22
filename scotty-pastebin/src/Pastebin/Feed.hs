@@ -9,7 +9,9 @@ module Pastebin.Feed
 
 import Data.ByteString.Builder (stringUtf8, toLazyByteString)
 import Data.Text               (unpack)
+import Data.Time
 import Database.Persist        (Entity (..))
+import System.Locale
 import Text.RSS.Export         (xmlRSS)
 import Text.RSS.Syntax         (RSS (..), RSSChannel (..), RSSItem (..),
                                 nullChannel, nullItem, nullRSS)
@@ -40,8 +42,9 @@ mkRssItem pid Paste{..} = (nullItem pasteTitle)
     , rssItemAuthor      = Just $ unpack pasteAuthor
     , rssItemDescription =
         Just $ colorizeStr pasteLiterateHs (unpack pasteContent)
---    , rssItemPubDate =
+    , rssItemPubDate = Just $ toPubDate pasteCreatedAt
     }
+  where toPubDate = formatTime defaultTimeLocale "%a, %d %b %Y %H:%M:%S UT"
 
 -- | Output the RSS feed
 renderRss :: Monad m => RSS -> ActionT m ()
