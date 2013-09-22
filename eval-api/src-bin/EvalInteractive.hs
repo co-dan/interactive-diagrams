@@ -6,7 +6,7 @@ import           Control.Monad
 import           Control.Monad.IO.Class
 import           Data.Default
 import           Data.List
-import qualified Data.Text.Lazy                         as TL
+import qualified Data.Text                              as T
 import           Data.Time.Clock                        (diffUTCTime,
                                                          getCurrentTime)
 import           System.Console.Readline
@@ -55,7 +55,7 @@ loop c (worker, restart) = do
         ((r, errors), w') <- evalLn ln (worker, restart)
         case r of
           Right (Static (StaticResult res)) ->
-            mapM_ (putStr . TL.unpack . result) res
+            mapM_ (putStr . T.unpack . result) res
             >> putStrLn ""
           Right (Interactive _) -> putStrLn "interactive result"
           Left err -> putStrLn err

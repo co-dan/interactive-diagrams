@@ -12,7 +12,7 @@ import Control.Monad.Trans.Resource (ResourceT)
 import Data.Data
 import Data.Maybe                   (fromJust)
 import Data.Monoid ((<>))    
-import Data.Text.Lazy               (Text, pack)
+import Data.Text                    (Text, pack)
 import Database.Persist             (Entity)
 import Database.Persist.Postgresql  (SqlPersistT, rawSql, toPersistValue)
 

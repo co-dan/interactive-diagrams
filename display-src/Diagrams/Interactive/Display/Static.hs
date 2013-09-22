@@ -61,24 +61,24 @@ newtype StaticResult = StaticResult [DR]
                                 Show, Read, Generic)
 data DR = DR {
       clientType :: ClientType, -- "SVG" "IMG" etc, changes how the browser-side javascript handles this result.
-      result     :: TL.Text            -- actual result data
+      result     :: T.Text            -- actual result data
       } deriving (Eq, Show, Typeable, Read, Generic)
                  
 instance Serialize ClientType
 instance Serialize StaticResult
 instance Serialize DR
 
-text :: TL.Text -> StaticResult
+text :: T.Text -> StaticResult
 text x = StaticResult [ DR Text x ]
 
 html :: B.Markup -> StaticResult
-html x = StaticResult [ DR Html (renderHtml x) ]
+html x = StaticResult [ DR Html (TL.toStrict (renderHtml x)) ]
 
 svg :: B.Markup -> StaticResult
-svg x = StaticResult [ DR Svg (renderHtml x) ]
+svg x = StaticResult [ DR Svg (TL.toStrict (renderHtml x)) ]
 
 displayString :: String -> StaticResult
-displayString = text . TL.pack
+displayString = text . T.pack
 
 displayChar :: Char -> StaticResult
 displayChar = displayString . return
@@ -138,7 +138,7 @@ instance Display StaticResult where
 
 instance Display SomeException where
   display e = StaticResult [
-    DR RuntimeErr (TL.pack . ("Uncaught runtime error: " ++) . show $ e)
+    DR RuntimeErr (T.pack . ("Uncaught runtime error: " ++) . show $ e)
     ]
 
 instance (a ~ D.SVG, b ~ D.R2, c ~ Any) => Display (D.QDiagram a b c) where
@@ -146,10 +146,10 @@ instance (a ~ D.SVG, b ~ D.R2, c ~ Any) => Display (D.QDiagram a b c) where
   displayList = displayListOf (svg . renderMyDiagramToSvg 200)
 
 instance Display TL.Text where
-  display d = displayChar '"' <> text d <> displayChar '"'
+  display d = displayChar '"' <> text (TL.toStrict d) <> displayChar '"'
 
 instance Display T.Text where
-  display d = displayChar '"' <> text (TL.fromStrict d) <> displayChar '"'
+  display d = displayChar '"' <> text d <> displayChar '"'
 
 instance Display a => Display [a] where
   display = displayList
@@ -178,7 +178,7 @@ instance Display Float where display = displayString . show
 instance Display Double where display = displayString . show
 instance Display Char where
   display = displayString . show
-  displayList = display . TL.pack
+  displayList = display . T.pack
 instance Display () where display () = displayString "()"
 
 -- generic instances

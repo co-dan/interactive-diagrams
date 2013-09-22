@@ -17,7 +17,7 @@
 module Pastebin.Paste where
 
 import Data.Aeson
-import Data.Text.Lazy          (Text)
+import Data.Text               (Text)
 import Data.Time.Clock
 import Database.Persist        as P
 import Database.Persist.TH     as P

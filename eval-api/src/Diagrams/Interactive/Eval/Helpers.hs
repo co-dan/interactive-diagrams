@@ -30,7 +30,7 @@ import           Control.Monad                          (void, when, (<=<))
 import           Control.Monad.IO.Class                 (MonadIO)
 import           Data.List
 import           Data.Monoid
-import qualified Data.Text.Lazy.IO                      as T
+import qualified Data.Text.IO                           as T
 import           Unsafe.Coerce                          (unsafeCoerce)
 
 import           Bag

@@ -54,7 +54,7 @@ import           JavaScript.JQuery.UI.Internal
 import           Debug.Trace
 
 
-newtype DynamicResult = DynamicResult TL.Text
+newtype DynamicResult = DynamicResult T.Text
                       deriving (Generic, Show, Read, Monoid)
 
 instance Serialize DynamicResult
@@ -194,7 +194,7 @@ defInputableList jq = do
     (inpArea, inpAct) <- inputable area
     addBtn <- lift (newBtn "Add"
                    >>= appendToJQuery area)
-    listData <- lift $ newIORef (0, [])
+    listData <- lift $ newIORef (0::Int, []) -- list size, list itself
     lift $ onClick addBtn $ \_ -> do
         setText "" msgarea
         res <- inpAct
@@ -371,8 +371,7 @@ instance (Display a, Display b, Display c) => Renderable (a,b,c)
 
 onClick jq a = click a def jq
 
-displayText (StaticResult drs) =
-    foldMap (TL.toStrict . result) drs
+displayText (StaticResult drs) = foldMap result drs
 
 -- * GInputable
 

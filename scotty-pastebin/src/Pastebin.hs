@@ -33,8 +33,9 @@ import           Control.Error.Util                   (hoistMaybe, maybeT,
 import           Data.Aeson                           ()
 import           Data.EitherR                         (catchT, throwT)
 import           Data.Maybe                           (isJust)
-import           Data.Text.Lazy                       (Text, pack)
-import qualified Data.Text.Lazy                       as T
+import           Data.Text                            (Text, pack)
+import qualified Data.Text                            as T
+import qualified Data.Text.Lazy                       as TL
 import           Data.Time.Clock                      (diffUTCTime,
                                                        getCurrentTime)
 import           Data.Time.Format                     (formatTime)
@@ -229,7 +230,7 @@ compilePaste (p@Paste{..}) = do
                 { pasteResult = Interactive dr }
 
 redirPaste :: Monad m => Int -> ActionT m ()
-redirPaste i = redirect $ pack ("/get/" ++ show i)
+redirPaste i = redirect $ TL.pack ("/get/" ++ show i)
 
 page404 :: Monad m => ActionT m ()
 page404 = do
@@ -245,6 +246,12 @@ measureTime act = do
     return res
 
 
+textStrict = text . TL.fromStrict
+htmlStrict = html . TL.fromStrict
+
+instance Parsable T.Text where
+    parseParam = fmap TL.toStrict . parseParam 
+
 main :: IO ()
 main = do
     runWithSql (runMigration migrateAll)
@@ -256,9 +263,9 @@ main = do
         S.post "/new" $ eitherT errPage redirPaste (measureTime newPaste)
         S.get "/get/:id" $ maybeT page404 renderPaste getPaste
         S.get "/json/:id" $ maybeT page404 json getPaste
-        S.get "/raw/:id/:ind" $ maybeT page404 text getRaw
-        S.get "/raw/:id/:ind/pic.svg" $ maybeT page404 html getRaw
-        S.get "/raw/:id/:ind/all.js" $ maybeT page404 html getRaw
+        S.get "/raw/:id/:ind" $ maybeT page404 textStrict getRaw
+        S.get "/raw/:id/:ind/pic.svg" $ maybeT page404 htmlStrict getRaw
+        S.get "/raw/:id/:ind/all.js" $ maybeT page404 htmlStrict getRaw
         S.get "/gallery" (listImages >>= renderGallery)
         S.get "/" listPastes
         S.get "/feed" feed

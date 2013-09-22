@@ -8,7 +8,7 @@ module Pastebin.Feed
     ) where
 
 import Data.ByteString.Builder (stringUtf8, toLazyByteString)
-import Data.Text.Lazy          (unpack)
+import Data.Text               (unpack)
 import Database.Persist        (Entity (..))
 import Text.RSS.Export         (xmlRSS)
 import Text.RSS.Syntax         (RSS (..), RSSChannel (..), RSSItem (..),

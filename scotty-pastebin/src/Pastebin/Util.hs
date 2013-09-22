@@ -24,6 +24,7 @@ import qualified Data.Hashable                as H
 import           Data.List
 import Data.String (fromString)
 import           Data.Monoid                  (mconcat, mempty, (<>))
+import qualified Data.Text                    as T
 import qualified Data.Text.Lazy               as TL
 import           Data.Time.Clock
 import           Database.Persist.Postgresql  as P
@@ -58,14 +59,14 @@ keyToInt :: Key a -> Int
 keyToInt (Key (PersistInt64 i)) = fromIntegral (toInteger i)
 keyToInt (Key _)                = error "Unknown key format"
 
-paramEscaped :: (Monad m, Functor m) => TL.Text -> ActionT m TL.Text
-paramEscaped = (fmap . fmap) (TL.concatMap escape) ST.param
+paramEscaped :: (Monad m, Functor m) => TL.Text -> ActionT m T.Text
+paramEscaped = (fmap . fmap) (T.concatMap escape . TL.toStrict) ST.param
 
 paramMaybe :: (Monad m, Functor m, Parsable a) => TL.Text -> ActionT m (Maybe a)
 paramMaybe q = fmap Just (ST.param q)
                `ST.rescue` \_ -> return Nothing
 
-escape :: Char -> TL.Text
+escape :: Char -> T.Text
 escape h
     | h == '&'  = "&amp;"
     | h == '\\' = "&#92;"
@@ -73,7 +74,7 @@ escape h
     | h == '\'' = "&#39;"
     | h == '<'  = "&lt;"
     | h == '>'  = "&gt;"
-    | otherwise = TL.singleton h
+    | otherwise = T.singleton h
 
 
 -- * Hashing
@@ -101,7 +102,7 @@ renderDR (DR Text r) = H.toHtml r
 renderDR (DR RuntimeErr r) = H.div ! HA.class_ "alert alert-error" $
                                  H.toHtml r
 
-renderCode :: Paste -> TL.Text
+renderCode :: Paste -> T.Text
 renderCode Paste{..} = colorize pasteLiterateHs pasteContent
 
 

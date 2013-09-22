@@ -7,7 +7,7 @@ module Pastebin.Coloring
     , colorizeStr
     ) where
 
-import qualified Data.Text.Lazy                as TL
+import qualified Data.Text                      as T
 import           Language.Haskell.HsColour.CSS
 
 data LitChunk = Code    String
@@ -20,11 +20,11 @@ unChunk (Comment c) = c
 
 
 colorize :: Bool     -- ^ Is the code Literate haskell?
-         -> TL.Text  -- ^ Code to be colourized
-         -> TL.Text
-colorize lhs = TL.pack
+         -> T.Text  -- ^ Code to be colourized
+         -> T.Text
+colorize lhs = T.pack
              . colorizeStr lhs
-             . TL.unpack
+             . T.unpack
 
 colorizeStr :: Bool -> String -> String
 colorizeStr lhs = if lhs
@@ -64,7 +64,7 @@ escape h
 joinL :: [LitChunk] -> [LitChunk]
 joinL []                  = []
 joinL (Code c:Code c2:xs) = joinL (Code (c++c2):xs)
-joinL (Comment c :Comment c2 :xs) = joinL (Comment  (c++c2):xs)
+joinL (Comment c:Comment c2 :xs) = joinL (Comment  (c++c2):xs)
 joinL (other:xs)            = other: joinL xs
 
 

@@ -37,8 +37,8 @@ import           Control.Monad.Reader                   (ask)
 import           Data.IORef                             (newIORef, readIORef)
 import           Data.Maybe                             (fromJust)
 import           Data.Serialize                         (Serialize)
-import           Data.Text.Lazy                         (Text)
-import qualified Data.Text.Lazy.IO                      as T
+import           Data.Text                              (Text)
+import qualified Data.Text.IO                           as T
 import           Data.Typeable
 import           GHC.Generics
 import           Network                                (accept)
