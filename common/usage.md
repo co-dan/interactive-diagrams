@@ -4,9 +4,9 @@
 
 The site you are looking at is very similar to other web pasting
 services like pastebin.com or Gist. However this service is made
-specifically for Haskell and will compile and run the code you pasted
+specifically for Haskell and will compile and run the code you paste
 for you. Your code will be checked and any errors during the
-compilation or runtime will be displayed. The service try to render
+compilation or runtime will be displayed. The service will try to render
 the value you provide under the name 'example'.
 
     [haskell]
@@ -30,14 +30,14 @@ For example:
     example :: Diagram SVG R2
     example = circle 1
 
-Values of the following types can be rendered on server: Char, String,
+Values of the following types can be rendered on the server: Char, String,
 Text, number types, Bool, Ordering, Maybe, Either, [a], tuples,
 Diagram (via SVG), Markup.
 
 ## Interactive widgets
 
 Of course, users should not be limited to rendering values that can be
-computed on server. If the services determines that the example you
+computed on the server. If the services determines that the example you
 are trying to paste is a function, it will try to compile the code to
 JavaScript for you and return a nice widget you can run.
 
@@ -55,12 +55,12 @@ Check out this example:
 sure to put it into the `Main` module/      
 
 - Values of the following types can be rendered on the client side:
-all that can be rendered on server and `(a -> b)`, where values of
+all that can be rendered on the server and `(a -> b)`, where values of
 type `a` can be inputted and values of type `b` can be rendered. The
 diagrams are rendered using HTML5 Canvas.
 
 - Values of the following types can be inputted: String, Char, Text,
-  number types, Bool, Ordering, Either, Maybe, tuples, lists, 
+  number types, Bool, Ordering, Either, Maybe, tuples, lists.
 
 ### Demo
 
@@ -111,7 +111,7 @@ processes powered by the
 [restricted-workers](http://hackage.haskell.org/package/restricted-workers)
 library. 
 
-You can read some my previous report on this project which is still
+You can read my previous report on this project, which is still
 pretty relevant: <http://parenz.wordpress.com/XXX>
 
 # Acknowledgments 
