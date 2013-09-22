@@ -7,8 +7,6 @@ copyright (c) 2012, Shae Erisson, Edward Kmett, Luite Stegeman
 {-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE StandaloneDeriving         #-}
-{-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE TypeOperators              #-}
 {-# LANGUAGE TypeSynonymInstances       #-}
@@ -128,7 +126,7 @@ class Display a where
     display = gdisplay . from
 
 displayEmpty :: StaticResult
-displayEmpty = StaticResult []
+displayEmpty = StaticResult [] 
 
 renderMyDiagramToSvg :: Double -> D.QDiagram D.SVG D.R2 Any -> B.Html
 renderMyDiagramToSvg size = D.renderDia D.SVG (D.SVGOptions (D.Dims size size))
@@ -155,7 +153,7 @@ instance Display a => Display [a] where
   display = displayList
 
 instance Display B.Markup where
-  display d = html d
+  display = html
 
 instance (Display a, Display b) => Display (a,b) where
   display (a, b) = displayChar '(' <> display a <> displayChar ',' <> display b <> displayChar ')'
@@ -186,10 +184,3 @@ instance Display Bool
 instance Display Ordering
 instance Display a => Display (Maybe a)
 instance (Display a, Display b) => Display (Either a b)
-
--- orphans
-instance Show B.Markup where
-  show = TL.unpack . renderHtml
-
-instance Show (D.QDiagram b v m) where
-  showsPrec _ _ = showString "<diagram>"
