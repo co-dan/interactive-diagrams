@@ -25,14 +25,14 @@ import Pastebin.Paste
 import Pastebin.Util
 
 -- | Create a simple RSS feed from the list of pastes
-mkRssFeed :: [Entity Paste] -> RSS
+mkRssFeed :: [(Int, Paste)] -> RSS
 mkRssFeed pastes = (nullRSS "Pastes" rootPath)
     { rssChannel = (nullChannel "Pastes" rootPath)
                    { rssItems = items
                    }
     }
   where
-    items = map (\(Entity k pst) -> mkRssItem (keyToInt k) pst) pastes
+    items = map (\(k, pst) -> mkRssItem k pst) pastes
 
 
 -- | Make a single RSS Item based on a paste and its id number

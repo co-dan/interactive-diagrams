@@ -43,6 +43,7 @@ import           System.Locale                        (defaultTimeLocale)
 
 
 import           Database.Persist                     as P
+import           Database.Persist.Sql                 as P
 import           Database.Persist.Postgresql          as P
 import           Network.HTTP.Types
 import           Network.Wai
@@ -111,22 +112,22 @@ renderPaste (Entity k p@Paste{..}) = do
     hastache "main"
 
 
-renderPasteList :: [Entity Paste] -> ActionH ()
+renderPasteList :: [(Single Int, Single String, Single Text)] -> ActionH ()
 renderPasteList pastes = do
     setH "result" $ MuBool False
     setH "title"  $ MuVariable ("Paste" :: Text)
     setH "pastes" $ MuList $
-                      map (\(Entity k pst) ->
+                      map (\(k, ptitle, pauthor) ->
                             (mkStrContext $ \cnt ->
                               case cnt of
-                                "k"       -> MuVariable . show . keyToInt $ k
-                                "ptitle"  -> MuVariable $ pasteTitle pst
-                                "pauthor" -> MuVariable $ pasteAuthor pst
+                                "k"       -> MuVariable . show $ unSingle k
+                                "ptitle"  -> MuVariable $ unSingle ptitle
+                                "pauthor" -> MuVariable $ unSingle pauthor
                                 _         -> MuNothing
                             ))
                       pastes
     hastache "main"
-
+    
 
 renderGallery :: [(Int, Paste)] -> ActionH ()
 renderGallery ps = do
@@ -166,14 +167,20 @@ listImages = do
 listPastes :: ActionH ()
 listPastes = do
     pastes <- liftIO $ runWithSql $
-              selectList [] [LimitTo 20, Desc PasteId]
+              rawSql "SELECT id, title, author FROM \"Paste\" ORDER BY id DESC LIMIT 20" []
+              --selectList [] [LimitTo 20, Desc PasteId]
+    -- let pastes = []
     renderPasteList pastes
 
 feed :: ActionH ()
 feed = do
     pastes <- liftIO $ runWithSql $
-              selectList [] [LimitTo 20, Desc PasteId]
-    renderRss $ mkRssFeed pastes
+              rawSql "SELECT id, title, content, \"literateHs\", author, \"createdAt\" FROM \"Paste\" ORDER BY id DESC LIMIT 20" []
+              -- selectList [] [LimitTo 20, Desc PasteId]
+
+    let pastes' = map (\(Single k, Single title, Single content, Single lhs, Single author, Single createdAt) -> (keyToInt k, Paste title content (Static $ StaticResult []) False lhs author createdAt Nothing)) pastes
+
+    renderRss $ mkRssFeed pastes'
 
 newPaste :: EitherT (Paste, (Text, [EvalError])) ActionH Int
 newPaste = do
