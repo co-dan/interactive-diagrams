@@ -247,15 +247,17 @@ inputableString w = do
 
 
 inputableNum :: (Num a, Read a) => JQuery -> ContT JQuery IO (JQuery, IO (Either String a))
-inputableNum = inputableRead (readErr "Cannot read a number")
+inputableNum w = do
+    (jq, act) <- inputableRead (readErr "Cannot read a number") w
+    jq' <- lift $ find "input" jq
+    liftIO $ initWidget jq' Spinner with { spinnerPage = 5 }
+    return (jq, act)
 
 inputableRead :: (String -> Either String a)
            -> JQuery
            -> ContT JQuery IO (JQuery, IO (Either String a))
 inputableRead readF w = do
     (jq, act) <- inputableString w
-    jq' <- lift $ find "input" jq
-    liftIO $ initWidget jq' Spinner with { spinnerPage = 5 }
     let act' = (=<<) <$> pure readF <*> (act :: IO (Either String String))
     return (jq, act')
 
