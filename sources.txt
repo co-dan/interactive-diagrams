@@ -4,6 +4,7 @@ scotty-hastache
 git://github.com/simonmar/async.git
 persistent
 git://github.com/diagrams/active.git active-0.1
+git://github.com/co-dan/postgresql-simple.git
 git://github.com/diagrams/diagrams-core.git
 git://github.com/diagrams/diagrams-lib.git
 git://github.com/diagrams/diagrams-svg.git

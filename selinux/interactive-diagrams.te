@@ -16,7 +16,10 @@ require {
   type security_t;
   type user_tmp_t;
   type cgroup_t;
-  
+  type postgresql_port_t;
+  type postgresql_t;
+  type var_run_t;
+  type net_conf_t;
 
   type semanage_t;
   type unconfined_t;
@@ -111,6 +114,10 @@ allow idia_web_t idia_web_exec_t:file { create unlink };
 rw_files_pattern(idia_web_t, idia_db_t, idia_db_t)
 # this seems to be neccessary for accessing the db file, but I have no idea why
 allow idia_web_t default_t:dir search;
+##
+allow idia_web_t net_conf_t:file { read getattr open };
+allow idia_web_t postgresql_port_t:tcp_socket name_connect;
+allow idia_web_t self:tcp_socket { getopt getattr connect };
 
 # Allow web worker to access GHC & idia packages
 getattr_dirs_pattern(idia_web_t, idia_pkg_t, idia_pkg_t)
@@ -147,7 +154,7 @@ allow idia_service_t tmp_t:file { write getattr read create open ioctl };
 allow idia_service_t self:unix_stream_socket { sendto connectto };
 allow idia_service_t tmp_t:dir { write getattr create add_name remove_name search };
 allow idia_service_t tmp_t:sock_file { write create unlink getattr };
-allow idia_service_t tmp_t:dir { read rmdir write remove_name add_name };
+allow idia_service_t tmp_t:dir { read write remove_name add_name };
 allow idia_service_t tmp_t:file { write create unlink execute };
 
 
@@ -207,7 +214,11 @@ allow idia_service_t idia_pkg_t:file { read getattr ioctl open execute };
 # TODO: Helper.hs
 allow idia_service_t idia_web_exec_t:file { read getattr open ioctl };
 allow idia_service_t idia_web_exec_t:dir { search getattr };
-
+allow idia_service_t idia_worker_env_t:dir { write remove_name create add_name search };
+allow idia_service_t idia_web_common_t:dir search;
+allow idia_service_t idia_web_common_t:file { getattr read open ioctl };
+allow idia_service_t idia_worker_env_t:dir { read getattr open };
+allow idia_service_t idia_web_common_t:dir getattr;
 
 ############################################################
 # idia worker
@@ -256,6 +267,13 @@ allow idia_restricted_t idia_worker_env_t:dir { search getattr };
 # # This is probably something to do with libdir
 # allow idia_restricted_t user_home_dir_t:dir search;
 # allow idia_restricted_t user_home_t:dir search;
+allow idia_restricted_t user_home_t:dir getattr;
+# allow idia_restricted_t user_home_t:file { read getattr open ioctl };
+###########!!!XXX
+allow idia_restricted_t idia_worker_env_t:file { read open getattr ioctl };
+allow idia_service_t idia_worker_env_t:file { read open getattr ioctl };
+allow idia_restricted_t tmp_t:file { rename setattr };
+allow idia_service_t tmp_t:file { rename setattr };
 
 # For communicating with the server
 allow idia_restricted_t tmp_t:sock_file write;
@@ -263,7 +281,8 @@ allow idia_restricted_t tmp_t:sock_file write;
 allow idia_restricted_t idia_service_t:unix_stream_socket { read write ioctl accept };
 allow idia_restricted_t tmp_t:dir { search getattr };
 allow idia_restricted_t tmp_t:file { getattr open read ioctl };
-allow idia_restricted_t tmp_t:dir { write remove_name add_name };
+allow idia_restricted_t tmp_t:dir { write remove_name add_name create };
+# do *NOT* allow tmp_t:dir rmdir!!!!
 allow idia_restricted_t tmp_t:file { write create unlink execute };
 
 ##################################################
@@ -299,6 +318,9 @@ allow unconfined_t idia_worker_env_t:dir { read getattr };
 
 #============= idia_restricted_t ==============
 # allow idia_restricted_t user_home_t:file { getattr open ioctl read };
+
+#============= postgresql_t ==============
+allow postgresql_t var_run_t:sock_file write;
 
 ########################################
 # hmm this doesn't seem to work
