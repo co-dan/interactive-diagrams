@@ -129,7 +129,7 @@ displayEmpty :: StaticResult
 displayEmpty = StaticResult [] 
 
 renderMyDiagramToSvg :: Double -> D.QDiagram D.SVG D.R2 Any -> B.Html
-renderMyDiagramToSvg size = D.renderDia D.SVG (D.SVGOptions (D.Dims size size))
+renderMyDiagramToSvg size = D.renderDia D.SVG (D.SVGOptions (D.Dims size size) Nothing)
 
 instance Display StaticResult where
   display d = d
