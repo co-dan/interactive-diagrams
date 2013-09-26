@@ -49,7 +49,7 @@ mkRssItem pid Paste{..} = (nullItem pasteTitle)
 -- | Output the RSS feed
 renderRss :: Monad m => RSS -> ActionT m ()
 renderRss rss = do
-    header "Content-Type" "application/rss+xml"
+    setHeader "Content-Type" "application/rss+xml"
     raw . toLazyByteString . stringUtf8 . showElement . xmlRSS $ rss
 
 

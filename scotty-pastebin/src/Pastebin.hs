@@ -49,6 +49,7 @@ import           Network.HTTP.Types
 import           Network.Wai
 import           Network.Wai.Middleware.RequestLogger
 import           Network.Wai.Middleware.Static
+import           Network.Wai.Middleware.Gzip
 import           Text.Blaze.Html.Renderer.Text
 import           Text.Hastache
 import           Text.Hastache.Context
@@ -136,6 +137,12 @@ renderGallery ps = do
     setH "images" $ MuList pastes
     hastache "gallery"
 
+
+about :: ActionH ()
+about = do
+    setH "title" $ MuVariable ("Usage" :: T.Text)
+    setH "about" $ MuVariable True
+    hastache "usage"
 
 -- | * Database access and logic
 
@@ -265,6 +272,7 @@ main = do
     scottyH 3000 $ do
         -- setTemplatesDir "../common/templates/"
         setHastacheConfig hastacheConf
+	middleware $ gzip $ def { gzipFiles = GzipCompress }
         middleware logStdoutDev
         middleware $ staticPolicy (addBase "../common/static")
         S.post "/new" $ eitherT errPage redirPaste (measureTime newPaste)
@@ -276,4 +284,5 @@ main = do
         S.get "/gallery" (listImages >>= renderGallery)
         S.get "/" listPastes
         S.get "/feed" feed
+	S.get "/about" about
 --        S.post "/fetch" $ eitherT errPage redirPaste fetchPaste
