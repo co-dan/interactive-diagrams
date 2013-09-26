@@ -216,7 +216,7 @@ compileToJS fp = do
 
 linkBinary :: DynFlags -> [PackageId] -> [FilePath] -> FilePath -> IO ()
 linkBinary dflags pkg_deps targets out =
-    void $ variantLink gen2Variant dflags True out [] deps targets [] isRoot
+    void $ variantLink gen2Variant dflags False out [] deps targets [] isRoot
   where
     isRoot = const True
     deps   = map (\pkg -> (pkg, packageLibPaths pkg)) pkg_deps'
