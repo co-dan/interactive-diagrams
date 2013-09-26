@@ -168,11 +168,12 @@ compileExpr expr = do
         _                -> panic "compileExpr"
 
 
+
 compileToJS :: FilePath -> EvalM DynamicResult
 compileToJS fp = do
     EvalSettings{..} <- evalSettings
     -- liftIO $ runGhcjsSession Nothing True $ do
-    liftGhc $ initGhcJs True
+    liftGhc $ initGhcJs False
     dflags <- getSessionDynFlags
     defaultCleanupHandler dflags $ do
         setSessionDynFlags $ dflags { verbosity = verbLevel
@@ -193,12 +194,12 @@ compileToJS fp = do
         let src = pm_parsed_source parsedMod
         let (L srcspan hsmod) = src
         let hsmod' = modifyModule injectRender hsmod
-        output hsmod'
         typecheckedMod <- typecheckModule $ parsedMod
                           { pm_parsed_source = L srcspan hsmod' }
         -- This will load the module and produce the obj file
         mod <- loadModule typecheckedMod
         let modSum' = pm_mod_summary (tm_parsed_module typecheckedMod)
+	output modSum'
         -- Linking stuff
         hsc_env <- getSession
         dflags2  <- getSessionDynFlags
@@ -263,6 +264,19 @@ wrapRender ty f@(FunBind{..})
         Just ty' -> [L l $ TypeSig [L l newName] (L l ty')]
     newF = f { fun_id = L l newName }
 wrapRender _ x = x
+
+
+isGhcjsPrimPackage :: PackageId -> Bool
+isGhcjsPrimPackage pkgId = "ghcjs-prim-" `isPrefixOf` packageIdString pkgId
+
+ghcjsPrimPackage :: DynFlags -> PackageId
+ghcjsPrimPackage dflags =
+  case prims of
+    (x:_) -> x
+    _ -> error "Package `ghcjs-prim' is required to link executables"
+  where
+    prims = reverse . sort $ filter isGhcjsPrimPackage pkgIds
+    pkgIds = map packageConfigId . eltsUFM . pkgIdMap . pkgState $ dflags
 
 isInteractivePackage :: PackageId -> Bool
 isInteractivePackage pkgId = "display-" `isPrefixOf` packageIdString pkgId

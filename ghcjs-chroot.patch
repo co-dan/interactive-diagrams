@@ -1,0 +1,42 @@
+diff --git a/src-bin/Boot.hs b/src-bin/Boot.hs
+index 142eca0..30f8c86 100644
+--- a/src-bin/Boot.hs
++++ b/src-bin/Boot.hs
+@@ -116,6 +116,8 @@ bootPackages = [ "ghc-prim"
+                , "containers"
+                , "template-haskell"
+                , "array"
++	       -- , "aeson"
++	       -- , "vector"
+                , "pretty"
+                ]
+ 
+diff --git a/src/Gen2/Linker.hs b/src/Gen2/Linker.hs
+index a92b652..0829382 100644
+--- a/src/Gen2/Linker.hs
++++ b/src/Gen2/Linker.hs
+@@ -162,7 +162,9 @@ splitPath' = map (filter (`notElem` "/\\")) . splitPath
+ -- fixme the wired-in package id's we get from GHC we have no version
+ getShims :: [FilePath] -> [PackageId] -> (FilePath, FilePath) -> IO ()
+ getShims extraFiles deps (fileBefore, fileAfter) = do
+-  base <- (</> "shims") <$> getGlobalPackageBase
++  -- base <- (</> "shims") <$> getGlobalPackageBase
++  -- XXX
++  let base = "/home/vagrant/.ghcjs/i386-linux-0.1.0-7.7.20130922/shims"
+   ((before, beforeFiles), (after, afterFiles))
+      <- collectShims base (map convertPkg deps)
+   T.writeFile fileBefore before
+diff --git a/src/Gen2/StgAst.hs b/src/Gen2/StgAst.hs
+index d9b1b34..7fd59b0 100644
+--- a/src/Gen2/StgAst.hs
++++ b/src/Gen2/StgAst.hs
+@@ -50,7 +50,8 @@ hackPprDflags = unsafePerformIO $ do
+   let (minusB_args, args1) = L.partition ("-B" `L.isPrefixOf`) args
+       mbMinusB | null minusB_args = Nothing
+                | otherwise = Just . drop 2 . last $ minusB_args
+-  libDir <- getGlobalPackageBase
++  -- libDir <- getGlobalPackageBase
++  let libDir = "/home/vagrant/.ghcjs/i386-linux-0.1.0-7.7.20130922"
+   mySettings <- initSysTools (mbMinusB `mplus` Just libDir)
+   initDynFlags (defaultDynFlags mySettings)
+ 

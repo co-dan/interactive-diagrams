@@ -50,17 +50,24 @@ initGhc ref vb = do
     _ <- setSessionDynFlags dfs2
     return ()
 
+addGhcjsDB :: DynFlags -> IO DynFlags
+addGhcjsDB dfs = do
+    let pkg  = PkgConfFile "/home/vagrant/.ghcjs/i386-linux-0.1.0-7.7.20130922/package.conf.d"
+    let pkg2  = PkgConfFile "/home/vagrant/.ghcjs/i386-linux-0.1.0-7.7.20130922/lib/package.conf.d"
+    let dfs' = dfs { extraPkgConfs = const [pkg, pkg2] }
+    return dfs'
+
 -- | This resets the session
 initGhcJs :: Bool -> Ghc ()
 initGhcJs debug = do
-    libDir <- liftIO $ getGlobalPackageBase
-    initGhcMonad (Just libDir)
-    base <- liftIO ghcjsDataDir
+    let base1 = "/home/vagrant/.ghcjs/i386-linux-0.1.0-7.7.20130922/"
+    -- libDir <- liftIO $ getGlobalPackageBase
+    initGhcMonad (Just base1)
     dflags <- getSessionDynFlags
-    dflags2 <- liftIO $ addPkgConf dflags
+    dflags2 <- liftIO $ addGhcjsDB dflags
     (dflags3,_) <- liftIO $ initPackages dflags2
     _ <- setSessionDynFlags
-         $ setGhcjsPlatform debug [] base
+         $ setGhcjsPlatform debug [] base1
          $ updateWays $ addWay' (WayCustom "js")
          $ setGhcjsSuffixes False
          $ dflags3 { ghcLink   = LinkBinary
