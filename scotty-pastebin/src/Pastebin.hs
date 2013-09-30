@@ -273,7 +273,7 @@ main = do
         -- setTemplatesDir "../common/templates/"
         setHastacheConfig hastacheConf
 	middleware $ gzip $ def { gzipFiles = GzipCompress }
-        middleware logStdoutDev
+        middleware logStdout
         middleware $ staticPolicy (addBase "../common/static")
         S.post "/new" $ eitherT errPage redirPaste (measureTime newPaste)
         S.get "/get/:id" $ maybeT page404 renderPaste getPaste
