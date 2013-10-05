@@ -78,10 +78,10 @@ class Input a where
         -> IO (IO (Either String a))  -- outer IO: prepare the container/form,
                       -- inner IO: get input
         
-  inputList :: JQuery -> IO (IO (Either String [a]))
+  inputList :: JQuery -> IO (IO [a])
   default inputList :: (Output a)
                     => JQuery -> IO (IO (Either String [a]))
-  inputList = defInputList
+  inputList = error "inputList undef" -- defInputList
 
 -- | Values of type 'a' can be 'outputted'
 class Output a where
@@ -200,36 +200,36 @@ defInputList jq = do
         span <- select "<span class=\"ui-icon ui-icon-arrowthick-2-n-s\">"
                       >>= appendToJQuery li
         writeIORef dat (n+1, a:elems)
-        join $ output li `ap` (return a)
+        join $ output li =<< a
 
 -- --------------------------------------------------
 -- -- Inputtable instances
 
-inputString w = do
-    inputBox <- newInputBox
-    let act = return . T.unpack <$> getVal inputBox
-    div <- select "<div>"
-    appendJQuery inputBox div
-        >>= appendToJQuery w
-    return act
-  where
-    newInputBox = select "<input type=\"text\" class=\"input-xmedium\" />"
+-- inputString w = do
+--     inputBox <- newInputBox
+--     let act = return . T.unpack <$> getVal inputBox
+--     div <- select "<div>"
+--     appendJQuery inputBox div
+--         >>= appendToJQuery w
+--     return act
+--   where
+--     newInputBox = select "<input type=\"text\" class=\"input-xmedium\" />"
 
-inputRead :: (String -> Either String a)
-          -> JQuery
-          -> IO (IO (Either String a))
-inputRead readF w = do
-    act <- inputString w
-    let act' = (=<<) <$> pure readF <*> (act :: IO (Either String String))
-    return act'
+-- inputRead :: (String -> Either String a)
+--           -> JQuery
+--           -> IO (IO (Either String a))
+-- inputRead readF w = do
+--     act <- inputString w
+--     let act' = (=<<) <$> pure readF <*> (act :: IO (Either String String))
+--     return act'
 
-inputNum :: (Num a, Read a)
-         => JQuery -> IO (IO (Either String a))
-inputNum w = do
-    act <- inputRead (readErr "Cannot read a number") w
-    -- jq' <- lift $ find "input" jq
-    -- initWidget jq' Spinner with { spinnerPage = 5 }
-    return act
+-- inputNum :: (Num a, Read a)
+--          => JQuery -> IO (IO (Either String a))
+-- inputNum w = do
+--     act <- inputRead (readErr "Cannot read a number") w
+--     -- jq' <- lift $ find "input" jq
+--     -- initWidget jq' Spinner with { spinnerPage = 5 }
+--     return act
 
 
 -- -- -- Useful for enums
@@ -251,46 +251,46 @@ inputNum w = do
 -- --               >>= setText s
 -- --     newSelect = select "<select>"
 
-instance Input Char where
-    input     = inputRead (headErr "Cannot read a char")                
-    inputList = inputString
+-- instance Input Char where
+--     input = inputRead (headErr "Cannot read a char")                
+--     inputList = inputString
 
-instance (Input a, Output a, Display a) => Input [a] where
-    input = inputList
+-- instance (Input a, Output a, Display a) => Input [a] where
+--     input = inputList
 
-instance Input Int     where { input = inputNum }
-instance Input Int8    where { input = inputNum }
-instance Input Int16   where { input = inputNum }
-instance Input Int32   where { input = inputNum }
-instance Input Int64   where { input = inputNum }
-instance Input Word    where { input = inputNum }
-instance Input Word8   where { input = inputNum }
-instance Input Word16  where { input = inputNum }
-instance Input Word32  where { input = inputNum }
-instance Input Word64  where { input = inputNum }
-instance Input Integer where { input = inputNum }
-instance Input Float   where { input = inputNum }
-instance Input Double  where { input = inputNum }
+-- instance Input Int     where { input = inputNum }
+-- instance Input Int8    where { input = inputNum }
+-- instance Input Int16   where { input = inputNum }
+-- instance Input Int32   where { input = inputNum }
+-- instance Input Int64   where { input = inputNum }
+-- instance Input Word    where { input = inputNum }
+-- instance Input Word8   where { input = inputNum }
+-- instance Input Word16  where { input = inputNum }
+-- instance Input Word32  where { input = inputNum }
+-- instance Input Word64  where { input = inputNum }
+-- instance Input Integer where { input = inputNum }
+-- instance Input Float   where { input = inputNum }
+-- instance Input Double  where { input = inputNum }
 
-instance Input T.Text  where { input = inputRead (Right . T.pack)  }
-instance Input TL.Text where { input = inputRead (Right . TL.pack) }
+-- instance Input T.Text  where { input = inputRead (Right . T.pack)  }
+-- instance Input TL.Text where { input = inputRead (Right . TL.pack) }
 
--- instance Inputable Bool where
---     inputable = inputableSelect [("True", True), ("False", False)]
--- instance Inputable Ordering where
---     inputable = inputableSelect [("<", LT), ("=", EQ), (">", GT)]    
--- instance (Inputable a, Inputable b,
---           Display a, Display b) => Inputable (Either a b)
--- instance (Inputable a, Display a) => Inputable (Maybe a)
+-- -- instance Inputable Bool where
+-- --     inputable = inputableSelect [("True", True), ("False", False)]
+-- -- instance Inputable Ordering where
+-- --     inputable = inputableSelect [("<", LT), ("=", EQ), (">", GT)]    
+-- -- instance (Inputable a, Inputable b,
+-- --           Display a, Display b) => Inputable (Either a b)
+-- -- instance (Inputable a, Display a) => Inputable (Maybe a)
 
--- instance (Inputable a, Inputable b,
---           Display a, Display b,
---           Renderable a, Renderable b)
---          => Inputable (a,b)
--- instance (Inputable a, Inputable b, Inputable c,
---           Display a, Display b, Display c,
---           Renderable a, Renderable b, Renderable c)
---          => Inputable (a,b,c)
+-- -- instance (Inputable a, Inputable b,
+-- --           Display a, Display b,
+-- --           Renderable a, Renderable b)
+-- --          => Inputable (a,b)
+-- -- instance (Inputable a, Inputable b, Inputable c,
+-- --           Display a, Display b, Display c,
+-- --           Renderable a, Renderable b, Renderable c)
+-- --          => Inputable (a,b,c)
 
 -- --------------------------------------------------
 -- -- Outputable instances
@@ -309,30 +309,30 @@ instance Input TL.Text where { input = inputRead (Right . TL.pack) }
 --                    =<< indexArray 0 (castRef canvas)
 --             renderDia Canvas (CanvasOptions (Dims 200 200) ctx) d
 
-instance Output Int
-instance Output Int8
-instance Output Int16
-instance Output Int32
-instance Output Int64
-instance Output Word
-instance Output Word8
-instance Output Word16
-instance Output Word32
-instance Output Word64
-instance Output Integer
-instance Output Float
-instance Output Double
-instance Output Char
-instance Output T.Text
-instance Output TL.Text
-instance Output ()
+-- instance Output Int
+-- instance Output Int8
+-- instance Output Int16
+-- instance Output Int32
+-- instance Output Int64
+-- instance Output Word
+-- instance Output Word8
+-- instance Output Word16
+-- instance Output Word32
+-- instance Output Word64
+-- instance Output Integer
+-- instance Output Float
+-- instance Output Double
+-- instance Output Char
+-- instance Output T.Text
+-- instance Output TL.Text
+-- instance Output ()
 
-instance (Output a, Display a) => Output [a]
+-- instance (Output a, Display a) => Output [a]
 
-instance Output Bool
-instance Output Ordering
-instance Display a => Output (Maybe a)
-instance (Display a, Display b) => Output (Either a b)
+-- instance Output Bool
+-- instance Output Ordering
+-- instance Display a => Output (Maybe a)
+-- instance (Display a, Display b) => Output (Either a b)
 
 -- instance (Display a, Display b)
 --          => Output (a, b)
