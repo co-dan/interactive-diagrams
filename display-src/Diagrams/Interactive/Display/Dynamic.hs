@@ -48,6 +48,7 @@ import           GHCJS.Marshal
 import           GHCJS.Types
 import           JavaScript.Canvas                    (getContext)
 import           JavaScript.JQuery                    hiding (on)
+import qualified JavaScript.JQuery                    as JQ
 import           JavaScript.JQuery.UI
 import           JavaScript.JQuery.UI.Class
 import           JavaScript.JQuery.UI.Internal
@@ -77,7 +78,16 @@ class Input a where
   input :: JQuery     -- container;
         -> IO (IO (Either String a))  -- outer IO: prepare the container/form,
                       -- inner IO: get input
-        
+  default input :: (Generic a, GInput (Rep a))
+                => JQuery -> IO (IO (Either String a))
+  input w = do
+      area <- select "<div class=\"input-group generic\">"
+              >>= appendToJQuery w
+      act <- ginput area
+      postprocess area
+      return $ liftM to `fmap` act
+  
+
   inputList :: JQuery -> IO (IO (Either String [a]))
   default inputList :: (Output a)
                     => JQuery -> IO (IO (Either String [a]))
@@ -86,11 +96,11 @@ class Input a where
 -- | Values of type 'a' can be 'outputted'
 class Output a where
   output :: JQuery          -- container;
-         -> IO (a -> IO ()) -- outer IO: prepare the container
-                            -- IO () -- update the output
+         -> IO (JQuery, a -> IO ()) -- outer IO: prepare the container
+                                    -- a -> IO () -- update the output
   default output :: (Display a)
-                 => JQuery -> IO (a -> IO ())
-  output w = output w >>= \f -> return (f . JSDisplay)  
+                 => JQuery -> IO (JQuery, a -> IO ())
+  output w = output w >>= \(a, f) -> return (a, f . JSDisplay)  
 
 -- | 'Interctive a b' means that it's possible to
 -- interctively execute 'a' to reach 'b'
@@ -113,50 +123,40 @@ instance (Result a ~ a) => Interactive a a where
 
 runInteractive :: (Interactive a b, Result a ~ b, Output b)
                => JQuery -> a -> IO ( IO () )
-runInteractive env f = do
-    val <- interactive env (return (Right f))
-    o   <- output env
+runInteractive env f = do    
+    val       <- interactive env (return (Right f))
+    (area, o) <- output env
     return $ do
+        --- XXX: display a progress bar
+        -- hideEffect area Blind with { blindDirection = "down" }
         v <- val
         case v of
-            Left str -> error str
+            Left str -> do
+                let msg = mconcat [ "<div class=\"alert alert-danger\">"
+                                  , T.pack str
+                                  , "</div>" ]
+                void $ setHtml msg area
             Right b  -> o b
-
--- class Inputable a where
---     inputable :: JQuery -> ContT JQuery IO (JQuery, IO (Either String a))
---     default inputable :: (Generic a, GInputable (Rep a))
---                       => JQuery
---                       -> ContT JQuery IO (JQuery, IO (Either String a))
---     inputable jq = do
---         (jq', act) <- ginputable jq
---         jq'' <- lift $ postprocess jq
---         return (jq', tto act)
---       --   (id *** tto) <$> ginputable jq
---       where tto = liftM $ liftM to
---     inputableList :: JQuery -> ContT JQuery IO (JQuery, IO (Either String [a]))
---     default inputableList :: (Renderable a)
---                           => JQuery
---                           -> ContT JQuery IO (JQuery, IO (Either String [a]))
---     inputableList = defInputableList
-
 
 newtype JSDisplay a = JSDisplay a
 
 instance (Display a) => Output (JSDisplay a) where
     output w = do
         area <- select "<div>" >>= appendToJQuery w
-        return $ \(JSDisplay a) -> void $ do
+        let act = \(JSDisplay a) -> void $ do
             setText (txt a) area
-            wrapInner "<code>" area
+            wrapInner "<pre>" area
+        return (area, act)
       where
         txt a = displayText (display a)
 
 
+--- XXX: ability to delete elements from the list
 defInputList :: (Output a, Input a)
              => JQuery
              -> IO (IO (Either String [a]))
 defInputList jq = do
-    area <- select "<div>" >>= appendToJQuery jq
+    area <- select "<div class=\"input-group\">" >>= appendToJQuery jq
     msgarea <- select "<p>" >>= appendToJQuery area
     listUl <- select "<ul class=\"sortable\">"
               >>= appendToJQuery area
@@ -200,7 +200,7 @@ defInputList jq = do
         span <- select "<span class=\"ui-icon ui-icon-arrowthick-2-n-s\">"
                       >>= appendToJQuery li
         writeIORef dat (n+1, a:elems)
-        join $ output li `ap` (return a)
+        join $ (snd `fmap` output li) `ap` (return a)
 
 -- --------------------------------------------------
 -- -- Inputtable instances
@@ -208,7 +208,7 @@ defInputList jq = do
 inputString w = do
     inputBox <- newInputBox
     let act = return . T.unpack <$> getVal inputBox
-    div <- select "<div>"
+    div <- select "<div class=\"input-group\">"
     appendJQuery inputBox div
         >>= appendToJQuery w
     return act
@@ -226,30 +226,36 @@ inputRead readF w = do
 inputNum :: (Num a, Read a)
          => JQuery -> IO (IO (Either String a))
 inputNum w = do
-    act <- inputRead (readErr "Cannot read a number") w
-    -- jq' <- lift $ find "input" jq
-    -- initWidget jq' Spinner with { spinnerPage = 5 }
+    inputBox <- newInputBox
+    let act = readErr "Cannot read a number"
+              .  T.unpack
+             <$> getVal inputBox
+    div <- select "<div class=\"input-group\">"
+    appendJQuery inputBox div
+        >>= appendToJQuery w
+    initWidget inputBox Spinner with { spinnerPage = 5 }
     return act
+  where
+    newInputBox = select "<input type=\"text\" class=\"input-xmedium\" />"
 
-
--- -- -- Useful for enums
--- -- inputableSelect :: [(T.Text, a)]
--- --                 -> JQuery
--- --                 -> ContT JQuery IO (JQuery, IO (Either String a))
--- -- inputableSelect options w = do
--- --     sel <- lift $ newSelect
--- --     lift $ mapM_ (appendToJQuery sel <=< (mkOpt . fst)) options
--- --     let act = maybe (Left "Unknown option") Right
--- --                .  (`lookup` options)
--- --               <$> getVal sel
--- --     div <- lift $ select "<div>"
--- --     lift $ appendJQuery sel div
--- --            >>= appendToJQuery w
--- --     return (div, act)
--- --   where
--- --     mkOpt s = select "<option>"
--- --               >>= setText s
--- --     newSelect = select "<select>"
+-- Useful for enums
+inputSelect :: [(T.Text, a)]
+            -> JQuery
+            -> IO (IO (Either String a))
+inputSelect options w = do
+    sel <- newSelect
+    mapM_ (appendToJQuery sel <=< (mkOpt . fst)) options
+    let act = maybe (Left "Unknown option") Right
+               .  (`lookup` options)
+              <$> getVal sel
+    div <- select "<div class=\"input-group\">"
+    appendJQuery sel div
+        >>= appendToJQuery w
+    return (act)
+  where
+    mkOpt s = select "<option>"
+              >>= setText s
+    newSelect = select "<select>"
 
 instance Input Char where
     input     = inputRead (headErr "Cannot read a char")                
@@ -275,39 +281,72 @@ instance Input Double  where { input = inputNum }
 instance Input T.Text  where { input = inputRead (Right . T.pack)  }
 instance Input TL.Text where { input = inputRead (Right . TL.pack) }
 
--- instance Inputable Bool where
---     inputable = inputableSelect [("True", True), ("False", False)]
--- instance Inputable Ordering where
---     inputable = inputableSelect [("<", LT), ("=", EQ), (">", GT)]    
--- instance (Inputable a, Inputable b,
---           Display a, Display b) => Inputable (Either a b)
--- instance (Inputable a, Display a) => Inputable (Maybe a)
+---  Enum instances
+instance Input () where
+    input = inputSelect [("()", ())]
+instance Input Bool where
+    input = inputSelect [("True", True), ("False", False)]
+instance Input Ordering where
+    input = inputSelect [("<", LT), ("=", EQ), (">", GT)]    
 
--- instance (Inputable a, Inputable b,
---           Display a, Display b,
---           Renderable a, Renderable b)
---          => Inputable (a,b)
--- instance (Inputable a, Inputable b, Inputable c,
---           Display a, Display b, Display c,
---           Renderable a, Renderable b, Renderable c)
---          => Inputable (a,b,c)
+instance (Input a, Input b,
+          Display a, Display b) => Input (Either a b)
+instance (Input a, Display a) => Input (Maybe a) where
+    input w = do
+        -- append "<div class=\"col-lg-6\">" w
+        area   <- select "<div class=\"input-group\">"
+                  >>= appendToJQuery w
+        spn    <- select "<span class=\"input-group-addon\">"
+                  >>= appendToJQuery area
+        lbl    <- select "<label>"
+                  >>= appendToJQuery spn
+        append "Just?" lbl
+        inner  <- select "<div>" >>= appendToJQuery area
+        inpAct <- input inner
+        cbox   <- select "<input type=\"checkbox\" />"
+                  >>= setAttr "checked" "true"
+                  >>= appendToJQuery lbl
+        let h _ = void $ do
+                checked <- is ":checked" cbox
+                if checked
+                    then setAttr "readonly" "false" inner
+                    else setAttr "readonly" "true"  inner
+        JQ.on h "change" def cbox
+        return $ do
+            checked <- is ":checked" cbox
+            if checked
+                then liftM (liftM Just) inpAct
+                else return (return Nothing)
+        
+instance (Input a, Input b,
+          Display a, Display b,
+          Output a, Output b)
+         => Input (a,b)
+instance (Input a, Input b, Input c,
+          Display a, Display b, Display c,
+          Output a, Output b, Output c)
+         => Input (a,b,c)
 
 -- --------------------------------------------------
 -- -- Outputable instances
 
--- instance (b ~ Canvas) => Output (Diagram b R2) where
---     output w = do
---         let nm = "testcanvas"
---         canvas <- select $
---                   "<canvas id=\"" <> nm <> "\" width=\"200\" height=\"200\""
---                   <> "style=\"border:1px solid #d3d3d3;\">"
---                   <> "</canvas><br />"
---         area <- select "<div>" >>= appendJQuery canvas 
---         appendJQuery area w
---         return $ \d -> do
---             ctx <- getContext
---                    =<< indexArray 0 (castRef canvas)
---             renderDia Canvas (CanvasOptions (Dims 200 200) ctx) d
+instance (b ~ Canvas) => Output (Diagram b R2) where
+    output w = do
+        let nm = "testcanvas"
+        area <- select "<div>"
+        appendJQuery area w
+        let act d = do
+            empty area
+            canvas <- select
+                      ("<canvas id=\"" <> nm <> "\" width=\"200\" height=\"200\""
+                       <> "style=\"border:1px solid #d3d3d3;\">"
+                       <> "</canvas><br />")
+                      >>= appendToJQuery area
+            -- setAttr "width" "400" canvas
+            ctx <- getContext
+                   =<< indexArray 0 (castRef canvas)
+            renderDia Canvas (CanvasOptions (Dims 200 200) ctx) d
+        return (area, act)
 
 instance Output Int
 instance Output Int8
@@ -333,10 +372,9 @@ instance Output Bool
 instance Output Ordering
 instance Display a => Output (Maybe a)
 instance (Display a, Display b) => Output (Either a b)
-
--- instance (Display a, Display b)
---          => Output (a, b)
--- instance (Display a, Display b, Display c) => Output (a,b,c)
+instance (Display a, Display b)
+         => Output (a, b)
+instance (Display a, Display b, Display c) => Output (a,b,c)
 
 -- ------------------------------------------------------------
 -- -- Helpers
@@ -345,82 +383,85 @@ onClick jq a = click a def jq
 
 displayText (StaticResult drs) = foldMap result drs
 
--- -- -- * GInputable
+-- -- -- * GInput & generic instances
 
--- -- type GInputCont f a = ContT JQuery IO (JQuery, IO (Either String (f a)))
+class GInput f where
+    ginput :: JQuery
+           -> IO (IO (Either String (f a)))
 
--- -- class GInputable f where
--- --     ginputable :: JQuery
--- --                -> ContT JQuery IO (JQuery, IO (Either String (f a)))
+instance GInput U1 where
+    ginput jq = do
+        codeblock <- select "<div><code></code></div>"
+        appendJQuery codeblock jq
+        return (return (Right U1))
 
--- -- instance GInputable U1 where
--- --     ginputable jq = do
--- --         codeblock <- lift $ select "<div><code></code></div>"
--- --         lift $ appendJQuery codeblock jq
--- --         return (codeblock, return (Right U1))
+instance (Input c) => GInput (K1 i c) where
+    ginput = liftM ((fmap . fmap) K1) . input
 
--- -- instance (Inputable c) => GInputable (K1 i c) where
--- --     ginputable = liftM (id *** ((fmap . fmap) K1)) . inputable
+instance (GInput f) => GInput (M1 i c f) where
+    ginput = liftM ((fmap . fmap) M1) . ginput
 
--- -- instance (GInputable f) => GInputable (M1 i c f) where
--- --     ginputable = liftM (id *** ((fmap . fmap) M1)) . ginputable
-
--- -- instance (GInputable f, GInputable g) => GInputable (f :*: g) where
--- --     ginputable jq = do
--- --         (inpArea1, inpAct1) <- ginputable jq
--- --         (inpArea2, inpAct2) <- ginputable jq
--- --         let act = runEitherT $ do
--- --                 res1 <- EitherT inpAct1
--- --                 res2 <- EitherT inpAct2
--- --                 return (res1 :*: res2)
--- --         return (jq, act)
-
-
--- -- instance (GInputable f, GInputable g)
--- --          => GInputable (f :+: g) where
--- --     ginputable jq = do
--- --         area <- lift $ do
--- --             sumDiv <- parent jq >>= find ".sum"
--- --             found <- (>0) <$> lengthArray (castRef sumDiv)
--- --             if found
--- --                 then return sumDiv
--- --                 else newDiv
--- --         (inpArea1, inpAct1) <- ginputable area
--- --         (inpArea2, inpAct2) <- ginputable area
--- --         lift $ initWidget area Accordion def
--- --         let act = do
--- --                 (Just n) <- fromJSRef =<< jq_getOptWidget "accordion" "active" area
--- --                 divs <- find "div" area
--- --                 len <- lengthArray (castRef divs)
--- --                 let mid = floor $ ((fromIntegral len)/2) - 1
--- --                 if (n::Int) <= mid
--- --                     then do
--- --                       (n'::JSRef Int) <- toJSRef (n+1)
--- --                       jq_setOptWidget "accordion" "active" n' area
--- --                       liftM L1 <$> inpAct1
--- --                     else do
--- --                       (n'::JSRef Int) <- toJSRef (n-1)
--- --                       jq_setOptWidget "accordion" "active" n' area
--- --                       liftM R1 <$> inpAct2
--- --         return (area, act)
--- --         where newDiv = do
--- --                   accord <- select "<div class=\"sum\">"
--- --                   appendJQuery accord jq
--- --                   return accord
+instance (GInput f, GInput g) => GInput (f :*: g) where
+    ginput jq = do
+        area <- select "<div>" >>= appendToJQuery jq
+        inpAct1 <- ginput area
+        inpAct2 <- ginput area
+        let act = runEitherT $ do
+                res1 <- EitherT inpAct1
+                res2 <- EitherT inpAct2
+                return (res1 :*: res2)
+        return act
 
 
--- -- | XXX: this is a hack
--- postprocess jq = do
---     sum <- find ".sum" jq
---     find "div" sum
---         >>= before "<h3>Option</h3>"
---     widgetMethod sum Accordion "destroy"
---     initWidget sum Accordion def
---     return sum    
+instance (GInput f, GInput g)
+         => GInput (f :+: g) where
+    ginput jq = do
+        area <- do
+            sumDiv <- parent jq >>= childrenMatching ".sum"
+            found <- (>0) <$> lengthArray (castRef sumDiv)
+            if found
+                then return sumDiv
+                else newDiv
+        inpAct1 <- ginput area
+        inpAct2 <- ginput area
+        initWidget area Accordion def
+        --- XXX: can we do this without chaging the active accordion panel?
+        let act = do
+                (Just n) <- fromJSRef =<< jq_getOptWidget "accordion" "active" area
+                divs <- childrenMatching "div" area
+                len <- lengthArray (castRef divs)
+                let mid = floor $ ((fromIntegral len)/2) - 1
+                let main = if (n::Int) <= mid
+                           then do
+                               (n'::JSRef Int) <- toJSRef (n+1)
+                               jq_setOptWidget "accordion" "active" n' area
+                               liftM L1 <$> inpAct1
+                           else do
+                               (n'::JSRef Int) <- toJSRef (n-1)
+                               jq_setOptWidget "accordion" "active" n' area
+                               liftM R1 <$> inpAct2
+                nOrig <- toJSRef n
+                main <* jq_setOptWidget "accordion" "active" nOrig area
+        return act
+        where newDiv = do
+                  accord <- select "<div class=\"sum\">"
+                  appendJQuery accord jq
+                  return accord
+
+
+-- | XXX: this is a hack
+postprocess jq = do
+    sum <- find ".sum" jq
+    childrenMatching "div" sum
+        >>= before "<h3>Option</h3>"
+    widgetMethod sum Accordion "destroy"
+    initWidget sum Accordion def
+    return sum    
     
 #else
 
 class Input a where
 class Output a where
 
+runInteractive = error "runInteractive available only in JavaScript"
 #endif    
