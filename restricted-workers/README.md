@@ -42,7 +42,7 @@ own types of workers.
   `Workers.Pool`
 - [CommandEvalProtocol.lhs](examples/CommandEvalProtocol.lhs) -
   rewriting our Echo worker to use the provided Protocol module
-- [NewWorkerType.lhs](examples/NewWorkerTypes.lhs) - rolling out your
+- [NewWorkerType.lhs](examples/NewWorkerType.lhs) - rolling out your
   own worker types
 
 ## Wiki page
