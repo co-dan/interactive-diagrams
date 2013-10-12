@@ -4,11 +4,11 @@
   Displaying 20 random images from the database. <a
   href="/gallery">Refresh</a>
   <hr />
-  <ul class="thumbnails">
+  <ul class="list-inline list-unstyled row">
   {{#images}}
   <li>
   <div class="thumbnail">
-    <a href="/get/{{itemIndex}}">
+    <a href="/get/{{itemIndex}}" class="thumbnail">
       <svg xmlns="http://www.w3.org/2000/svg"
            xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1"
            width="200.0" height="200.0" viewBox="0 0 400 400">

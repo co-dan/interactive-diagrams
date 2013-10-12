@@ -50,6 +50,12 @@ body {
     border-radius: 4px;
 }
 
+.CodeMirror-scroll {
+  overflow-y: hidden;
+  overflow-x: auto;
+}
+
+
 /* code view */
 .lhs-comment {
     font-family: monospace;

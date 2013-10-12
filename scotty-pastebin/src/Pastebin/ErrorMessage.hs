@@ -17,7 +17,7 @@ import qualified Text.Blaze.Html5              as H
 
 import           Diagrams.Interactive.Eval.EvalError
 
-data ErrMsg = ErrMsg { content :: Text, caption :: String, style :: String }
+data ErrMsg = ErrMsg { content :: Text, caption :: String, msgstyle :: String }
             deriving (Typeable, Data)
 
 mkErrMsg :: EvalError -> ErrMsg
@@ -25,10 +25,10 @@ mkErrMsg EvalError{..} = ErrMsg
    { content  = renderHtml $
                 foldMap ((<> H.br) . H.toHtml . pack) (lines errMsg)
    , caption  = caption
-   , style = style }
+   , msgstyle = style }
   where (style, caption) = case severity of
-          SevError   -> ("alert-error", "Error")
-          SevWarning -> ("alert-block", "Warning")
-          SevFatal   -> ("alert-error", "Error")
+          SevError   -> ("alert-danger", "Error")
+          SevWarning -> ("alert-warning", "Warning")
+          SevFatal   -> ("alert-danger", "Error")
           _ -> ("alert-info", "Info")
 

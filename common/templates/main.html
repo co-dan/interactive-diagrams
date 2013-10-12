@@ -6,6 +6,7 @@
         <li class="active"><a href="#view" data-toggle="tab">View</a></li>
         <li><a href="#edit" data-toggle="tab">Edit</a></li>
       </ul>
+      <div id="push"></div>
     {{/result}}  
       <div class="tab-content">
         <div class="tab-pane {{#result}}active{{/result}}" id="view">
@@ -19,16 +20,14 @@
     {{! Closing .tabbable}}
     </div>
     {{/result}}
-   {{!<div class="span7" style="padding-right:20px; border-right: 1px solid #ccc;">}}
-   {{!</div>}} 
   </div>
   <div class="row-fluid">
-    <div class="span10">
+    <div class="col-md-10">
       <div id="sheet">
         {{msg}} <br /> <br />
         {{#errors}}
         <div id="error">
-          <div class="alert {{severity}}">
+          <div class="alert {{msgstyle}}">
             <button type="button" class="close"
             data-dismiss="alert">&times;</button>
             <strong>{{caption}}</strong><br/>
@@ -42,6 +41,7 @@
         {{/result}}
         {{^result}}
          {{>pastelisting}}
+         <div id="push"></div>
         {{/result}}
       </div>
     </div>  

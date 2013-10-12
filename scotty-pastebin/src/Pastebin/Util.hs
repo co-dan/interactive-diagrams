@@ -99,7 +99,7 @@ renderDR (DR Svg  r) = H.div ! HA.class_ "thumbnail" $
 
 
 renderDR (DR Text r) = H.toHtml r
-renderDR (DR RuntimeErr r) = H.div ! HA.class_ "alert alert-error" $
+renderDR (DR RuntimeErr r) = H.div ! HA.class_ "alert alert-danger" $
                                  H.toHtml r
 
 renderCode :: Paste -> T.Text
