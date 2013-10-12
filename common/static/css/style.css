@@ -76,10 +76,6 @@ body {
 
 /* Widgets */
 
-input[type="text"] {
-    font-size:13pt;
-    height:32px;
-}
 .ui-progressbar {
     position: relative;
 }
