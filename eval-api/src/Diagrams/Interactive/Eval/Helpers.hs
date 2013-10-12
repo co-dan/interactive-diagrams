@@ -251,7 +251,7 @@ wrapRender ty f@(FunBind{..})
 
     dclass  = "Diagrams.Interactive.Display.Dynamic"
     newName = mkRdrUnqual (mkVarOcc "old example")
-    renderF = mkRdrQual (mkModuleName dclass) (mkVarOcc "runRenderTest")
+    renderF = mkRdrQual (mkModuleName dclass) (mkVarOcc "mkInteractiveWidgetTest")
     renderV = HsVar renderF
     l = getLoc fun_id
     rhs :: HsExpr RdrName

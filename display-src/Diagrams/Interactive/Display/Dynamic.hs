@@ -121,6 +121,22 @@ instance (Input a, Interactive b c) => Interactive (a -> b) c where
 instance (Result a ~ a) => Interactive a a where
   interactive env x = return x
 
+mkInteractiveWidgetTest :: (Interactive a b, Result a ~ b, Output b)
+                        => a -> IO ()
+mkInteractiveWidgetTest = mkInteractiveWidget "#test"
+
+mkInteractiveWidget :: (Interactive a b, Result a ~ b, Output b)
+                    => T.Text -> a -> IO ()
+mkInteractiveWidget div k = do
+    test <- select div
+    _ <- empty test
+    act <- runInteractive test k
+    btn <- select "<button>Go</button>" >>= appendToJQuery test
+    onClick btn $ \_ -> do
+        act
+    return ()
+
+
 runInteractive :: (Interactive a b, Result a ~ b, Output b)
                => JQuery -> a -> IO ( IO () )
 runInteractive env f = do    
@@ -464,4 +480,6 @@ class Input a where
 class Output a where
 
 runInteractive = error "runInteractive available only in JavaScript"
+mkInteractiveWidgetTest = error "mkInteractiveWidgetTest available only in JavaScript"
+mkInteractiveWidget = error "mkInteractiveWidget available only in JavaScript"
 #endif    
