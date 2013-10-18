@@ -14,6 +14,7 @@ module Diagrams.Interactive.Eval.Handlers
 import           Control.Monad                       (liftM)
 import           Control.Monad.IO.Class              (MonadIO, liftIO)
 import           Data.IORef                          (IORef, modifyIORef')
+import           Data.List                           (foldl')
 
 import           DsMeta                              (templateHaskellNames)
 import           DynFlags
@@ -47,7 +48,8 @@ initGhc ref vb = do
                     , log_action = logHandler ref
                     , verbosity  = vb
                     }
-    _ <- setSessionDynFlags dfs2
+    let dfs3 = foldl' wopt_set dfs2 minusWallOpts
+    _ <- setSessionDynFlags dfs3
     return ()
 
 addGhcjsDB :: DynFlags -> IO DynFlags
@@ -112,3 +114,54 @@ handleException m =
     flip gfinally (liftIO restoreHandlers) $
     liftM Right m
 
+
+
+--------------------------------------------------
+-- Bits copied from GHC
+-- XXX: it's pain in the ass to maintain this?
+
+standardWarnings :: [WarningFlag]
+standardWarnings
+    = [ Opt_WarnOverlappingPatterns,
+        Opt_WarnWarningsDeprecations,
+        Opt_WarnDeprecatedFlags,
+        Opt_WarnUnrecognisedPragmas,
+        Opt_WarnPointlessPragmas,
+        Opt_WarnDuplicateConstraints,
+        Opt_WarnDuplicateExports,
+        Opt_WarnOverflowedLiterals,
+        Opt_WarnEmptyEnumerations,
+        Opt_WarnMissingFields,
+        Opt_WarnMissingMethods,
+        Opt_WarnLazyUnliftedBindings,
+        Opt_WarnWrongDoBind,
+        Opt_WarnUnsupportedCallingConventions,
+        Opt_WarnDodgyForeignImports,
+        Opt_WarnInlineRuleShadowing,
+        Opt_WarnAlternativeLayoutRuleTransitional,
+        Opt_WarnUnsupportedLlvmVersion
+      ]
+
+minusWOpts :: [WarningFlag]
+-- Things you get with -W
+minusWOpts
+    = standardWarnings ++
+      [ Opt_WarnUnusedBinds,
+        Opt_WarnUnusedMatches,
+        Opt_WarnUnusedImports,
+        Opt_WarnIncompletePatterns,
+        Opt_WarnDodgyExports,
+        Opt_WarnDodgyImports
+      ]
+
+minusWallOpts :: [WarningFlag]
+-- Things you get with -Wall
+minusWallOpts
+    = minusWOpts ++
+      [ Opt_WarnTypeDefaults,
+        Opt_WarnNameShadowing,
+        Opt_WarnMissingSigs,
+        Opt_WarnHiShadows,
+        Opt_WarnOrphans,
+        Opt_WarnUnusedDoBind
+      ]
