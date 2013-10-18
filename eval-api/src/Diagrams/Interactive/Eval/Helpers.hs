@@ -11,6 +11,7 @@ module Diagrams.Interactive.Eval.Helpers
     (
       -- * Compilation and interpretation (of computer programs)
       loadFile
+    , loadFileWithImports
     , compileExpr
     , compileToJS
       -- * Code queries
@@ -138,6 +139,26 @@ isUnderIO ty = do
 displayImport :: InteractiveImport
 displayImport = IIDecl . simpleImportDecl $ mkModuleName "Diagrams.Interactive.Display"
 
+loadFileWithImports :: GhcMonad m => FilePath -> m ()
+loadFileWithImports file = do
+    setTargets =<< sequence [guessTarget file Nothing]
+    graph <- depanal [] False
+    let modSum = head graph
+    dflags'' <- getSessionDynFlags
+    (_,dep'') <- liftIO $ initPackages dflags''
+    parsedMod <- parseModule modSum
+    let src = pm_parsed_source parsedMod
+    let (L srcspan hsmod) = src
+    let hsmod' = modifyModule injectStdImports hsmod
+    output hsmod'
+    typecheckedMod <- typecheckModule $ parsedMod
+                   { pm_parsed_source = L srcspan hsmod' }
+    -- This will load the module and produce the obj file
+    mod <- loadModule typecheckedMod
+    let modSum' = pm_mod_summary (tm_parsed_module typecheckedMod)
+    output modSum'
+    setContext $ displayImport:(map (IIModule . ms_mod_name) graph)
+    
 -- | Loads the file into the evaluator
 loadFile :: GhcMonad m => FilePath -> m ()
 loadFile file = do
@@ -153,7 +174,6 @@ compileExpr :: String -> EvalM StaticResult
 compileExpr expr = do
     -- ty <- exprType expr -- throws exception if doesn't typecheck
     -- output ty
-
     sess <- getSession
     Just (vars, hval, fix_env) <- liftIO $ hscStmt sess expr -- ("let __cmCompileExpr="++expr)
     updateFixityEnv fix_env
@@ -199,7 +219,7 @@ compileToJS fp = do
         -- This will load the module and produce the obj file
         mod <- loadModule typecheckedMod
         let modSum' = pm_mod_summary (tm_parsed_module typecheckedMod)
-	output modSum'
+        -- output modSum'
         -- Linking stuff
         hsc_env <- getSession
         dflags2  <- getSessionDynFlags
@@ -239,6 +259,17 @@ injectRender = do
     tshims  = "Diagrams.Interactive.TypeShims"
     backends = ["Diagrams.Backend.SVG", "Diagrams.Backend.Cairo"]
     maindef = mkVarOcc "example"
+
+
+injectStdImports :: SourceMod ()
+injectStdImports = mapM_ addImportSimple stdImports
+
+stdImports = [ "Diagrams.Prelude"
+             , "Diagrams.Backend.SVG"
+             , "Data.Maybe"
+             , "Data.Tuple"
+             , "Data.List" ]
+    
 
 wrapRender :: Maybe (HsType RdrName) -> HsBind RdrName -> HsBind RdrName
 wrapRender ty f@(FunBind{..})

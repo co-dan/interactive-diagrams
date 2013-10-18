@@ -199,6 +199,9 @@ newPaste = do
     lhs <- lift (param "literate"
                  `rescue` (return (return False)))
 
+    addImports <- lift (param "addImports"
+                        `rescue` (return (return False)))
+
     parentP' <- lift (paramMaybe "parent")
 
     let parentP = fmap intToKey parentP'
@@ -208,15 +211,15 @@ newPaste = do
 
     let p = Paste title code (Static $ StaticResult []) [] False lhs author now parentP
     when (T.null code) $ throwT (p, ("Empty input", []))
-    pid <- compilePaste p
+    pid <- compilePaste addImports p
            `catchT` \e -> throwT (p, e)
 
     return (keyToInt pid)
 
 compilePaste :: MonadIO m
-             => Paste
+             => Bool -> Paste
              -> EitherT (Text, [EvalError]) m (Key (PasteGeneric SqlBackend))
-compilePaste (p@Paste{..}) = do
+compilePaste addImports (p@Paste{..}) = do
     fname <- liftIO $ hash pasteContent
     let extn = if pasteLiterateHs then ".lhs" else ".hs"
     hndl <- liftIO $ connectTo "localhost" (UnixSocket controlSock)
@@ -224,7 +227,7 @@ compilePaste (p@Paste{..}) = do
     (worker :: Worker EvalWorker) <- liftIO $ getData hndl
     liftIO $ hClose hndl
     ((res, errors), wstatus) <- liftIO $ sendEvalRequestNoRestart worker $
-                                EvalFile (show fname ++ extn) pasteContent
+                                EvalFile (show fname ++ extn) pasteContent addImports
     hndl2 <- liftIO $ connectTo "localhost" (UnixSocket controlSock)
     _ <- liftIO $ sendData hndl2 (ReturnWorker wstatus worker)
     liftIO $ hClose hndl2

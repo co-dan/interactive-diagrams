@@ -132,7 +132,7 @@ evalWorkerAction hndl = do
 sendCompileFileRequest :: (Worker EvalWorker, RestartWorker IO EvalWorker)
                        -> FilePath
                        -> IO (EvalResultWithErrors, Worker EvalWorker)
-sendCompileFileRequest w fpath = sendEvalRequest w (CompileFile fpath)
+sendCompileFileRequest w fpath = sendEvalRequest w (CompileFile fpath False)
 
 
 -- | Send the 'Worker' a request to compile an expression
@@ -212,11 +212,12 @@ performEvalRequest hndl cmd = do
 ------------------------------------------------------------
 
 -- | Datatype used for communicating with the 'EvalWorker'
-data EvalCmd = CompileFile FilePath
-               -- ^ Compile a Haskell module. Takes the path to the file
+data EvalCmd = CompileFile FilePath        Bool
+               -- ^ Compile a Haskell module. Takes the path to the
+               -- file and a flag - whether to import some standard packages
              | EvalString  String
                -- ^ Evaluate a string. Takes the expression to evaluate
-             | EvalFile    String    Text
+             | EvalFile    String    Text  Bool
                -- ^  Similar to 'CompileFile'. Takes the name of the file, contents
              deriving (Typeable, Generic)
 
@@ -224,8 +225,10 @@ instance Serialize EvalCmd
 
 -- | Convert an 'EvalCmd' to 'EvalM' action that can be executed
 evalCmdToEvalM :: EvalCmd -> EvalM DisplayResult
-evalCmdToEvalM (CompileFile fpath) = do
-  loadFile fpath
+evalCmdToEvalM (CompileFile fpath stdinc) = do
+  (if stdinc
+   then loadFileWithImports
+   else loadFile) fpath
   interactive <- needsInput "example"
   ty <- exprType "example"
   underIO <- isUnderIO ty
@@ -239,12 +242,12 @@ evalCmdToEvalM (CompileFile fpath) = do
            else compileExpr "(display example) :: StaticResult"
                 
 evalCmdToEvalM (EvalString s) = fmap Static $ compileExpr s
-evalCmdToEvalM (EvalFile n txt) = do
+evalCmdToEvalM (EvalFile n txt flag) = do
   EvalSettings{..} <- ask
   let fpath = tmpDirPath </> n
 --  traceM fpath
   liftIO $ T.writeFile fpath txt
-  evalCmdToEvalM (CompileFile fpath)
+  evalCmdToEvalM (CompileFile fpath flag)
 
 -- | Worker status
 data WStatus = OK | Timeout | Unknown

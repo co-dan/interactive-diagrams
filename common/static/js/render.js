@@ -50,3 +50,14 @@ $(function () {
         $('#mainform').get(0).setAttribute('action', '/new');
     });
 });
+
+//Add tooltips
+$(function () {
+    $("#addImports").tooltip({ "html": true
+                             , "title" : 
+                               "Import some standard modules "
+                               + "like <code>Diagrams.Prelude</code>,"
+                               + " <code>Diagrams.Backend.SVG</code>,"
+                               + " <code>Data.List</code> and others."});    
+    $('[data-toggle="tooltip"]').tooltip();  
+});

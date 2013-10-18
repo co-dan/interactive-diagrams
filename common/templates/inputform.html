@@ -30,12 +30,20 @@
             cm.refresh();
           });
           </script>
-        </div>
-        <div class="checkbox">
-          <label>
+        </div>       
+        <div class="checkbox-inline">
+          <label class="checkbox-inline">
             <input type="checkbox" value="True"
                    name="literate"
                    {{#literate}}checked{{/literate}}> Literate Haskell
+          </label>
+          <label class="checkbox-inline"
+                 data-toggle="tooltip"
+                 data-placement="right"
+                 id="addImports">
+            <input type="checkbox" value="True"
+                   name="addImports"
+                   checked> Import a number of standard modules
           </label>
         </div>
         <div class="form-group">
