@@ -40,4 +40,13 @@ $(function () {
         }
         cm.setOption("mode", mode);
     });
-})
+});
+
+//Force submit button
+$(function () {
+    $("#forcebtn").click(function () {
+        $('#mainform').get(0).setAttribute('action', '/force');
+        $('#mainform').get(0).submit();
+        $('#mainform').get(0).setAttribute('action', '/new');
+    });
+});

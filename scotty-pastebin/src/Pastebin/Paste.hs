@@ -24,13 +24,17 @@ import Database.Persist.TH     as P
 import GHC.Generics
 
 import Diagrams.Interactive.Display
+import Diagrams.Interactive.Eval.EvalError
 import Pastebin.DisplayPersist ()
+
+import PersistCereal as S
 
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistUpperCase|
 Paste
     title       String default='(untitled)'
     content     Text
     result      DisplayResult
+    errors      [EvalError] default='[]'
     containsImg Bool
     literateHs  Bool   default=False
     author      Text
@@ -51,3 +55,13 @@ instance ToJSON DisplayResult
 instance ToJSON StaticResult
 instance ToJSON DynamicResult
 instance ToJSON Paste
+
+-- EvalError ToJSON orphan
+instance ToJSON Severity
+instance ToJSON SrcPos
+instance ToJSON EvalError
+
+
+instance PersistField EvalError where
+    toPersistValue   = S.toPersistValue
+    fromPersistValue = S.fromPersistValue

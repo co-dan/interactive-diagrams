@@ -1,5 +1,5 @@
 {{>header}}
-  <div class="row-fluid">
+  <div class="row">
     {{#result}}
     <div class="tabbable">
       <ul class="nav nav-tabs">
@@ -21,11 +21,40 @@
     </div>
     {{/result}}
   </div>
-  <div class="row-fluid">
+  
+  {{#msg}}
+  <div class="row">
     <div class="col-md-10">
-      <div id="sheet">
-        {{msg}} <br /> <br />
-        {{#errors}}
+      <div class="panel panel-danger">
+        <div class="panel-heading">Error!</div>
+        <div class="panel-body">
+          <p>Compilation error: <pre>{{msg}}</pre></p>
+          <p>The code contains an error, are you sure you want to
+            paste it?</p>
+          <button id="forcebtn" type="button" class="btn btn-danger">Yes please</button>        
+        </div>
+      </div>
+    </div>
+  </div>    
+  {{/msg}}
+
+  {{#result}}
+  <div class="row">
+    <div class="col-md-10">
+      <div 
+         class="panel panel-{{#hasError}}danger{{/hasError}}{{^hasError}}success{{/hasError}}">
+        <div class="panel-heading">Result</div>
+        <div class="panel-body">
+          <pre>{{result}}</pre>
+        </div>
+      </div>
+    </div>
+  </div>
+  {{/result}}
+
+  {{#errors}}
+  <div class="row">
+    <div class="col-md-10">
         <div id="error">
           <div class="alert {{msgstyle}}">
             <button type="button" class="close"
@@ -34,16 +63,12 @@
             {{content}}
           </div>
         </div>
-        {{/errors}}
-        {{#result}}
-          <p>Result:</p>
-          <pre>{{result}}</pre>
-        {{/result}}
-        {{^result}}
-         {{>pastelisting}}
-         <div id="push"></div>
-        {{/result}}
-      </div>
-    </div>  
+    </div>
   </div>
+  {{/errors}}
+  
+  {{^result}}
+  {{>pastelisting}}
+     <div id="push"></div>
+  {{/result}}
 {{>footer}}
