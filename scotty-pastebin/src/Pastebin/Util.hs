@@ -4,9 +4,10 @@
 {-# LANGUAGE TemplateHaskell   #-}
 module Pastebin.Util
     (
-      -- * Convertation & queries
+      -- * Convertion & queries
       getDR
     , hasImage
+    , hasError
     , paramEscaped
     , paramMaybe
     , intToKey
@@ -23,7 +24,7 @@ import           Control.Applicative
 import qualified Data.Hashable                as H
 import           Data.List
 import Data.String (fromString)
-import           Data.Monoid                  (mconcat, mempty, (<>))
+import           Data.Monoid                  (mconcat, mempty)
 import qualified Data.Text                    as T
 import qualified Data.Text.Lazy               as TL
 import           Data.Time.Clock
@@ -48,6 +49,11 @@ hasImage :: DisplayResult -> Maybe DR
 hasImage (Static (StaticResult drs)) =
     find ((==Display.Svg) . clientType) drs
 hasImage (Interactive (DynamicResult _)) = Nothing
+
+hasError :: DisplayResult -> Maybe DR
+hasError (Static (StaticResult drs)) =
+    find ((==Display.CompileErr) . clientType) drs
+hasError (Interactive (DynamicResult _)) = Nothing
 
 getDR :: StaticResult -> [DR]
 getDR (StaticResult drs) = drs
@@ -101,6 +107,7 @@ renderDR (DR Svg  r) = H.div ! HA.class_ "thumbnail" $
 renderDR (DR Text r) = H.toHtml r
 renderDR (DR RuntimeErr r) = H.div ! HA.class_ "alert alert-danger" $
                                  H.toHtml r
+renderDR (DR CompileErr r) = H.toHtml r
 
 renderCode :: Paste -> T.Text
 renderCode Paste{..} = colorize pasteLiterateHs pasteContent

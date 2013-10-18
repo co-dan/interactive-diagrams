@@ -43,7 +43,7 @@ data SrcPos = SrcPos
     , startCol  :: Int
     , endLine   :: Int
     , endCol    :: Int
-    } deriving (Generic, Eq)
+    } deriving (Generic, Eq, Read)
 
 srcPos :: RealSrcSpan -> SrcPos
 srcPos sp = SrcPos
@@ -57,10 +57,11 @@ data EvalError = EvalError
     { severity :: Severity  -- ^ The severity of the error
     , errMsg   :: String    -- ^ The error message
     , srcSpan  :: SrcPos    -- ^ Position of the error in the source code
-    } deriving (Generic, Eq)
+    } deriving (Generic, Eq, Read)
                
 deriving instance Generic Severity
 deriving instance Eq Severity
+deriving instance Read Severity
 instance Serialize Severity
 instance Serialize SrcPos
 instance Serialize EvalError

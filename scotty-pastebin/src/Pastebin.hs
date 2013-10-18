@@ -15,21 +15,15 @@
 module Main where
 
 import           Control.Applicative                  ((<$>))
-import           Control.Monad                        (when)
-import           Control.Monad.IO.Class               (MonadIO (..))
 import           Control.Monad.State
-import           Control.Monad.Trans                  (lift)
 import           Control.Monad.Trans.Either           (EitherT (..), eitherT)
 import           Control.Monad.Trans.Maybe            (MaybeT (..))
-import           Control.Monad.Trans.Resource         (ResourceT,
-                                                       transResourceT)
 import           Data.Foldable                        (foldMap)
-import           Data.Monoid                          (mconcat, mempty)
+import           Data.Monoid                          (mconcat)
 import           Network                              (PortID (..), connectTo)
 import           System.IO                            (hClose)
 
-import           Control.Error.Util                   (hoistMaybe, maybeT,
-                                                       nothing)
+import           Control.Error.Util                   (hoistMaybe, maybeT)
 import           Data.Aeson                           ()
 import           Data.EitherR                         (catchT, throwT)
 import           Data.Maybe                           (isJust)
@@ -44,9 +38,7 @@ import           System.Locale                        (defaultTimeLocale)
 
 import           Database.Persist                     as P
 import           Database.Persist.Sql                 as P
-import           Database.Persist.Postgresql          as P
 import           Network.HTTP.Types
-import           Network.Wai
 import           Network.Wai.Middleware.RequestLogger
 import           Network.Wai.Middleware.Static
 import           Network.Wai.Middleware.Gzip
@@ -60,7 +52,9 @@ import           Config
 import           Diagrams.Interactive.Display         (DisplayResult (..),
                                                        DynamicResult (..),
                                                        StaticResult (..),
-                                                       display, result)
+                                                       DR(..),
+                                                       ClientType(..),
+                                                       result)
 import           Diagrams.Interactive.Eval
 import           Diagrams.Interactive.Eval.EvalError
 import           Pastebin.ErrorMessage
@@ -95,6 +89,9 @@ errPage (Paste{..}, (msg, errors)) = do
 
 renderPaste :: (Entity Paste) -> ActionH ()
 renderPaste (Entity k p@Paste{..}) = do
+    let errmsgs = map (mkGenericContext . mkErrMsg) pasteErrors
+    setH "errors"   $ MuList errmsgs
+    setH "hasError" $ MuBool $ isJust (hasError pasteResult)
     setH "code"     $ MuVariable pasteContent
     setH "codeView" $ MuVariable (renderCode p)
     setH "title"    $ MuVariable $ mconcat ["Paste / ", T.pack pasteTitle,
@@ -185,7 +182,7 @@ feed = do
               rawSql "SELECT id, title, content, \"literateHs\", author, \"createdAt\" FROM \"Paste\" ORDER BY id DESC LIMIT 20" []
               -- selectList [] [LimitTo 20, Desc PasteId]
 
-    let pastes' = map (\(Single k, Single title, Single content, Single lhs, Single author, Single createdAt) -> (keyToInt k, Paste title content (Static $ StaticResult []) False lhs author createdAt Nothing)) pastes
+    let pastes' = map (\(Single k, Single title, Single content, Single lhs, Single author, Single createdAt) -> (keyToInt k, Paste title content (Static $ StaticResult []) [] False lhs author createdAt Nothing)) pastes
 
     renderRss $ mkRssFeed pastes'
 
@@ -209,7 +206,7 @@ newPaste = do
     -- let parentP = Just (intToKey parentP')
     now <- liftIO getCurrentTime
 
-    let p = Paste title code (Static $ StaticResult []) False lhs author now parentP
+    let p = Paste title code (Static $ StaticResult []) [] False lhs author now parentP
     when (T.null code) $ throwT (p, ("Empty input", []))
     pid <- compilePaste p
            `catchT` \e -> throwT (p, e)
@@ -238,10 +235,24 @@ compilePaste (p@Paste{..}) = do
             liftIO . runWithSql . insert $ p
                 { pasteResult      = Static dr
                 , pasteContainsImg = containsImage
+                , pasteErrors      = errors
                 }
         Right (Interactive dr) -> do
             liftIO . runWithSql . insert $ p
-                { pasteResult = Interactive dr }
+                { pasteResult = Interactive dr
+                , pasteErrors = errors
+                }
+
+
+forceCompile :: (Paste, (Text, [EvalError])) -> ActionH Int
+forceCompile (p@Paste{..}, (msg, errors)) = do
+    let sr = StaticResult [DR CompileErr msg]
+    liftM keyToInt 
+      (liftIO . runWithSql . insert $ p
+          { pasteResult      = Static sr
+          , pasteErrors      = errors
+          })
+    
 
 redirPaste :: Monad m => Int -> ActionT m ()
 redirPaste i = redirect $ TL.pack ("/get/" ++ show i)
@@ -276,6 +287,7 @@ main = do
         middleware logStdout
         middleware $ staticPolicy (addBase "../common/static")
         S.post "/new" $ eitherT errPage redirPaste (measureTime newPaste)
+        S.post "/force" $ eitherT (redirPaste <=< forceCompile) redirPaste newPaste
         S.get "/get/:id" $ maybeT page404 renderPaste getPaste
         S.get "/json/:id" $ maybeT page404 json getPaste
         S.get "/raw/:id/:ind" $ maybeT page404 textStrict getRaw
@@ -284,5 +296,5 @@ main = do
         S.get "/gallery" (listImages >>= renderGallery)
         S.get "/" listPastes
         S.get "/feed" feed
-	S.get "/about" about
+        S.get "/about" about
 --        S.post "/fetch" $ eitherT errPage redirPaste fetchPaste

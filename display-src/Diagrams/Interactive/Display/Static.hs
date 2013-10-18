@@ -50,7 +50,7 @@ import Diagrams.Interactive.Display.Orphans ()
 
 -- * Main datatypes
     
-data ClientType = Html | Svg | Text | RuntimeErr
+data ClientType = Html | Svg | Text | RuntimeErr | CompileErr
                 deriving (Eq, Show, Enum, Read, Generic)
 
 
