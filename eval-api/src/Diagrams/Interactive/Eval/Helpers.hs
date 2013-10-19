@@ -144,6 +144,9 @@ loadFileWithImports file = do
     setTargets =<< sequence [guessTarget file Nothing]
     graph <- depanal [] False
     let modSum = head graph
+    loaded <- load (LoadDependenciesOf $ ms_mod_name modSum)
+    -- ^ this will unload the old stuff
+    when (failed loaded) $ throw LoadingException
     dflags'' <- getSessionDynFlags
     (_,dep'') <- liftIO $ initPackages dflags''
     parsedMod <- parseModule modSum
