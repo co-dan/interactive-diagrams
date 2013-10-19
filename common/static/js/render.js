@@ -53,11 +53,17 @@ $(function () {
 
 //Add tooltips
 $(function () {
-    $("#addImports").tooltip({ "html": true
-                             , "title" : 
+    $("#addImports").popover({ "html"    : true
+                             , "trigger" : 'hover'
+                             , "delay"   : 
+                               { "show" : 300
+                               , "hide" : 100
+                               }
+                             , "content" : 
                                "Import some standard modules "
                                + "like <code>Diagrams.Prelude</code>,"
                                + " <code>Diagrams.Backend.SVG</code>,"
-                               + " <code>Data.List</code> and others."});    
-    $('[data-toggle="tooltip"]').tooltip();  
+                               + " <code>Data.List</code>, etc. See"
+                               + " the &laquo;About&raquo;  page for more info."});    
+    $('[data-toggle="popover"]').popover();  
 });

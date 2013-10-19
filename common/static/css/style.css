@@ -61,6 +61,10 @@ body {
     font-family: monospace;
 }
 
+/* Tooltip */
+#addImports {
+    cursor: help;
+}
 
 /* Diagrams */
 
@@ -100,3 +104,15 @@ input[type="text"] {
 }
 .sortable li { margin: 0 3px 3px 3px; padding: 0.4em; padding-left: 1.5em; font-size: 1.4em; height: 18px; }
 .sortable li span { position: absolute; margin-left: -1.3em; }
+
+/* Syntax hilighting for pandoc */
+/* Should be in sync with http://co-dan.github.io/static/css/hscolour-emacs.css*/
+.sourceCode .kw  { color: BlueViolet; }
+.sourceCode .co  { color: Firebrick;}
+.sourceCode .st  { color: RosyBrown; }
+.sourceCode .ch  { color: RosyBrown;}
+.sourceCode .dt  { color: ForestGreen; }
+.sourceCode .dv, .sourceCode .bn, .sourceCode .fl { color: black; }
+.sourceCode .fu  { color: DarkGoldenrod; }
+.sourceCode .al, .sourceCode .er  { color: Red; }
+.sourceCode .ot { color: Blue; }

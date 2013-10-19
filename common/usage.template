@@ -1,0 +1,5 @@
+{{>header}}
+$toc$
+<hr />
+$body$
+{{>footer}}

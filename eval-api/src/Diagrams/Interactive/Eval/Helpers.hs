@@ -268,7 +268,9 @@ stdImports = [ "Diagrams.Prelude"
              , "Diagrams.Backend.SVG"
              , "Data.Maybe"
              , "Data.Tuple"
-             , "Data.List" ]
+             , "Data.List"
+             , "Data.Char"
+             ]
     
 
 wrapRender :: Maybe (HsType RdrName) -> HsBind RdrName -> HsBind RdrName

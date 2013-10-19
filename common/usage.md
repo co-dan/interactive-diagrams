@@ -6,13 +6,16 @@ The site you are looking at is very similar to other web pasting
 services like pastebin.com or Gist. However this service is made
 specifically for Haskell and will compile and run the code you paste
 for you. Your code will be checked and any errors during the
-compilation or runtime will be displayed. The service will try to render
-the value you provide under the name 'example'.
+compilation or runtime will be displayed. The service will try to
+render the value you provide under the name 'example'.
 
-    [haskell]
-    module Test where
-    example :: Int
-    example = 4 + 4
+```haskell
+module Test where
+example :: Int
+example = 4 + 4
+```
+
+[paste link](/get/1)
 
 ## Rendering
 
@@ -21,53 +24,68 @@ The pastesite is able to render a bunch of types, including the
 
 For example:
 
-    [haskell]
-    module DiaTest
+```haskell
+module DiaTest
 
-    import Diagrams.Backend.SVG
-    import Diagrams.Prelude
-    
-    example :: Diagram SVG R2
-    example = circle 1
+import Diagrams.Backend.SVG
+import Diagrams.Prelude
+
+example :: Diagram SVG R2
+example = circle 1
+```
+
+[paste link](/get/3)
 
 Values of the following types can be rendered on the server: Char, String,
 Text, number types, Bool, Ordering, Maybe, Either, [a], tuples,
 Diagram (via SVG), Markup.
 
+## Standard imports
+
+If you tick the "Import standard modules" checkbox (checked by
+default), the service will automatically bring a number of "default"
+modules into the scope so you can avoid writing boilerplate header
+code. Modules that are imported are:
+
+```
+Diagrams.Prelude
+Diagrams.Backend.SVG
+Data.Maybe
+Data.Tuple
+Data.List
+Data.Char
+```
+
 ## Interactive widgets
 
 Of course, users should not be limited to rendering values that can be
-computed on the server. If the services determines that the example you
-are trying to paste is a function, it will try to compile the code to
-JavaScript for you and return a nice widget you can run.
+computed on the server. If the services determines that the example
+you are trying to paste is a function, it will try to compile the code
+to JavaScript for you and return a nice widget you can run.
 
 Check out this example:
       
-      [haskell]
-      module Main where
+```haskell
+module Main where
 
-      main = return ()
+main = return ()
       
-      example :: Int -> Bool -> String
-      example i = concat . replicate i . show
+example :: Int -> Bool -> String
+example i = concat . replicate i . show
+```
 
-/Note: if you are trying to paste code that requires interaction, make
-sure to put it into the `Main` module/      
+[paste link](/get/182)
+
+*Note: if you are trying to paste code that requires interaction, make
+ sure to put it into the `Main` module*
 
 - Values of the following types can be rendered on the client side:
 all that can be rendered on the server and `(a -> b)`, where values of
 type `a` can be inputted and values of type `b` can be rendered. The
-diagrams are rendered using HTML5 Canvas.
+diagrams are rendered with HTML5 Canvas.
 
 - Values of the following types can be inputted: String, Char, Text,
   number types, Bool, Ordering, Either, Maybe, tuples, lists.
-
-### Demo
-
-Below you can see a video of me showing off the interactive widgets
-functionality.
-
-*todo: insert video*
 
 ### Using your own datatype in interactive widgets
 
@@ -75,22 +93,28 @@ You can try using your own datatypes in the functions you want to
 compile to JavaScript. You'll need to derive some instances first
 though.
 
-        [haskell]
-        module Main where
-        import GHC.Generics
-        import Diagrams.Interactive
+```haskell
+{-# LANGUAGE DeriveGeneric #-}
+module Main where
+import GHC.Generics
+import Diagrams.Interactive
         
-        data Foo = Bar String | Baz Int Int
-                   deriving (Show, Generic)
+data Foo = Bar String | Baz Int Int
+           deriving (Show, Generic)
 
-        instance Inputable Foo
-        instance Renderable Foo
-        instance Display Foo
+instance Input Foo
+instance Output Foo
+instance Display Foo
 
-        example :: Foo -> Int
-        example (Bar s)   = length s
-        example (Baz i j) = i + j
-        
+example :: Foo -> Int
+example (Bar s)   = length s
+example (Baz i j) = i + j
+
+main = return ()
+```        
+
+[paste link](/get/183)
+
 
 # Reporting bugs and suggestions
 
@@ -99,22 +123,3 @@ free to use the [issue
 tracker](http://github.com/co-dan/interactive-diagrams/issues) and
 don't hesitate to contact me.
 
-# Technology used
-
-This site is powered by [Scotty](http://github.com/xich/scotty) and
-[scotty-hastache](http://github.com/co-dan/scotty-hastache), the
-access to PosgreSQL db is done via the excellent
-[persistent](http://hackage.haskell.org/package/persistent)
-library. The compilation is done using [GHC](http://ghc.haskell.org)
-and [GHCJS](http://github.com/ghcjs/ghcjs) inside the workers
-processes powered by the
-[restricted-workers](http://hackage.haskell.org/package/restricted-workers)
-library. 
-
-You can read my previous report on this project, which is still
-pretty relevant: <http://parenz.wordpress.com/XXX>
-
-# Acknowledgments 
-
-This project was developed as part of the Google Summer of Code 2013
-program, and I would like to thank people
