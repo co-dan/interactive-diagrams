@@ -192,8 +192,8 @@ compileExpr expr = do
 
 
 
-compileToJS :: FilePath -> EvalM DynamicResult
-compileToJS fp = do
+compileToJS :: FilePath -> Bool -> EvalM DynamicResult
+compileToJS fp includeStdImports = do
     EvalSettings{..} <- evalSettings
     -- liftIO $ runGhcjsSession Nothing True $ do
     liftGhc $ initGhcJs False
@@ -216,7 +216,10 @@ compileToJS fp = do
         parsedMod <- parseModule modSum
         let src = pm_parsed_source parsedMod
         let (L srcspan hsmod) = src
-        let hsmod' = modifyModule injectRender hsmod
+        let mod = if includeStdImports
+                  then injectStdImports
+                  else mempty                       
+        let hsmod' = modifyModule (mod <> injectRender) hsmod
         typecheckedMod <- typecheckModule $ parsedMod
                           { pm_parsed_source = L srcspan hsmod' }
         -- This will load the module and produce the obj file

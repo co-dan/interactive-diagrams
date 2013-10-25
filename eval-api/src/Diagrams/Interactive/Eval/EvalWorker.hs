@@ -235,7 +235,7 @@ evalCmdToEvalM (CompileFile fpath stdinc) = do
   if interactive
       then fmap Interactive $ do
            sess <- getSession
-           compileToJS fpath
+           compileToJS fpath stdinc
                `gfinally` setSession sess
       else fmap Static $ if underIO
            then compileExpr "(return . display =<< example) :: IO StaticResult"
