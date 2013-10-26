@@ -119,6 +119,17 @@ modifyDefinition target modify = fromEndo mempty (Endo (map go))
         in L l1 (Match lpat lty (rs
                                   { grhssGRHSs = map f grhssGRHSs }))                
 
+containsValDeinition :: OccName -> [Located (HsDecl RdrName)] -> Maybe (Located (HsDecl RdrName))
+containsValDeinition occ = go
+  where is (L _ x) = rdrNameOcc x == occ
+        go [] = Nothing
+        go (x@(L _ (ValD (FunBind{..}))):xs)
+          | is fun_id
+          = Just x
+          | otherwise
+          = go xs
+        go (_:xs) = go xs
+
 containsOcc :: OccName
             -> [Located RdrName]
             -> Maybe (Located RdrName, [Located RdrName])

@@ -46,10 +46,12 @@ import           HscTypes
 import           HscTypes
 import           Module
 import           MonadUtils                             hiding (MonadIO, liftIO)
+import           NameSet                                (emptyNameSet)
 import           OccName
 import           Outputable                             hiding ((<>))
 import           Packages                               hiding (display)
 import           RdrName
+import           TcEvidence                             (idHsWrapper)
 import           TyCon
 import           Type
 import           UniqFM                                 (eltsUFM)
@@ -161,7 +163,7 @@ loadFileWithImports file = do
     let modSum' = pm_mod_summary (tm_parsed_module typecheckedMod)
     output modSum'
     setContext $ displayImport:(map (IIModule . ms_mod_name) graph)
-    
+
 -- | Loads the file into the evaluator
 loadFile :: GhcMonad m => FilePath -> m ()
 loadFile file = do
@@ -218,10 +220,23 @@ compileToJS fp includeStdImports = do
         let (L srcspan hsmod) = src
         let mod = if includeStdImports
                   then injectStdImports
-                  else mempty                       
-        let hsmod' = modifyModule (mod <> injectRender) hsmod
+                  else mempty
+        let hsmod' = (modifyModule (mod <> injectRender) hsmod)
+                     { hsmodExports = Nothing
+                     , hsmodName    = Just (noLoc (mkModuleName "Main"))
+                     } -- export ALL symbols
+
+        hsmod'' <- case containsValDeinition (mkVarOcc "main") (hsmodDecls hsmod') of
+                Just _ -> return hsmod'
+                Nothing -> do
+                    setContext [ IIDecl
+                                 . simpleImportDecl
+                                 . mkModuleName $ "Prelude" ]
+                    ioT <- exprType "(return ()) :: IO ()"
+                    return $ hsmod' { hsmodDecls = (mainDecl ioT):(hsmodDecls hsmod') }
+
         typecheckedMod <- typecheckModule $ parsedMod
-                          { pm_parsed_source = L srcspan hsmod' }
+                          { pm_parsed_source = L srcspan hsmod'' }
         -- This will load the module and produce the obj file
         mod <- loadModule typecheckedMod
         let modSum' = pm_mod_summary (tm_parsed_module typecheckedMod)
@@ -266,7 +281,19 @@ injectRender = do
     backends = ["Diagrams.Backend.SVG", "Diagrams.Backend.Cairo"]
     maindef = mkVarOcc "example"
 
-
+mainDecl ioT = noLoc decl
+  where decl = ValD $
+               FunBind
+               { fun_id = noLoc (mkRdrUnqual (mkVarOcc "main"))
+               , fun_infix = False
+               , fun_matches = MG [noLoc mat] [] ioT
+               , fun_co_fn  = idHsWrapper
+               , bind_fvs = emptyNameSet
+               , fun_tick = Nothing
+               }
+        mat = Match [] Nothing $ GRHSs [noLoc $ GRHS [] (noLoc retstm)] EmptyLocalBinds
+        retstm = HsApp (noLoc $ HsVar (mkRdrUnqual (mkVarOcc "return"))) (noLoc $ HsVar (mkRdrUnqual (mkVarOcc "undefined")))
+            
 injectStdImports :: SourceMod ()
 injectStdImports = mapM_ addImportSimple stdImports
 
@@ -277,7 +304,7 @@ stdImports = [ "Diagrams.Prelude"
              , "Data.List"
              , "Data.Char"
              ]
-    
+
 
 wrapRender :: Maybe (HsType RdrName) -> HsBind RdrName -> HsBind RdrName
 wrapRender ty f@(FunBind{..})
