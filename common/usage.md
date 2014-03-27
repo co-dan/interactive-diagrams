@@ -25,7 +25,7 @@ The pastesite is able to render a bunch of types, including the
 For example:
 
 ```haskell
-module DiaTest
+module DiaTest where
 
 import Diagrams.Backend.SVG
 import Diagrams.Prelude
