@@ -1,0 +1,12 @@
+#!/bin/bash
+# run after rebooting
+cd /idia/run/workers/worker1
+mount --bind /home/vagrant/.ghc ./home/vagrant/.ghc
+mount --bind /home/vagrant/ghc ./home/vagrant/ghc
+mount --bind /home/vagrant/.cabal ./home/vagrant/.cabal
+mount --bind /home/vagrant/.ghcjs ./home/vagrant/.ghcjs
+cd /idia/run/workers/worker2
+mount --bind /home/vagrant/.ghc ./home/vagrant/.ghc
+mount --bind /home/vagrant/ghc ./home/vagrant/ghc
+mount --bind /home/vagrant/.cabal ./home/vagrant/.cabal
+mount --bind /home/vagrant/.ghcjs ./home/vagrant/.ghcjs

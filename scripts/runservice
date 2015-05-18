@@ -1,0 +1,3 @@
+#!/bin/bash
+runcon -u system_u -r system_r -t idia_service_t ./eval-service
+

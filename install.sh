@@ -19,4 +19,5 @@ wget http://co-dan.github.io/static/css/codemirror.css -O common/static/css/code
 wget http://co-dan.github.io/static/js/codemirror.js -O common/static/js/codemirror.js
 wget http://co-dan.github.io/static/js/haskell.js -O common/static/js/haskell.js
 wget http://co-dan.github.io/static/js/bootstrap.min.js -O common/static/js/bootstrap.min.js
-cp -R common/* /idia/run/common/
+cp -R common/* /idia/run/common/ &&
+cp scripts/* /idia/run/bin/
